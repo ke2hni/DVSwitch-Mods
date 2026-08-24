@@ -1,0 +1,22 @@
+name: Repository checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run repository compliance check
+        run: bash tests/check-repository-compliance.sh
+
+      - name: Run installer tests
+        run: bash tests/test-installer.sh

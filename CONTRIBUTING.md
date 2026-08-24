@@ -1,6 +1,6 @@
 # Contributing
 
-Contributions are welcome when they comply with the repository’s licensing and redistribution rules.
+Contributions are welcome when they comply with the repository's licensing and redistribution rules.
 
 ## Permitted contributions
 
@@ -8,8 +8,8 @@ Contributions are welcome when they comply with the repository’s licensing and
 - Validation and rollback logic
 - Tests
 - Documentation
-- Narrowly scoped transformations applied to software already installed on a user’s system
-- Original code licensed under the repository’s MIT License
+- Narrowly scoped transformations applied to software already installed on a user's system
+- Original code licensed under the repository's MIT License
 
 ## Prohibited contributions
 
@@ -27,7 +27,7 @@ Do not submit:
 
 A modification must:
 
-1. Operate only on files already installed on the user’s system.
+1. Operate only on files already installed on the user's system.
 2. Verify that the target file and expected structure are supported.
 3. Create a timestamped backup before modification.
 4. Preserve ownership, permissions, and existing copyright or license notices.
@@ -37,6 +37,6 @@ A modification must:
 
 ## Licensing
 
-By contributing original material, contributors agree to license that material under the repository’s MIT License.
+By contributing original material, contributors agree to license that material under the repository's MIT License.
 
 Third-party material remains governed by its original license and must not be added unless redistribution permission has been confirmed and documented.
