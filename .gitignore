@@ -1,0 +1,50 @@
+# DVSwitch executables and complete upstream files
+MMDVM_Bridge*
+Analog_Bridge*
+P25Gateway*
+NXDNGateway*
+YSFGateway*
+functions.php
+status.php
+dvswitch.sh
+
+# Installed configuration and credentials
+*.ini
+*.conf
+*.yml.local
+*.yaml.local
+.env
+.env.*
+credentials*
+secrets*
+
+# Compiled packages and binaries
+*.deb
+*.rpm
+*.so
+*.a
+*.o
+*.bin
+*.elf
+*.exe
+
+# Backups and temporary files
+*.bak
+*.backup
+*.orig
+*.rej
+*~
+backups/
+tmp/
+temp/
+
+# Logs and test output
+*.log
+coverage/
+test-results/
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
