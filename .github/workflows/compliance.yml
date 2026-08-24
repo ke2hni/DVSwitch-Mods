@@ -20,3 +20,6 @@ jobs:
 
       - name: Run installer tests
         run: bash tests/test-installer.sh
+
+      - name: Run P25/NXDN patcher tests
+        run: python3 tests/test-p25-nxdn-patcher.py

@@ -9,9 +9,13 @@ DVSwitch-Mods/
 │       └── compliance.yml
 ├── tests/
 │   ├── check-repository-compliance.sh
-│   └── test-installer.sh
+│   ├── test-installer.sh
+│   └── test-p25-nxdn-patcher.py
+├── lib/
+│   └── patch_p25_nxdn.py
 ├── .gitignore
 ├── CONTRIBUTING.md
+├── MODULE-P25-NXDN.md
 ├── THIRD_PARTY_NOTICES.md
 └── install-dvswitch-mods.sh
 ```
