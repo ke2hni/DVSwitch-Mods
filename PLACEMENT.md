@@ -1,7 +1,7 @@
 # Release placement
 
-Copy the contents of the release archive into the root of the `DVSwitch-Mods` repository, preserving all directories and replacing matching files.
+Copy the contents of this update archive into the root of the Windows `DVSwitch-Mods` working copy, preserving all directories and replacing matching files.
 
-The archive is a complete repository snapshot except for Git history. Keep `.git/` from the existing clone; do not copy material from the former `dvswitch-fixes` repository.
+Keep the existing `.git/` directory. Do not copy upstream DVSwitch files, executables, package files, configuration files, backups, or material from the former `dvswitch-fixes` repository.
 
-After committing, the `Repository checks` workflow must pass without warnings before the release candidate is downloaded to `nodetest`.
+Review `git status` before committing. The `Repository checks` workflow must pass without warnings before the release candidate is pulled onto `nodetest`.

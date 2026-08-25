@@ -13,10 +13,8 @@ Official project resources:
 - https://github.com/DVSwitch/MMDVM_Bridge
 - https://github.com/DVSwitch/DVSwitch-Dashboard
 
-The installer may modify locally installed third-party files only after creating backups and verifying supported file structures. It does not grant users any additional rights to third-party software.
-
-Existing copyright, license, and attribution notices in locally installed files must be preserved.
+The installer may transform temporary copies of locally installed third-party files only after verifying narrowly scoped supported patterns. It does not distribute those third-party files or grant users additional rights to them. Existing copyright, license, and attribution notices in locally installed text files must be preserved.
 
 ## Project license scope
 
-The MIT License in this repository applies only to the independently written installer, validation logic, documentation, and original modification code distributed by this project. It does not apply to DVSwitch or other third-party software.
+The MIT License applies only to the independently written installer, transformation logic, validation logic, tests, and documentation distributed by this project. It does not apply to DVSwitch or other third-party software.

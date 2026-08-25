@@ -10,42 +10,40 @@ This project is under development and is not ready for production use.
 
 This project is not affiliated with, endorsed by, or maintained by the DVSwitch project or its contributors.
 
-This repository does not distribute DVSwitch executables or complete upstream DVSwitch source files. It applies narrowly scoped modifications to files already installed on the user’s system.
+This repository does not distribute DVSwitch executables or complete upstream DVSwitch source files. It creates temporary candidates from software already installed on the user's system and applies narrowly scoped, fixed-length transformations and text modifications.
 
 DVSwitch and its original components remain the property of their respective copyright holders and are governed by their respective licenses and permissions.
 
 ## License
 
-The independently written installer, validation logic, documentation, and original patching code in this repository are licensed under the MIT License. This license does not grant rights to DVSwitch software or other third-party components.
+The independently written installer, validation logic, documentation, tests, and original patching code are licensed under the MIT License. This license does not grant rights to DVSwitch software or other third-party components.
 
-## P25/NXDN release candidate
+## Release candidate 0.3.0-rc1
 
-Version `0.2.0-rc2` adds friendly P25 and NXDN reflector labels using separately downloaded RefCheck JSON databases. Lookup order is `name`, `sponsor`, then `TG <number>`.
+The installer applies and validates modules in dependency order:
 
-The repository does not contain complete DVSwitch files. The installer creates temporary candidates from files already installed on the local system and applies narrowly scoped transformations.
+1. Local MMDVM_Bridge P25 remote-command spacing compatibility.
+2. Local MMDVM_Bridge five-digit YSF link-command spacing compatibility.
+3. P25 dashboard parsing for `Switched to reflector <number>`.
+4. Friendly P25/NXDN reflector labels using RefCheck JSON data.
+5. Persistent validated P25/NXDN JSON updater integration.
 
-### Safety workflow
+Friendly-name lookup order is `name`, `sponsor`, then `TG <number>`.
 
-Run only on a non-production test node during release-candidate testing:
+## Safety workflow
+
+Use a non-production test node during release-candidate testing:
 
 ```bash
 sudo ./install-dvswitch-mods.sh --check
-```
-
-```bash
 sudo ./install-dvswitch-mods.sh --dry-run
-```
-
-After reviewing the dry-run output:
-
-```bash
 sudo ./install-dvswitch-mods.sh --install
 ```
 
-The installer reports the protected backup name. Restore it with:
+Restore the protected backup reported by the installer with:
 
 ```bash
 sudo ./install-dvswitch-mods.sh --restore install-YYYYMMDD-HHMMSS
 ```
 
-Backups are stored under `/var/backups/dvswitch-mods` with mode `0700`. Existing ownership and permissions are preserved. Candidate and live syntax, JSON structure, and known reflector data are validated. An installation failure triggers automatic rollback.
+Backups are stored under `/var/backups/dvswitch-mods` with mode `0700`. Existing ownership and permissions are preserved. The MMDVM binary is transformed first, but all targets participate in one transaction; any later failure restores every original target.

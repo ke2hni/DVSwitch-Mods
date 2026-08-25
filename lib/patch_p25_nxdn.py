@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Jeff Milne, KE2HNI
 
-"""Apply the independently written P25/NXDN additions to temporary copies."""
+"""Apply independently written P25/NXDN additions to temporary local copies."""
 
 from __future__ import annotations
 
@@ -41,6 +40,11 @@ function formatReflectorLink($linkText, $mode) {
         return "Reflector<br/><span style=\"color:#b5651d;font-weight:bold;display:inline-block;max-width:100%;white-space:normal;word-break:normal;overflow-wrap:break-word;text-align:center;\">".$label."</span>";
 }
 
+'''
+
+P25_REMOTE_COMMAND = r'''               if (preg_match("/Switched to reflector ([0-9]+)/", $logLine, $matches)) {
+                  return "Linked to <span style=\"color:#b5651d;font-weight:bold;\">TG ".$matches[1]."</span>";
+               }
 '''
 
 SHELL_FUNCTION = r'''#################################################################
@@ -112,77 +116,71 @@ def replace_once(text: str, old: str, new: str, description: str) -> str:
     return text.replace(old, new, 1)
 
 
-def patch_functions(text: str) -> str:
-    if text.count("function formatReflectorLink(") == 1:
+def patch_p25_remote_command(text: str) -> str:
+    marker = 'preg_match("/Switched to reflector ([0-9]+)/", $logLine, $matches)'
+    if text.count(marker) == 1:
         return text
-    if "function formatReflectorLink(" in text:
+    if marker in text:
+        raise PatchError("duplicate P25 remote-command parser")
+    case_marker = '    case "P25":'
+    if text.count(case_marker) != 1:
+        raise PatchError(f"expected one P25 case marker, found {text.count(case_marker)}")
+    before, p25_case = text.split(case_marker, 1)
+    anchor = '               if (strpos($logLine,"Linked to")) {'
+    if p25_case.count(anchor) != 1:
+        raise PatchError(f"expected one P25 linked parser, found {p25_case.count(anchor)}")
+    p25_case = p25_case.replace(anchor, P25_REMOTE_COMMAND + anchor, 1)
+    return before + case_marker + p25_case
+
+
+def patch_functions(text: str) -> str:
+    text = patch_p25_remote_command(text)
+    count = text.count("function formatReflectorLink(")
+    if count == 0:
+        return insert_once(text, "function getActualReflector(", PHP_FUNCTION, "getActualReflector")
+    if count != 1:
         raise PatchError("duplicate formatReflectorLink function")
-    return insert_once(text, "function getActualReflector(", PHP_FUNCTION, "getActualReflector")
+    return text
 
 
 def patch_status(text: str) -> str:
-    text = replace_once(
-        text,
-        'getActualLink($logLinesP25Gateway, "P25")',
-        'formatReflectorLink(getActualLink($logLinesP25Gateway, "P25"), "P25")',
-        "P25 status call",
-    )
-    return replace_once(
-        text,
-        'getActualLink($logLinesNXDNGateway, "NXDN")',
-        'formatReflectorLink(getActualLink($logLinesNXDNGateway, "NXDN"), "NXDN")',
-        "NXDN status call",
-    )
+    text = replace_once(text, 'getActualLink($logLinesP25Gateway, "P25")', 'formatReflectorLink(getActualLink($logLinesP25Gateway, "P25"), "P25")', "P25 status call")
+    return replace_once(text, 'getActualLink($logLinesNXDNGateway, "NXDN")', 'formatReflectorLink(getActualLink($logLinesNXDNGateway, "NXDN"), "NXDN")', "NXDN status call")
 
 
 def add_reflector_json_call(text: str, mode: str) -> str:
     json_call = f'        downloadAndValidateReflectorJSON "{mode}"\n'
-    call_count = text.count(json_call)
-    if call_count == 1:
-        return text
-    if call_count != 0:
-        raise PatchError(f"duplicate {mode} reflector JSON updater call")
-
-    anchors = (
-        f'        downloadAndValidate{mode}\n',
-        f'        downloadAndValidate "{mode}Hosts.txt" "{mode}_Hosts.txt" "dvswitch.org"\n',
-    )
+    count = text.count(json_call)
+    if count == 1: return text
+    if count != 0: raise PatchError(f"duplicate {mode} reflector JSON updater call")
+    anchors = (f'        downloadAndValidate{mode}\n', f'        downloadAndValidate "{mode}Hosts.txt" "{mode}_Hosts.txt" "dvswitch.org"\n')
     matches = [(anchor, text.count(anchor)) for anchor in anchors]
-    match_count = sum(count for _, count in matches)
-    if match_count != 1:
-        raise PatchError(f"expected one {mode} database updater call, found {match_count}")
-
+    total = sum(count for _, count in matches)
+    if total != 1: raise PatchError(f"expected one {mode} database updater call, found {total}")
     anchor = next(anchor for anchor, count in matches if count == 1)
     return text.replace(anchor, anchor + json_call, 1)
 
 
 def patch_dvswitch(text: str) -> str:
-    if text.count("function downloadAndValidateReflectorJSON()") == 0:
-        text = insert_once(text, "function downloadDatabases() {", SHELL_FUNCTION, "downloadDatabases")
-    elif text.count("function downloadAndValidateReflectorJSON()") != 1:
-        raise PatchError("duplicate reflector JSON updater function")
-    text = add_reflector_json_call(text, "NXDN")
-    return add_reflector_json_call(text, "P25")
+    count = text.count("function downloadAndValidateReflectorJSON()")
+    if count == 0: text = insert_once(text, "function downloadDatabases() {", SHELL_FUNCTION, "downloadDatabases")
+    elif count != 1: raise PatchError("duplicate reflector JSON updater function")
+    return add_reflector_json_call(add_reflector_json_call(text, "NXDN"), "P25")
 
 
 def patch_file(path: Path, kind: str) -> None:
     original = path.read_text(encoding="utf-8")
     patchers = {"functions": patch_functions, "status": patch_status, "dvswitch": patch_dvswitch}
-    patched = patchers[kind](original)
-    path.write_text(patched, encoding="utf-8")
+    path.write_text(patchers[kind](original), encoding="utf-8")
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Patch temporary DVSwitch Dashboard copies")
-    parser.add_argument("--functions", type=Path)
-    parser.add_argument("--status", type=Path)
-    parser.add_argument("--dvswitch", type=Path)
+    parser = argparse.ArgumentParser(description="Patch temporary DVSwitch copies")
+    parser.add_argument("--functions", required=True, type=Path)
+    parser.add_argument("--status", required=True, type=Path)
+    parser.add_argument("--dvswitch", required=True, type=Path)
     args = parser.parse_args()
-    if not args.functions or not args.status or not args.dvswitch:
-        parser.error("--functions, --status and --dvswitch are required")
-    patch_file(args.functions, "functions")
-    patch_file(args.status, "status")
-    patch_file(args.dvswitch, "dvswitch")
+    patch_file(args.functions, "functions"); patch_file(args.status, "status"); patch_file(args.dvswitch, "dvswitch")
     return 0
 
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0-rc1 - 2026-08-25
+
+- Add strict fixed-length local MMDVM_Bridge transformations for P25 `TalkGroup %d` and five-digit YSF `Link... %05d` commands.
+- Reject unsupported, missing, or ambiguous binary patterns and preserve binary size.
+- Add P25 dashboard parsing for `Switched to reflector <number>` remote-command log entries.
+- Enforce MMDVM compatibility installation before dashboard and JSON modules.
+- Include the MMDVM binary in the same protected transaction and automatic rollback.
+- Restart `mmdvm_bridge.service` after successful installation or restore.
+- Add binary-patcher, dependency-order, idempotency, and malformed-input regression tests.
+
 ## 0.2.0-rc2 - 2026-08-24
 
 - Use RefCheck's accepted `DVSwitch` HTTP user-agent for installer JSON downloads.

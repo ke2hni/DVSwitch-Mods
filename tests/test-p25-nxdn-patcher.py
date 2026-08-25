@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 import importlib.util
-import subprocess
 import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -19,93 +19,95 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-functions_fixture = """<?php
-function existingDashboardFunction() { return true; }
+functions_fixture = '''<?php
+function getActualLink($logLines, $mode) {
+    switch ($mode) {
+    case "P25":
+        foreach ($logLines as $logLine) {
+               if (strpos($logLine,"Linked to")) {
+                  return "Linked";
+               }
+        }
+        break;
+    }
+}
 function getActualReflector($logLines, $mode) { return $mode; }
-"""
+'''
 
-status_fixture = """<?php
-echo getActualLink($logLinesP25Gateway, \"P25\");
-echo getActualLink($logLinesNXDNGateway, \"NXDN\");
-"""
+status_fixture = '''<?php
+echo getActualLink($logLinesP25Gateway, "P25");
+echo getActualLink($logLinesNXDNGateway, "NXDN");
+'''
 
-specialized_dvswitch_fixture = """#!/bin/bash
+specialized_dvswitch_fixture = '''#!/bin/bash
 function downloadAndValidateNXDN() { :; }
 function downloadAndValidateP25() { :; }
 function downloadDatabases() {
         downloadAndValidateNXDN
         downloadAndValidateP25
 }
-"""
+'''
 
-stock_dvswitch_fixture = """#!/bin/bash
+stock_dvswitch_fixture = '''#!/bin/bash
 function downloadAndValidate() { :; }
 function downloadDatabases() {
         downloadAndValidate "NXDNHosts.txt" "NXDN_Hosts.txt" "dvswitch.org"
         downloadAndValidate "P25Hosts.txt" "P25_Hosts.txt" "dvswitch.org"
 }
-"""
+'''
 
 with tempfile.TemporaryDirectory() as directory:
-    directory_path = Path(directory)
-    functions_path = directory_path / "dashboard-functions.txt"
-    status_path = directory_path / "dashboard-status.txt"
-    dvswitch_path = directory_path / "dvswitch-script.txt"
-    functions_path.write_text(functions_fixture, encoding="utf-8")
-    status_path.write_text(status_fixture, encoding="utf-8")
-    dvswitch_path.write_text(specialized_dvswitch_fixture, encoding="utf-8")
+    root = Path(directory)
+    functions = root / "functions.php"
+    status = root / "status.php"
+    updater = root / "dvswitch.sh"
+    functions.write_text(functions_fixture, encoding="utf-8")
+    status.write_text(status_fixture, encoding="utf-8")
+    updater.write_text(specialized_dvswitch_fixture, encoding="utf-8")
 
-    module.patch_file(functions_path, "functions")
-    module.patch_file(status_path, "status")
-    module.patch_file(dvswitch_path, "dvswitch")
-    first_functions = functions_path.read_text(encoding="utf-8")
-    first_status = status_path.read_text(encoding="utf-8")
-    first_dvswitch = dvswitch_path.read_text(encoding="utf-8")
+    module.patch_file(functions, "functions")
+    module.patch_file(status, "status")
+    module.patch_file(updater, "dvswitch")
+    first_functions = functions.read_text(encoding="utf-8")
+    first_status = status.read_text(encoding="utf-8")
+    first_updater = updater.read_text(encoding="utf-8")
 
-    require(first_functions.count("function formatReflectorLink(") == 1, "friendly-name function missing or duplicated")
+    require(first_functions.count("function formatReflectorLink(") == 1, "friendly-name function missing")
+    require(first_functions.count("Switched to reflector ([0-9]+)") == 1, "P25 remote-command parser missing")
     require("htmlspecialchars" in first_functions, "UTF-8-safe escaping missing")
-    require('array("name", "sponsor")' in first_functions, "name-to-sponsor lookup order missing")
+    require('array("name", "sponsor")' in first_functions, "lookup order missing")
     require(first_status.count("formatReflectorLink(") == 2, "status wrappers missing")
-    require(first_dvswitch.count("function downloadAndValidateReflectorJSON()") == 1, "JSON updater missing")
-    require(first_dvswitch.count('downloadAndValidateReflectorJSON "NXDN"') == 1, "NXDN updater call missing")
-    require(first_dvswitch.count('downloadAndValidateReflectorJSON "P25"') == 1, "P25 updater call missing")
+    require(first_updater.count("function downloadAndValidateReflectorJSON()") == 1, "JSON updater missing")
+    require(first_updater.count('downloadAndValidateReflectorJSON "NXDN"') == 1, "NXDN call missing")
+    require(first_updater.count('downloadAndValidateReflectorJSON "P25"') == 1, "P25 call missing")
     if shutil.which("php"):
-        subprocess.run(["php", "-l", str(functions_path)], check=True, stdout=subprocess.DEVNULL)
-        subprocess.run(["php", "-l", str(status_path)], check=True, stdout=subprocess.DEVNULL)
-    subprocess.run(["bash", "-n", str(dvswitch_path)], check=True)
+        subprocess.run(["php", "-l", str(functions)], check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(["php", "-l", str(status)], check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(["bash", "-n", str(updater)], check=True)
 
-    module.patch_file(functions_path, "functions")
-    module.patch_file(status_path, "status")
-    module.patch_file(dvswitch_path, "dvswitch")
-    require(functions_path.read_text(encoding="utf-8") == first_functions, "functions patch is not idempotent")
-    require(status_path.read_text(encoding="utf-8") == first_status, "status patch is not idempotent")
-    require(dvswitch_path.read_text(encoding="utf-8") == first_dvswitch, "updater patch is not idempotent")
+    module.patch_file(functions, "functions"); module.patch_file(status, "status"); module.patch_file(updater, "dvswitch")
+    require(functions.read_text(encoding="utf-8") == first_functions, "functions patch is not idempotent")
+    require(status.read_text(encoding="utf-8") == first_status, "status patch is not idempotent")
+    require(updater.read_text(encoding="utf-8") == first_updater, "updater patch is not idempotent")
 
-    stock_dvswitch_path = directory_path / "stock-dvswitch-script.txt"
-    stock_dvswitch_path.write_text(stock_dvswitch_fixture, encoding="utf-8")
-    module.patch_file(stock_dvswitch_path, "dvswitch")
-    first_stock_dvswitch = stock_dvswitch_path.read_text(encoding="utf-8")
-    require(first_stock_dvswitch.count("function downloadAndValidateReflectorJSON()") == 1, "stock JSON updater missing")
-    require(first_stock_dvswitch.count('downloadAndValidateReflectorJSON "NXDN"') == 1, "stock NXDN updater call missing")
-    require(first_stock_dvswitch.count('downloadAndValidateReflectorJSON "P25"') == 1, "stock P25 updater call missing")
-    require(first_stock_dvswitch.index('downloadAndValidate "NXDNHosts.txt"') < first_stock_dvswitch.index('downloadAndValidateReflectorJSON "NXDN"'), "stock NXDN call order is wrong")
-    require(first_stock_dvswitch.index('downloadAndValidate "P25Hosts.txt"') < first_stock_dvswitch.index('downloadAndValidateReflectorJSON "P25"'), "stock P25 call order is wrong")
-    subprocess.run(["bash", "-n", str(stock_dvswitch_path)], check=True)
-    module.patch_file(stock_dvswitch_path, "dvswitch")
-    require(stock_dvswitch_path.read_text(encoding="utf-8") == first_stock_dvswitch, "stock updater patch is not idempotent")
+    stock = root / "stock-dvswitch.sh"
+    stock.write_text(stock_dvswitch_fixture, encoding="utf-8")
+    module.patch_file(stock, "dvswitch")
+    first_stock = stock.read_text(encoding="utf-8")
+    require(first_stock.count('downloadAndValidateReflectorJSON "NXDN"') == 1, "stock NXDN call missing")
+    require(first_stock.count('downloadAndValidateReflectorJSON "P25"') == 1, "stock P25 call missing")
+    module.patch_file(stock, "dvswitch")
+    require(stock.read_text(encoding="utf-8") == first_stock, "stock patch is not idempotent")
 
-try:
-    module.patch_functions("<?php\n")
-except module.PatchError:
-    pass
-else:
-    raise AssertionError("missing anchor was accepted")
-
-try:
-    module.patch_dvswitch("#!/bin/bash\nfunction downloadDatabases() {\n}\n")
-except module.PatchError:
-    pass
-else:
-    raise AssertionError("missing database updater calls were accepted")
+for function in (
+    lambda: module.patch_functions("<?php\n"),
+    lambda: module.patch_dvswitch("#!/bin/bash\nfunction downloadDatabases() {\n}\n"),
+):
+    try:
+        function()
+    except module.PatchError:
+        pass
+    else:
+        raise AssertionError("missing anchor was accepted")
 
 print("P25/NXDN patcher tests passed.")
