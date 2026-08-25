@@ -23,3 +23,6 @@ jobs:
 
       - name: Run P25/NXDN patcher tests
         run: python3 tests/test-p25-nxdn-patcher.py
+
+      - name: Run transaction tests
+        run: bash tests/test-transaction.sh
