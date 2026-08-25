@@ -29,12 +29,20 @@ echo getActualLink($logLinesP25Gateway, \"P25\");
 echo getActualLink($logLinesNXDNGateway, \"NXDN\");
 """
 
-dvswitch_fixture = """#!/bin/bash
+specialized_dvswitch_fixture = """#!/bin/bash
 function downloadAndValidateNXDN() { :; }
 function downloadAndValidateP25() { :; }
 function downloadDatabases() {
         downloadAndValidateNXDN
         downloadAndValidateP25
+}
+"""
+
+stock_dvswitch_fixture = """#!/bin/bash
+function downloadAndValidate() { :; }
+function downloadDatabases() {
+        downloadAndValidate "NXDNHosts.txt" "NXDN_Hosts.txt" "dvswitch.org"
+        downloadAndValidate "P25Hosts.txt" "P25_Hosts.txt" "dvswitch.org"
 }
 """
 
@@ -45,7 +53,7 @@ with tempfile.TemporaryDirectory() as directory:
     dvswitch_path = directory_path / "dvswitch-script.txt"
     functions_path.write_text(functions_fixture, encoding="utf-8")
     status_path.write_text(status_fixture, encoding="utf-8")
-    dvswitch_path.write_text(dvswitch_fixture, encoding="utf-8")
+    dvswitch_path.write_text(specialized_dvswitch_fixture, encoding="utf-8")
 
     module.patch_file(functions_path, "functions")
     module.patch_file(status_path, "status")
@@ -73,11 +81,31 @@ with tempfile.TemporaryDirectory() as directory:
     require(status_path.read_text(encoding="utf-8") == first_status, "status patch is not idempotent")
     require(dvswitch_path.read_text(encoding="utf-8") == first_dvswitch, "updater patch is not idempotent")
 
+    stock_dvswitch_path = directory_path / "stock-dvswitch-script.txt"
+    stock_dvswitch_path.write_text(stock_dvswitch_fixture, encoding="utf-8")
+    module.patch_file(stock_dvswitch_path, "dvswitch")
+    first_stock_dvswitch = stock_dvswitch_path.read_text(encoding="utf-8")
+    require(first_stock_dvswitch.count("function downloadAndValidateReflectorJSON()") == 1, "stock JSON updater missing")
+    require(first_stock_dvswitch.count('downloadAndValidateReflectorJSON "NXDN"') == 1, "stock NXDN updater call missing")
+    require(first_stock_dvswitch.count('downloadAndValidateReflectorJSON "P25"') == 1, "stock P25 updater call missing")
+    require(first_stock_dvswitch.index('downloadAndValidate "NXDNHosts.txt"') < first_stock_dvswitch.index('downloadAndValidateReflectorJSON "NXDN"'), "stock NXDN call order is wrong")
+    require(first_stock_dvswitch.index('downloadAndValidate "P25Hosts.txt"') < first_stock_dvswitch.index('downloadAndValidateReflectorJSON "P25"'), "stock P25 call order is wrong")
+    subprocess.run(["bash", "-n", str(stock_dvswitch_path)], check=True)
+    module.patch_file(stock_dvswitch_path, "dvswitch")
+    require(stock_dvswitch_path.read_text(encoding="utf-8") == first_stock_dvswitch, "stock updater patch is not idempotent")
+
 try:
     module.patch_functions("<?php\n")
 except module.PatchError:
     pass
 else:
     raise AssertionError("missing anchor was accepted")
+
+try:
+    module.patch_dvswitch("#!/bin/bash\nfunction downloadDatabases() {\n}\n")
+except module.PatchError:
+    pass
+else:
+    raise AssertionError("missing database updater calls were accepted")
 
 print("P25/NXDN patcher tests passed.")

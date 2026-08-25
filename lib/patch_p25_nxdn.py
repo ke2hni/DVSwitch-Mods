@@ -135,23 +135,34 @@ def patch_status(text: str) -> str:
     )
 
 
+def add_reflector_json_call(text: str, mode: str) -> str:
+    json_call = f'        downloadAndValidateReflectorJSON "{mode}"\n'
+    call_count = text.count(json_call)
+    if call_count == 1:
+        return text
+    if call_count != 0:
+        raise PatchError(f"duplicate {mode} reflector JSON updater call")
+
+    anchors = (
+        f'        downloadAndValidate{mode}\n',
+        f'        downloadAndValidate "{mode}Hosts.txt" "{mode}_Hosts.txt" "dvswitch.org"\n',
+    )
+    matches = [(anchor, text.count(anchor)) for anchor in anchors]
+    match_count = sum(count for _, count in matches)
+    if match_count != 1:
+        raise PatchError(f"expected one {mode} database updater call, found {match_count}")
+
+    anchor = next(anchor for anchor, count in matches if count == 1)
+    return text.replace(anchor, anchor + json_call, 1)
+
+
 def patch_dvswitch(text: str) -> str:
     if text.count("function downloadAndValidateReflectorJSON()") == 0:
         text = insert_once(text, "function downloadDatabases() {", SHELL_FUNCTION, "downloadDatabases")
     elif text.count("function downloadAndValidateReflectorJSON()") != 1:
         raise PatchError("duplicate reflector JSON updater function")
-    text = replace_once(
-        text,
-        '        downloadAndValidateNXDN\n',
-        '        downloadAndValidateNXDN\n        downloadAndValidateReflectorJSON "NXDN"\n',
-        "NXDN database updater call",
-    )
-    return replace_once(
-        text,
-        '        downloadAndValidateP25\n',
-        '        downloadAndValidateP25\n        downloadAndValidateReflectorJSON "P25"\n',
-        "P25 database updater call",
-    )
+    text = add_reflector_json_call(text, "NXDN")
+    return add_reflector_json_call(text, "P25")
 
 
 def patch_file(path: Path, kind: str) -> None:
