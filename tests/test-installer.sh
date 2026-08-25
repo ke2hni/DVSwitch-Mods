@@ -17,7 +17,7 @@ grep -Fq 'SPDX-License-Identifier: MIT' "$INSTALLER" || fail "MIT SPDX identifie
 grep -Fq 'Copyright (c) 2026 Jeff Milne, KE2HNI' "$INSTALLER" || fail "copyright notice is missing"
 
 help_output="$(bash "$INSTALLER" --help)"
-grep -Fq 'DVSwitch Mods installer 0.1.0-dev' <<<"$help_output" || fail "version is missing from help output"
+grep -Fq 'DVSwitch Mods installer 0.2.0-rc1' <<<"$help_output" || fail "version is missing from help output"
 grep -Fq 'Usage:' <<<"$help_output" || fail "usage text is missing"
 
 set +e
@@ -35,5 +35,8 @@ grep -Fq 'ERROR: Unknown option:' <<<"$unknown_output" || fail "unknown option d
 grep -Fq '/usr/share/dvswitch/include/functions.php' "$INSTALLER" || fail "functions.php target is missing"
 grep -Fq '/usr/share/dvswitch/include/status.php' "$INSTALLER" || fail "status.php target is missing"
 grep -Fq '/opt/MMDVM_Bridge/dvswitch.sh' "$INSTALLER" || fail "dvswitch.sh target is missing"
+grep -Fq -- '--dry-run' "$INSTALLER" || fail "dry-run option is missing"
+grep -Fq -- '--install' "$INSTALLER" || fail "install option is missing"
+grep -Fq -- '--restore' "$INSTALLER" || fail "restore option is missing"
 
 printf 'Installer tests passed.\n'

@@ -42,6 +42,8 @@ temp/
 *.log
 coverage/
 test-results/
+__pycache__/
+*.pyc
 
 # Editor and operating-system files
 .vscode/

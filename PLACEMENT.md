@@ -1,17 +1,7 @@
-# File placement
+# Release placement
 
-Copy these files into the root of `DVSwitch-Mods`, preserving the directories:
+Copy the contents of the release archive into the root of the `DVSwitch-Mods` repository, preserving all directories and replacing matching files.
 
-```text
-DVSwitch-Mods/
-├── .github/
-│   └── workflows/
-│       └── compliance.yml          # replace existing file
-├── lib/
-│   └── transaction.sh              # new file
-├── tests/
-│   └── test-transaction.sh         # new file
-└── TRANSACTION.md                  # new file
-```
+The archive is a complete repository snapshot except for Git history. Keep `.git/` from the existing clone; do not copy material from the former `dvswitch-fixes` repository.
 
-`PLACEMENT.md` is only an upload guide and does not need to be committed.
+After committing, the `Repository checks` workflow must pass without warnings before the release candidate is downloaded to `nodetest`.
