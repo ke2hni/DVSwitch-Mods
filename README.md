@@ -18,13 +18,13 @@ DVSwitch and its original components remain the property of their respective cop
 
 The independently written installer, validation logic, documentation, tests, and original patching code are licensed under the MIT License. This license does not grant rights to DVSwitch software or other third-party components.
 
-## Release candidate 0.3.0-rc1
+## Release candidate 0.3.0-rc2
 
 The installer applies and validates modules in dependency order:
 
 1. Local MMDVM_Bridge P25 remote-command spacing compatibility.
 2. Local MMDVM_Bridge five-digit YSF link-command spacing compatibility.
-3. P25 dashboard parsing for `Switched to reflector <number>`.
+3. P25 dashboard log filtering and parsing for `Switched to reflector <number>`.
 4. Friendly P25/NXDN reflector labels using RefCheck JSON data.
 5. Persistent validated P25/NXDN JSON updater integration.
 

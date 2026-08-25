@@ -20,6 +20,14 @@ def require(condition: bool, message: str) -> None:
 
 
 functions_fixture = '''<?php
+function getP25GatewayLog() {
+    $today = `egrep -a -h "Link|Starting|Unlink|unlinking" $logPath1`;
+    $yesterday = `egrep -a -h "Link|Starting|Unlink|unlinking" $logPath2`;
+}
+function getNXDNGatewayLog() {
+    $today = `egrep -a -h "Link|Starting|Unlink|unlinking" $logPath1`;
+    $yesterday = `egrep -a -h "Link|Starting|Unlink|unlinking" $logPath2`;
+}
 function getActualLink($logLines, $mode) {
     switch ($mode) {
     case "P25":
@@ -74,6 +82,9 @@ with tempfile.TemporaryDirectory() as directory:
 
     require(first_functions.count("function formatReflectorLink(") == 1, "friendly-name function missing")
     require(first_functions.count("Switched to reflector ([0-9]+)") == 1, "P25 remote-command parser missing")
+    require(first_functions.count('"Link|Starting|Unlink|unlinking|Switched"') == 2, "P25 Switched log filters missing")
+    nxdn_log = first_functions.split("function getNXDNGatewayLog() {", 1)[1].split("function getActualLink", 1)[0]
+    require(nxdn_log.count('"Link|Starting|Unlink|unlinking"') == 2, "NXDN filters changed unexpectedly")
     require("htmlspecialchars" in first_functions, "UTF-8-safe escaping missing")
     require('array("name", "sponsor")' in first_functions, "lookup order missing")
     require(first_status.count("formatReflectorLink(") == 2, "status wrappers missing")

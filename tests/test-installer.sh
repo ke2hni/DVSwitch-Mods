@@ -8,7 +8,7 @@ bash -n "$INSTALLER" || fail "installer failed shell syntax validation"
 grep -Fq 'SPDX-License-Identifier: MIT' "$INSTALLER" || fail "MIT SPDX identifier is missing"
 grep -Fq 'Copyright (c) 2026 Jeff Milne, KE2HNI' "$INSTALLER" || fail "copyright notice is missing"
 help_output="$(bash "$INSTALLER" --help)"
-grep -Fq 'DVSwitch Mods installer 0.3.0-rc1' <<<"$help_output" || fail "version is missing"
+grep -Fq 'DVSwitch Mods installer 0.3.0-rc2' <<<"$help_output" || fail "version is missing"
 grep -Fq 'Usage:' <<<"$help_output" || fail "usage text is missing"
 set +e
 no_argument_output="$(bash "$INSTALLER" 2>&1)"; no_argument_status=$?

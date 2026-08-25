@@ -116,6 +116,29 @@ def replace_once(text: str, old: str, new: str, description: str) -> str:
     return text.replace(old, new, 1)
 
 
+def patch_p25_log_filter(text: str) -> str:
+    start_marker = "function getP25GatewayLog() {"
+    end_marker = "function getNXDNGatewayLog() {"
+    if text.count(start_marker) != 1 or text.count(end_marker) != 1:
+        raise PatchError("expected one P25 and one NXDN gateway log function")
+    before, remainder = text.split(start_marker, 1)
+    p25_log, after = remainder.split(end_marker, 1)
+    old = '"Link|Starting|Unlink|unlinking"'
+    new = '"Link|Starting|Unlink|unlinking|Switched"'
+    old_count = p25_log.count(old)
+    new_count = p25_log.count(new)
+    if old_count == 2 and new_count == 0:
+        p25_log = p25_log.replace(old, new)
+    elif old_count == 0 and new_count == 2:
+        pass
+    else:
+        raise PatchError(
+            "unsupported or ambiguous P25 log filters "
+            f"(unpatched={old_count}, patched={new_count})"
+        )
+    return before + start_marker + p25_log + end_marker + after
+
+
 def patch_p25_remote_command(text: str) -> str:
     marker = 'preg_match("/Switched to reflector ([0-9]+)/", $logLine, $matches)'
     if text.count(marker) == 1:
@@ -134,6 +157,7 @@ def patch_p25_remote_command(text: str) -> str:
 
 
 def patch_functions(text: str) -> str:
+    text = patch_p25_log_filter(text)
     text = patch_p25_remote_command(text)
     count = text.count("function formatReflectorLink(")
     if count == 0:

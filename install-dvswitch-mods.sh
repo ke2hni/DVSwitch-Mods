@@ -3,7 +3,7 @@
 # Copyright (c) 2026 Jeff Milne, KE2HNI
 set -Eeuo pipefail
 umask 077
-readonly SCRIPT_VERSION="0.3.0-rc1"
+readonly SCRIPT_VERSION="0.3.0-rc2"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly MMDVM_PATCHER="$SCRIPT_DIR/lib/patch_mmdvm_binary.py" PHP_PATCHER="$SCRIPT_DIR/lib/patch_p25_nxdn.py" TRANSACTION_LIBRARY="$SCRIPT_DIR/lib/transaction.sh"
 readonly MMDVM_BINARY="/opt/MMDVM_Bridge/MMDVM_Bridge" DVSWITCH_SCRIPT="/opt/MMDVM_Bridge/dvswitch.sh"

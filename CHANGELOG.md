@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-rc2 - 2026-08-25
+
+- Include `Switched` in both current-day and previous-day P25Gateway dashboard log filters.
+- Preserve the NXDN log filters unchanged.
+- Add regression coverage proving remote-command events reach the P25 parser.
+
 ## 0.3.0-rc1 - 2026-08-25
 
 - Add strict fixed-length local MMDVM_Bridge transformations for P25 `TalkGroup %d` and five-digit YSF `Link... %05d` commands.
