@@ -3,7 +3,7 @@
 # Copyright (c) 2026 Jeff Milne, KE2HNI
 set -Eeuo pipefail
 umask 077
-readonly SCRIPT_VERSION="0.2.0-rc1"
+readonly SCRIPT_VERSION="0.2.0-rc2"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PATCHER="$SCRIPT_DIR/lib/patch_p25_nxdn.py" TRANSACTION_LIBRARY="$SCRIPT_DIR/lib/transaction.sh"
 readonly DASHBOARD_FUNCTIONS="/usr/share/dvswitch/include/functions.php" DASHBOARD_STATUS="/usr/share/dvswitch/include/status.php"
@@ -39,7 +39,7 @@ try:
 except Exception as e: print('ERROR: JSON validation failed: %s'%e,file=sys.stderr); sys.exit(1)
 PYJSON
 }
-download_json(){ curl --fail --location --silent --show-error --user-agent "DVSwitch-Mods/$SCRIPT_VERSION" --connect-timeout 10 --max-time 60 --retry 3 --retry-delay 2 -o "$2" "https://hostfiles.refcheck.radio/${1}Hosts.json"; validate_json "$2" "$1"; }
+download_json(){ curl --fail --location --silent --show-error --user-agent "DVSwitch" --connect-timeout 10 --max-time 60 --retry 3 --retry-delay 2 -o "$2" "https://hostfiles.refcheck.radio/${1}Hosts.json"; validate_json "$2" "$1"; }
 prepare_candidates(){ WORK_DIR=$(mktemp -d /tmp/dvswitch-mods.XXXXXX); cp -- "$DASHBOARD_FUNCTIONS" "$WORK_DIR/functions"; cp -- "$DASHBOARD_STATUS" "$WORK_DIR/status"; cp -- "$DVSWITCH_SCRIPT" "$WORK_DIR/dvswitch"; python3 "$PATCHER" --functions "$WORK_DIR/functions" --status "$WORK_DIR/status" --dvswitch "$WORK_DIR/dvswitch"; php -l "$WORK_DIR/functions" >/dev/null; php -l "$WORK_DIR/status" >/dev/null; bash -n "$WORK_DIR/dvswitch"; download_json P25 "$WORK_DIR/P25Hosts.json"; download_json NXDN "$WORK_DIR/NXDNHosts.json"; }
 show_changes(){ for pair in "$DASHBOARD_FUNCTIONS:$WORK_DIR/functions" "$DASHBOARD_STATUS:$WORK_DIR/status" "$DVSWITCH_SCRIPT:$WORK_DIR/dvswitch"; do live=${pair%%:*}; candidate=${pair#*:}; if cmp -s "$live" "$candidate"; then printf 'UNCHANGED: %s\n' "$live"; else printf 'CHANGE READY: %s\n' "$live"; fi; done; printf 'JSON READY: %s and %s\n' "$P25_JSON" "$NXDN_JSON"; }
 record_json(){ if [[ -e "$1" || -L "$1" ]]; then dvsm_backup_file "$1"; else dvsm_record_absent_file "$1"; fi; }

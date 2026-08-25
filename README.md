@@ -20,7 +20,7 @@ The independently written installer, validation logic, documentation, and origin
 
 ## P25/NXDN release candidate
 
-Version `0.2.0-rc1` adds friendly P25 and NXDN reflector labels using separately downloaded RefCheck JSON databases. Lookup order is `name`, `sponsor`, then `TG <number>`.
+Version `0.2.0-rc2` adds friendly P25 and NXDN reflector labels using separately downloaded RefCheck JSON databases. Lookup order is `name`, `sponsor`, then `TG <number>`.
 
 The repository does not contain complete DVSwitch files. The installer creates temporary candidates from files already installed on the local system and applies narrowly scoped transformations.
 

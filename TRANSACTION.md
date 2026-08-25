@@ -1,6 +1,6 @@
 # Transaction framework
 
-Status: integrated into installer release candidate `0.2.0-rc1`.
+Status: integrated into installer release candidate `0.2.0-rc2`.
 
 The transaction library creates unique mode-0700 backup sets, copies targets with their metadata, installs candidates by same-directory atomic replacement, and restores all recorded files in reverse order.
 

@@ -17,7 +17,7 @@ grep -Fq 'SPDX-License-Identifier: MIT' "$INSTALLER" || fail "MIT SPDX identifie
 grep -Fq 'Copyright (c) 2026 Jeff Milne, KE2HNI' "$INSTALLER" || fail "copyright notice is missing"
 
 help_output="$(bash "$INSTALLER" --help)"
-grep -Fq 'DVSwitch Mods installer 0.2.0-rc1' <<<"$help_output" || fail "version is missing from help output"
+grep -Fq 'DVSwitch Mods installer 0.2.0-rc2' <<<"$help_output" || fail "version is missing from help output"
 grep -Fq 'Usage:' <<<"$help_output" || fail "usage text is missing"
 
 set +e
@@ -38,5 +38,7 @@ grep -Fq '/opt/MMDVM_Bridge/dvswitch.sh' "$INSTALLER" || fail "dvswitch.sh targe
 grep -Fq -- '--dry-run' "$INSTALLER" || fail "dry-run option is missing"
 grep -Fq -- '--install' "$INSTALLER" || fail "install option is missing"
 grep -Fq -- '--restore' "$INSTALLER" || fail "restore option is missing"
+grep -Fq -- '--user-agent "DVSwitch"' "$INSTALLER" || fail "RefCheck-compatible user-agent is missing"
+if grep -Fq -- '--user-agent "DVSwitch-Mods/' "$INSTALLER"; then fail "unsupported RefCheck user-agent is present"; fi
 
 printf 'Installer tests passed.\n'
