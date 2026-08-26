@@ -39,8 +39,12 @@ function getActualLink($logLines, $mode) {
         foreach ($logLines as $logLine) {
                if (strpos($logLine,"Linked to")) { return "P25"; }
         }
-          break;
-          }
+\tbreak;
+\t}
+\treturn "Service Not Started";
+}
+function getActualReflector($logLines, $mode) {
+    return $mode;
 }
 '''
 

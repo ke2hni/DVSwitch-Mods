@@ -17,7 +17,7 @@ class PatchError(RuntimeError):
 P25_LOG_START = "function getP25GatewayLog() {"
 NXDN_LOG_START = "function getNXDNGatewayLog() {"
 P25_CASE_START = '    case "P25":'
-P25_CASE_END = "          break;\n          }"
+P25_CASE_END = "function getActualReflector("
 STOCK_FILTER = '"Link|Starting|Unlink|unlinking"'
 REPAIRED_FILTER = '"Link|Starting|Unlink|unlinking|Switched"'
 PARSER_MARKER = 'preg_match("/Switched to reflector ([0-9]+)/", $logLine, $matches)'
