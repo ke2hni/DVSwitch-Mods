@@ -1,49 +1,103 @@
 # DVSwitch Mods
 
-Unofficial, independently developed installer for applying local compatibility and dashboard modifications to an existing DVSwitch installation.
+Unofficial, independently developed repair and modification tools for an
+existing DVSwitch installation.
 
 ## Project status
 
-This project is under development and is not ready for production use.
+This project is under staged development and is not ready for production use.
+
+The old `0.3.0-rc2` combined installer remains development history. Do not run
+`install-dvswitch-mods.sh` until every standalone repair and modification stage
+has passed and the combined installer has been rebuilt and retested.
 
 ## Important notice
 
-This project is not affiliated with, endorsed by, or maintained by the DVSwitch project or its contributors.
+This project is not affiliated with, endorsed by, or maintained by the
+DVSwitch project or its contributors.
 
-This repository does not distribute DVSwitch executables or complete upstream DVSwitch source files. It creates temporary candidates from software already installed on the user's system and applies narrowly scoped, fixed-length transformations and text modifications.
+This repository does not distribute DVSwitch executables, complete upstream
+source files, patched binaries, DEBs, or package contents. Its independently
+written tools create temporary candidates from files already installed on the
+user's system and apply narrow local transformations.
 
-DVSwitch and its original components remain the property of their respective copyright holders and are governed by their respective licenses and permissions.
+DVSwitch and its original components remain the property of their respective
+copyright holders and are governed by their respective licenses and
+permissions. See `THIRD_PARTY_NOTICES.md`.
 
 ## License
 
-The independently written installer, validation logic, documentation, tests, and original patching code are licensed under the MIT License. This license does not grant rights to DVSwitch software or other third-party components.
+The independently written installers, patchers, validation logic,
+documentation, tests, and original support code are licensed under the MIT
+License. This license does not grant rights to DVSwitch software or other
+third-party components.
 
-## Release candidate 0.3.0-rc2
+This is practical compliance work and is not a guarantee against legal claims.
 
-The installer applies and validates modules in dependency order:
+## Staged development model
 
-1. Local MMDVM_Bridge P25 remote-command spacing compatibility.
-2. Local MMDVM_Bridge five-digit YSF link-command spacing compatibility.
-3. P25 dashboard log filtering and parsing for `Switched to reflector <number>`.
-4. Friendly P25/NXDN reflector labels using RefCheck JSON data.
-5. Persistent validated P25/NXDN JSON updater integration.
+Repairs restore intended stock behavior. Modifications add new data or display
+behavior. Each stage must have its own installer or patcher, tests,
+documentation, protected backup, rollback, restore, idempotency, and validation
+before it can enter the combined installer.
 
-Friendly-name lookup order is `name`, `sponsor`, then `TG <number>`.
+| Stage | Classification | Status |
+| --- | --- | --- |
+| 1. MMDVM command spacing | Repair | Standalone Raspberry Pi 4 and Pi 5 validation passed |
+| 2. Stock TXT updater | Repair | Standalone development and validation in progress |
+| 3. P25 dashboard compatibility | Repair | Pending |
+| 4. PHP 8 dashboard guard | Repair | Pending |
+| 5. P25/NXDN JSON databases | Modification | Pending separation and validation |
+| 6. Friendly P25/NXDN names | Modification | Pending separation and validation |
+| 7. Combined installer | Integration | Blocked until every standalone stage passes |
 
-## Safety workflow
+## Stage 1: MMDVM command-spacing repair
 
-Use a non-production test node during release-candidate testing:
+Stage 1 locally repairs two fixed-length command strings in the installed
+`MMDVM_Bridge` executable:
 
-```bash
-sudo ./install-dvswitch-mods.sh --check
-sudo ./install-dvswitch-mods.sh --dry-run
-sudo ./install-dvswitch-mods.sh --install
+- P25 `TalkGroup%d` becomes `TalkGroup %d`.
+- Five-digit YSF `Link%c%c%c%05d` becomes `Link%c%c%c %05d`.
+
+The standalone files are:
+
+```text
+repair-mmdvm-spacing.sh
+lib/patch_mmdvm_binary.py
+tests/test-repair-mmdvm-spacing.sh
+tests/test-mmdvm-binary-patcher.py
+MODULE-MMDVM-COMPATIBILITY.md
 ```
 
-Restore the protected backup reported by the installer with:
+## Stage 2: TXT database updater repair
 
-```bash
-sudo ./install-dvswitch-mods.sh --restore install-YYYYMMDD-HHMMSS
+Stage 2 locally repairs `/opt/MMDVM_Bridge/dvswitch.sh` so existing TXT
+talkgroup and reflector databases are downloaded to temporary files, validated,
+and atomically installed without destroying last-known-good data.
+
+It repairs YSF, TGIF, P25, NXDN, BrandMeister, and D-Star update behavior while
+retaining the existing TXT paths and formats. It does not add JSON databases or
+change the dashboard.
+
+The standalone files are:
+
+```text
+repair-dvswitch-txt-updater.sh
+lib/patch_dvswitch_txt_updater.py
+tests/test-dvswitch-txt-updater-patcher.py
+tests/test-repair-dvswitch-txt-updater.sh
+MODULE-DVSWITCH-TXT-UPDATER.md
 ```
 
-Backups are stored under `/var/backups/dvswitch-mods` with mode `0700`. Existing ownership and permissions are preserved. The MMDVM binary is transformed first, but all targets participate in one transaction; any later failure restores every original target.
+See `MODULE-DVSWITCH-TXT-UPDATER.md` for sources, safety behavior, exclusions,
+validation order, and restore instructions.
+
+## Development safety rules
+
+- Test standalone stages only on designated non-production nodes.
+- Apply and validate one layer at a time.
+- Do not combine repairs and modifications during development.
+- Do not run the combined installer until every standalone stage passes.
+- Review the reported protected backup before proceeding to the next stage.
+- Never commit credentials, private configuration, complete upstream files, or
+  compiled third-party binaries.

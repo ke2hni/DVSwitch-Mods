@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Jeff Milne, KE2HNI
 
 set -euo pipefail
 
@@ -39,6 +41,29 @@ while IFS= read -r -d '' relative_path; do
         fi
     fi
 done < <(git -C "$REPO_ROOT" ls-files -z)
+
+for required in \
+    repair-mmdvm-spacing.sh \
+    lib/patch_mmdvm_binary.py \
+    tests/test-repair-mmdvm-spacing.sh \
+    repair-dvswitch-txt-updater.sh \
+    lib/patch_dvswitch_txt_updater.py \
+    tests/test-dvswitch-txt-updater-patcher.py \
+    tests/test-repair-dvswitch-txt-updater.sh \
+    MODULE-DVSWITCH-TXT-UPDATER.md; do
+    if ! git -C "$REPO_ROOT" ls-files --error-unmatch "$required" >/dev/null 2>&1; then
+        report_failure "required staged-development file is not tracked: $required"
+    fi
+done
+
+for executable in \
+    repair-mmdvm-spacing.sh \
+    tests/test-repair-mmdvm-spacing.sh \
+    repair-dvswitch-txt-updater.sh \
+    tests/test-repair-dvswitch-txt-updater.sh; do
+    mode=$(git -C "$REPO_ROOT" ls-files -s -- "$executable" | awk '{print $1}')
+    [[ "$mode" == 100755 ]] || report_failure "script is not tracked executable: $executable"
+done
 
 if ((FAILURES > 0)); then
     printf 'Repository compliance check failed with %d problem(s).\n' "$FAILURES" >&2

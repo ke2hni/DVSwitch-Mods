@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased
+
+### Stage 2 — standalone DVSwitch TXT updater repair
+
+- Add `repair-dvswitch-txt-updater.sh` as a standalone installer for the
+  locally installed `/opt/MMDVM_Bridge/dvswitch.sh`.
+- Add `lib/patch_dvswitch_txt_updater.py` with strict structural-anchor and
+  mixed-state rejection.
+- Download TXT databases into same-directory `mktemp` files and replace live
+  files only after validation.
+- Preserve last-known-good databases after HTTP, empty, HTML, malformed,
+  truncated, conversion, or validation failures.
+- Preserve existing database ownership and mode; create missing databases as
+  `root:root` mode `0644`.
+- Repair YSF, TGIF, P25, NXDN, BrandMeister, DCS, DPlus, DExtra, and XLX update
+  behavior while retaining existing TXT paths and formats.
+- Route the existing FCS and APRS calls through the safe generic updater without
+  changing their sources or formats.
+- Add isolated patcher and installer tests covering syntax, idempotency,
+  missing/duplicate/mixed anchors, stage isolation, metadata operations, and a
+  read-only live check.
+- Add `MODULE-DVSWITCH-TXT-UPDATER.md` with scope, safety, validation, restore,
+  and licensing details.
+- Keep JSON databases, dashboard parsing, PHP compatibility, and friendly-name
+  behavior outside Stage 2.
+
+### Development workflow
+
+- Separate repairs from modifications and require every stage to pass
+  independently before rebuilding or running the combined installer.
+- Mark the old `0.3.0-rc2` combined installer as development history that must
+  not be run during standalone-stage validation.
+
 ## 0.3.0-rc2 - 2026-08-25
 
 - Include `Switched` in both current-day and previous-day P25Gateway dashboard log filters.
