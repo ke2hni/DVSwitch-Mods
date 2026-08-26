@@ -109,6 +109,14 @@ with tempfile.TemporaryDirectory() as directory:
     require('chown root:root "${_candidate}"' in repaired, "new-file ownership missing")
     require('chmod 0644 "${_candidate}"' in repaired, "new-file mode missing")
     require('mv -f -- "${_candidate}" "${_live}"' in repaired, "atomic replacement missing")
+    require(
+        'if [ "${_kind}" = GENERIC ]; then' in repaired,
+        "generic success-output branch missing",
+    )
+    require(
+        'echo "${_name} downloaded and validated successfully (${_fileSize} bytes)"' in repaired,
+        "generic byte-only success output missing",
+    )
 
     expected_calls = (
         'downloadAndValidateDatabase "NXDNHosts.txt" "https://hostfiles.refcheck.radio/NXDNHosts.txt" NXDN',

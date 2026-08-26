@@ -210,7 +210,11 @@ PY_BM
         return
     fi
 
-    echo "${_name} downloaded and validated successfully (${_recordCount} records, ${_fileSize} bytes)"
+    if [ "${_kind}" = GENERIC ]; then
+        echo "${_name} downloaded and validated successfully (${_fileSize} bytes)"
+    else
+        echo "${_name} downloaded and validated successfully (${_recordCount} records, ${_fileSize} bytes)"
+    fi
 }
 
 #################################################################
