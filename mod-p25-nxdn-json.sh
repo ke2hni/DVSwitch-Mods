@@ -8,12 +8,12 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="0.1.1-dev"
+readonly SCRIPT_VERSION="0.1.0-dev"
 readonly TARGET="/opt/MMDVM_Bridge/dvswitch.sh"
 readonly DATA_DIR="/var/lib/mmdvm"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/p25-nxdn-json"
-readonly STAGE2_HASH="59ee01e069ae489ff0e5c7525876f4621e7215e8d54e7f8e726b573f4d937203"
-readonly MOD_MARKER="# DVSwitch-Mods: P25/NXDN JSON updater modification v1"
+readonly STAGE2_HASH="64c2a18d5d1b236c8416bc039307bd78198fb5877a74c1949e326cffa2f836a9"
+readonly MOD_MARKER="# DVSwitch-Mods: P25/NXDN JSON updater modification"
 
 WORK_DIR=""
 ACTIVE_BACKUP=""
@@ -95,7 +95,7 @@ import os
 
 path = Path(os.environ["DVSWITCH_CANDIDATE"])
 text = path.read_text(encoding="utf-8")
-marker = "# DVSwitch-Mods: P25/NXDN JSON updater modification v1"
+marker = "# DVSwitch-Mods: P25/NXDN JSON updater modification"
 stage2 = "# DVSwitch-Mods: safe TXT database updater repair"
 
 calls = '''        downloadAndValidateDatabase "NXDNHosts.txt" "https://hostfiles.refcheck.radio/NXDNHosts.txt" NXDN
@@ -128,7 +128,7 @@ function downloadAndValidateReflectorJSON() {
 
     if ! ${DEBUG} curl --fail --location --silent --show-error \
         --user-agent "DVSwitch" --connect-timeout 10 --max-time 60 \
- -o "${_candidate}" "${_url}"; then
+        --retry 3 --retry-delay 2 -o "${_candidate}" "${_url}"; then
         echo "Warning, ${_name} download failure; keeping existing ${_name}"
         rm -f -- "${_candidate}"
         _ERRORCODE=$ERROR_FILE_NOT_FOUND
@@ -226,7 +226,7 @@ prepare_candidate() {
 download_candidate() {
     local mode=$1 output="$WORK_DIR/${1}Hosts.json"
     curl --fail --location --silent --show-error --user-agent "DVSwitch" \
-        --connect-timeout 10 --max-time 60 \
+        --connect-timeout 10 --max-time 60 --retry 3 --retry-delay 2 \
         -o "$output" "https://hostfiles.refcheck.radio/${mode}Hosts.json"
     [[ -s "$output" ]] || die "$mode JSON download is empty."
     validate_json "$output" "$mode"
