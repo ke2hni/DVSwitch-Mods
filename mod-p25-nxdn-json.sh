@@ -8,11 +8,12 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="0.1.1-dev"
+readonly SCRIPT_VERSION="0.1.2-dev"
 readonly TARGET="/opt/MMDVM_Bridge/dvswitch.sh"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/p25-nxdn-json"
 readonly STAGE2_HASH="59ee01e069ae489ff0e5c7525876f4621e7215e8d54e7f8e726b573f4d937203"
-readonly MOD_MARKER="# DVSwitch-Mods: P25/NXDN JSON updater modification v1"
+readonly MOD_MARKER="# DVSwitch-Mods: P25/NXDN JSON updater modification v2"
+readonly LEGACY_MOD_MARKER="# DVSwitch-Mods: P25/NXDN JSON updater modification v1"
 
 WORK_DIR=""
 ACTIVE_BACKUP=""
@@ -36,7 +37,7 @@ check_platform() {
 patch_candidate() {
     local candidate=$1 current_hash
     current_hash=$(sha256sum "$TARGET" | awk '{print $1}')
-    if ! grep -Fq "$MOD_MARKER" "$TARGET" && [[ "$current_hash" != "$STAGE2_HASH" ]]; then
+    if ! grep -Fq "$MOD_MARKER" "$TARGET" && ! grep -Fq "$LEGACY_MOD_MARKER" "$TARGET" && [[ "$current_hash" != "$STAGE2_HASH" ]]; then
         die "Unsupported dvswitch.sh. Expected the completed Stage 2 updater ($STAGE2_HASH), found $current_hash."
     fi
 
@@ -46,8 +47,11 @@ import os
 
 path = Path(os.environ["DVSWITCH_CANDIDATE"])
 text = path.read_text(encoding="utf-8")
-marker = "# DVSwitch-Mods: P25/NXDN JSON updater modification v1"
+marker = "# DVSwitch-Mods: P25/NXDN JSON updater modification v2"
+legacy_marker = "# DVSwitch-Mods: P25/NXDN JSON updater modification v1"
 stage2 = "# DVSwitch-Mods: safe TXT database updater repair"
+retry_options = '        --retry 3 --retry-delay 2 -o "${_raw}" "${_url}"; then'
+single_request = '        -o "${_raw}" "${_url}"; then'
 
 calls = '''        downloadAndValidateDatabase "NXDNHosts.txt" "https://hostfiles.refcheck.radio/NXDNHosts.txt" NXDN
         downloadAndValidateDatabase "P25Hosts.txt" "https://hostfiles.refcheck.radio/P25Hosts.txt" P25'''
@@ -62,7 +66,7 @@ function_anchor = '''###########################################################
 #################################################################
 function downloadAndValidate() {'''
 
-json_function = r'''# DVSwitch-Mods: P25/NXDN JSON updater modification v1
+json_function = r'''# DVSwitch-Mods: P25/NXDN JSON updater modification v2
 #################################################################
 # Download, validate, and atomically install dashboard JSON data.
 #################################################################
@@ -146,17 +150,28 @@ if text.count(stage2) != 1:
     raise SystemExit("ERROR: completed Stage 2 marker is missing or ambiguous")
 
 if text.count(marker) == 1:
-    if text.count("function downloadAndValidateReflectorJSON()") != 1 or text.count(modified_calls) != 1:
+    if text.count(legacy_marker) != 0 or text.count("function downloadAndValidateReflectorJSON()") != 1 or text.count(modified_calls) != 1:
         raise SystemExit("ERROR: incomplete or ambiguous JSON modification")
-    if calls in text:
-        raise SystemExit("ERROR: mixed unmodified and modified JSON call block")
+    if calls in text or retry_options in text:
+        raise SystemExit("ERROR: mixed or retry-enabled v2 modification")
+elif text.count(legacy_marker) == 1:
+    if text.count(marker) != 0 or text.count("function downloadAndValidateReflectorJSON()") != 1 or text.count(modified_calls) != 1:
+        raise SystemExit("ERROR: incomplete or ambiguous legacy JSON modification")
+    if text.count(retry_options) != 1:
+        raise SystemExit("ERROR: legacy Stage 2 retry anchor is missing or ambiguous")
+    text = text.replace(legacy_marker, marker, 1)
+    text = text.replace(retry_options, single_request, 1)
+    path.write_text(text, encoding="utf-8")
 elif text.count(marker) == 0:
     if text.count(function_anchor) != 1 or text.count(calls) != 1:
         raise SystemExit("ERROR: supported Stage 2 insertion anchors are missing or ambiguous")
     if "P25Hosts.json" in text or "NXDNHosts.json" in text:
         raise SystemExit("ERROR: unexpected existing JSON updater code")
+    if text.count(retry_options) != 1:
+        raise SystemExit("ERROR: Stage 2 retry anchor is missing or ambiguous")
     text = text.replace(function_anchor, json_function + function_anchor, 1)
     text = text.replace(calls, modified_calls, 1)
+    text = text.replace(retry_options, single_request, 1)
     path.write_text(text, encoding="utf-8")
 else:
     raise SystemExit("ERROR: duplicate JSON modification markers")
