@@ -12,7 +12,7 @@ readonly SCRIPT_VERSION="0.1.0-dev"
 readonly TARGET="/opt/MMDVM_Bridge/dvswitch.sh"
 readonly DATA_DIR="/var/lib/mmdvm"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/p25-nxdn-json"
-readonly STAGE2_HASH="64c2a18d5d1b236c8416bc039307bd78198fb5877a74c1949e326cffa2f836a9"
+readonly STAGE2_HASH="59ee01e069ae489ff0e5c7525876f4621e7215e8d54e7f8e726b573f4d937203"
 readonly MOD_MARKER="# DVSwitch-Mods: P25/NXDN JSON updater modification"
 
 WORK_DIR=""
