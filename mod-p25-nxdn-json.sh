@@ -8,12 +8,11 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="0.1.0-dev"
+readonly SCRIPT_VERSION="0.1.1-dev"
 readonly TARGET="/opt/MMDVM_Bridge/dvswitch.sh"
-readonly DATA_DIR="/var/lib/mmdvm"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/p25-nxdn-json"
-readonly STAGE2_HASH="64c2a18d5d1b236c8416bc039307bd78198fb5877a74c1949e326cffa2f836a9"
-readonly MOD_MARKER="# DVSwitch-Mods: P25/NXDN JSON updater modification"
+readonly STAGE2_HASH="59ee01e069ae489ff0e5c7525876f4621e7215e8d54e7f8e726b573f4d937203"
+readonly MOD_MARKER="# DVSwitch-Mods: P25/NXDN JSON updater modification v1"
 
 WORK_DIR=""
 ACTIVE_BACKUP=""
@@ -34,54 +33,6 @@ check_platform() {
     case "${VERSION_ID:-}" in 12|13) ;; *) die "Unsupported Debian version: ${VERSION_ID:-unknown}" ;; esac
 }
 
-validate_json() {
-    local file=$1 mode=$2
-    REFLECTOR_JSON="$file" REFLECTOR_MODE="$mode" python3 - <<'PY_JSON'
-import json
-import os
-import sys
-
-path = os.environ["REFLECTOR_JSON"]
-mode = os.environ["REFLECTOR_MODE"]
-known = {"P25": {10200, 10201}, "NXDN": {65000}}[mode]
-
-try:
-    with open(path, "r", encoding="utf-8-sig") as source:
-        data = json.load(source)
-    if not isinstance(data, dict):
-        raise ValueError("top level is not an object")
-    if not isinstance(data.get("_refcheck_metadata"), dict):
-        raise ValueError("RefCheck metadata is missing")
-    rows = data.get("reflectors")
-    if not isinstance(rows, list) or len(rows) < 200:
-        raise ValueError("reflectors array is missing or undersized")
-    seen = set()
-    for row in rows:
-        if not isinstance(row, dict):
-            raise ValueError("reflector record is not an object")
-        designator = row.get("designator")
-        if type(designator) is not int or not 1 <= designator <= 9999999:
-            raise ValueError("invalid reflector designator")
-        if designator in seen:
-            raise ValueError("duplicate reflector designator")
-        seen.add(designator)
-        port = row.get("port")
-        if type(port) is not int or not 1 <= port <= 65535:
-            raise ValueError("invalid reflector port")
-        for field in ("name", "sponsor"):
-            if row.get(field) is not None and not isinstance(row[field], str):
-                raise ValueError(f"invalid {field} value")
-    missing = known - seen
-    if missing:
-        raise ValueError(f"known reflector is missing: {min(missing)}")
-except Exception as exc:
-    print(f"ERROR: {mode} JSON validation failed: {exc}", file=sys.stderr)
-    sys.exit(1)
-
-print(f"PASS: {mode} JSON validated ({len(rows)} reflectors)")
-PY_JSON
-}
-
 patch_candidate() {
     local candidate=$1 current_hash
     current_hash=$(sha256sum "$TARGET" | awk '{print $1}')
@@ -95,7 +46,7 @@ import os
 
 path = Path(os.environ["DVSWITCH_CANDIDATE"])
 text = path.read_text(encoding="utf-8")
-marker = "# DVSwitch-Mods: P25/NXDN JSON updater modification"
+marker = "# DVSwitch-Mods: P25/NXDN JSON updater modification v1"
 stage2 = "# DVSwitch-Mods: safe TXT database updater repair"
 
 calls = '''        downloadAndValidateDatabase "NXDNHosts.txt" "https://hostfiles.refcheck.radio/NXDNHosts.txt" NXDN
@@ -111,7 +62,7 @@ function_anchor = '''###########################################################
 #################################################################
 function downloadAndValidate() {'''
 
-json_function = r'''# DVSwitch-Mods: P25/NXDN JSON updater modification
+json_function = r'''# DVSwitch-Mods: P25/NXDN JSON updater modification v1
 #################################################################
 # Download, validate, and atomically install dashboard JSON data.
 #################################################################
@@ -128,7 +79,7 @@ function downloadAndValidateReflectorJSON() {
 
     if ! ${DEBUG} curl --fail --location --silent --show-error \
         --user-agent "DVSwitch" --connect-timeout 10 --max-time 60 \
-        --retry 3 --retry-delay 2 -o "${_candidate}" "${_url}"; then
+        -o "${_candidate}" "${_url}"; then
         echo "Warning, ${_name} download failure; keeping existing ${_name}"
         rm -f -- "${_candidate}"
         _ERRORCODE=$ERROR_FILE_NOT_FOUND
@@ -223,15 +174,6 @@ prepare_candidate() {
     [[ "$first_hash" == "$(sha256sum "$WORK_DIR/dvswitch.sh")" ]] || die "Embedded patch is not idempotent."
 }
 
-download_candidate() {
-    local mode=$1 output="$WORK_DIR/${1}Hosts.json"
-    curl --fail --location --silent --show-error --user-agent "DVSwitch" \
-        --connect-timeout 10 --max-time 60 --retry 3 --retry-delay 2 \
-        -o "$output" "https://hostfiles.refcheck.radio/${mode}Hosts.json"
-    [[ -s "$output" ]] || die "$mode JSON download is empty."
-    validate_json "$output" "$mode"
-}
-
 begin_backup() {
     local timestamp candidate counter=0
     install -d -o root -g root -m 0700 "$BACKUP_ROOT"
@@ -240,15 +182,6 @@ begin_backup() {
     while [[ -e "$candidate" ]]; do counter=$((counter + 1)); candidate="$BACKUP_ROOT/install-$timestamp-$counter"; done
     install -d -o root -g root -m 0700 "$candidate"
     cp -a -- "$TARGET" "$candidate/dvswitch.sh"
-    for name in P25Hosts.json NXDNHosts.json; do
-        if [[ -e "$DATA_DIR/$name" || -L "$DATA_DIR/$name" ]]; then
-            require_regular_file "$DATA_DIR/$name"
-            cp -a -- "$DATA_DIR/$name" "$candidate/$name"
-        else
-            : > "$candidate/$name.absent"
-            chmod 0600 "$candidate/$name.absent"
-        fi
-    done
     ACTIVE_BACKUP="$candidate"
     printf 'Backup: %s\n' "$ACTIVE_BACKUP"
 }
@@ -262,33 +195,12 @@ atomic_replace_script() {
     mv -fT -- "$temporary" "$TARGET"
 }
 
-atomic_install_json() {
-    local name=$1 target="$DATA_DIR/$1" temporary
-    [[ ! -L "$target" ]] || die "Refusing symbolic-link target: $target"
-    [[ ! -e "$target" || -f "$target" ]] || die "Refusing non-regular target: $target"
-    temporary=$(mktemp --tmpdir="$DATA_DIR" ".${name}.install.XXXXXX")
-    install -o root -g root -m 0644 "$WORK_DIR/$name" "$temporary"
-    mv -fT -- "$temporary" "$target"
-}
-
 restore_backup_dir() {
-    local directory=$1 name target temporary
+    local directory=$1 temporary
     require_regular_file "$directory/dvswitch.sh"
     temporary=$(mktemp --tmpdir="$(dirname "$TARGET")" .dvswitch-json-restore.XXXXXX)
     cp -a -- "$directory/dvswitch.sh" "$temporary"
     mv -fT -- "$temporary" "$TARGET"
-    for name in P25Hosts.json NXDNHosts.json; do
-        target="$DATA_DIR/$name"
-        if [[ -f "$directory/$name" && ! -L "$directory/$name" ]]; then
-            temporary=$(mktemp --tmpdir="$DATA_DIR" ".${name}.restore.XXXXXX")
-            cp -a -- "$directory/$name" "$temporary"
-            mv -fT -- "$temporary" "$target"
-        elif [[ -f "$directory/$name.absent" && ! -L "$directory/$name.absent" ]]; then
-            rm -f -- "$target"
-        else
-            die "Backup state is missing for $name."
-        fi
-    done
     bash -n "$TARGET"
 }
 
@@ -308,9 +220,8 @@ trap cleanup EXIT
 
 preflight() {
     check_platform
-    for command in awk bash chmod chown cmp cp curl date grep install mktemp mv python3 rm sha256sum stat; do require_command "$command"; done
+    for command in awk bash chmod chown cmp cp date grep install mktemp mv python3 rm sha256sum; do require_command "$command"; done
     require_regular_file "$TARGET"
-    [[ -d "$DATA_DIR" && ! -L "$DATA_DIR" ]] || die "Required data directory is unavailable: $DATA_DIR"
     bash -n "$TARGET"
 }
 
@@ -318,11 +229,6 @@ verify_installed() {
     cmp -s "$WORK_DIR/dvswitch.sh" "$TARGET" || die "Installed dvswitch.sh does not match the validated candidate."
     bash -n "$TARGET"
     [[ $(grep -Fc "$MOD_MARKER" "$TARGET") -eq 1 ]] || die "Installed modification marker is missing or duplicated."
-    for mode in P25 NXDN; do
-        require_regular_file "$DATA_DIR/${mode}Hosts.json"
-        [[ $(stat -c '%U:%G:%a' "$DATA_DIR/${mode}Hosts.json") == root:root:644 ]] || die "Incorrect metadata on ${mode}Hosts.json."
-        validate_json "$DATA_DIR/${mode}Hosts.json" "$mode"
-    done
 }
 
 run_check() {
@@ -342,25 +248,17 @@ run_check() {
 run_install() {
     preflight
     prepare_candidate
-    if cmp -s "$TARGET" "$WORK_DIR/dvswitch.sh" && \
-       [[ -f "$DATA_DIR/P25Hosts.json" && ! -L "$DATA_DIR/P25Hosts.json" ]] && \
-       [[ -f "$DATA_DIR/NXDNHosts.json" && ! -L "$DATA_DIR/NXDNHosts.json" ]] && \
-       validate_json "$DATA_DIR/P25Hosts.json" P25 >/dev/null && \
-       validate_json "$DATA_DIR/NXDNHosts.json" NXDN >/dev/null; then
-        printf 'ALREADY MODIFIED: P25/NXDN JSON updater and validated databases are installed.\n'
+    if cmp -s "$TARGET" "$WORK_DIR/dvswitch.sh"; then
+        printf 'ALREADY MODIFIED: P25/NXDN JSON updater modification is installed.\n'
         return
     fi
 
-    download_candidate P25
-    download_candidate NXDN
     begin_backup
     INSTALL_ACTIVE=1
     atomic_replace_script
-    atomic_install_json P25Hosts.json
-    atomic_install_json NXDNHosts.json
     verify_installed
     INSTALL_ACTIVE=0
-    printf 'PASS: P25/NXDN JSON updater modification installed and verified.\nBackup: %s\n' "$ACTIVE_BACKUP"
+    printf 'PASS: P25/NXDN JSON updater code installed and verified without network access.\nBackup: %s\n' "$ACTIVE_BACKUP"
 }
 
 run_restore() {
@@ -370,7 +268,7 @@ run_restore() {
     directory="$BACKUP_ROOT/$name"
     [[ -d "$directory" && ! -L "$directory" ]] || die "Backup not found: $name"
     restore_backup_dir "$directory"
-    printf 'PASS: dvswitch.sh and P25/NXDN JSON state restored from %s.\n' "$name"
+    printf 'PASS: dvswitch.sh restored from %s.\n' "$name"
 }
 
 main() {
