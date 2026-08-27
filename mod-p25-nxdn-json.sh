@@ -8,7 +8,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="0.1.2-dev"
+readonly SCRIPT_VERSION="0.1.3-dev"
 readonly TARGET="/opt/MMDVM_Bridge/dvswitch.sh"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/p25-nxdn-json"
 readonly STAGE2_HASH="59ee01e069ae489ff0e5c7525876f4621e7215e8d54e7f8e726b573f4d937203"
@@ -52,6 +52,7 @@ legacy_marker = "# DVSwitch-Mods: P25/NXDN JSON updater modification v1"
 stage2 = "# DVSwitch-Mods: safe TXT database updater repair"
 retry_options = '        --retry 3 --retry-delay 2 -o "${_raw}" "${_url}"; then'
 single_request = '        -o "${_raw}" "${_url}"; then'
+noisy_count = '    print(len(rows))\n'
 
 calls = '''        downloadAndValidateDatabase "NXDNHosts.txt" "https://hostfiles.refcheck.radio/NXDNHosts.txt" NXDN
         downloadAndValidateDatabase "P25Hosts.txt" "https://hostfiles.refcheck.radio/P25Hosts.txt" P25'''
@@ -121,7 +122,6 @@ try:
                 raise ValueError("invalid " + field)
     if not known.issubset(seen):
         raise ValueError("known reflector is missing")
-    print(len(rows))
 except Exception as exc:
     print(f"{mode} JSON validation failed: {exc}", file=sys.stderr)
     sys.exit(1)
@@ -154,13 +154,21 @@ if text.count(marker) == 1:
         raise SystemExit("ERROR: incomplete or ambiguous JSON modification")
     if calls in text or retry_options in text:
         raise SystemExit("ERROR: mixed or retry-enabled v2 modification")
+    if text.count(noisy_count) == 1:
+        text = text.replace(noisy_count, "", 1)
+        path.write_text(text, encoding="utf-8")
+    elif text.count(noisy_count) != 0:
+        raise SystemExit("ERROR: ambiguous JSON validator count output")
 elif text.count(legacy_marker) == 1:
     if text.count(marker) != 0 or text.count("function downloadAndValidateReflectorJSON()") != 1 or text.count(modified_calls) != 1:
         raise SystemExit("ERROR: incomplete or ambiguous legacy JSON modification")
     if text.count(retry_options) != 1:
         raise SystemExit("ERROR: legacy Stage 2 retry anchor is missing or ambiguous")
+    if text.count(noisy_count) != 1:
+        raise SystemExit("ERROR: legacy JSON validator output anchor is missing or ambiguous")
     text = text.replace(legacy_marker, marker, 1)
     text = text.replace(retry_options, single_request, 1)
+    text = text.replace(noisy_count, "", 1)
     path.write_text(text, encoding="utf-8")
 elif text.count(marker) == 0:
     if text.count(function_anchor) != 1 or text.count(calls) != 1:
@@ -198,7 +206,6 @@ begin_backup() {
     install -d -o root -g root -m 0700 "$candidate"
     cp -a -- "$TARGET" "$candidate/dvswitch.sh"
     ACTIVE_BACKUP="$candidate"
-    printf 'Backup: %s\n' "$ACTIVE_BACKUP"
 }
 
 atomic_replace_script() {
@@ -240,6 +247,12 @@ preflight() {
     bash -n "$TARGET"
 }
 
+preflight_restore() {
+    check_platform
+    for command in bash cp mktemp mv rm; do require_command "$command"; done
+    require_regular_file "$TARGET"
+}
+
 verify_installed() {
     cmp -s "$WORK_DIR/dvswitch.sh" "$TARGET" || die "Installed dvswitch.sh does not match the validated candidate."
     bash -n "$TARGET"
@@ -278,7 +291,7 @@ run_install() {
 
 run_restore() {
     local name=$1 directory
-    preflight
+    preflight_restore
     [[ "$name" =~ ^install-[0-9]{8}-[0-9]{6}(-[0-9]+)?$ ]] || die "Invalid backup name: $name"
     directory="$BACKUP_ROOT/$name"
     [[ -d "$directory" && ! -L "$directory" ]] || die "Backup not found: $name"
