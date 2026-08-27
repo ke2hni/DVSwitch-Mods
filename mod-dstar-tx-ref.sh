@@ -8,7 +8,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="0.1.0-dev"
+readonly SCRIPT_VERSION="0.1.1-dev"
 readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dstar-tx-ref"
 readonly SUPPORTED_HASH="5b21a7a8e4e4a753ba3881bc3077ea4a1047c2e1d969cbd8f2b1c3a6c15976f3"
@@ -157,11 +157,11 @@ preflight_restore() {
 }
 
 verify_installed() {
-    cmp -s "$WORK_DIR/status.php" "$TARGET" || die "Installed status.php does not match the validated candidate."
-    php -l "$TARGET" >/dev/null
-    [[ $(grep -Fc "$MOD_MARKER" "$TARGET") -eq 1 ]] || die "Installed modification marker is missing or duplicated."
-    [[ $(grep -Fc 'Tx TG/Ref' "$TARGET") -eq 2 ]] || die "Installed Tx TG/Ref labels are missing or duplicated."
-    [[ $(grep -Fc 'formatReflectorLink(' "$TARGET") -eq 2 ]] || die "P25/NXDN friendly-name wrappers were not preserved."
+    if ! cmp -s "$WORK_DIR/status.php" "$TARGET"; then printf 'ERROR: installed status.php does not match the validated candidate.\n' >&2; return 1; fi
+    if ! php -l "$TARGET" >/dev/null; then printf 'ERROR: installed status.php failed PHP syntax validation.\n' >&2; return 1; fi
+    if [[ $(grep -Fc "$MOD_MARKER" "$TARGET") -ne 1 ]]; then printf 'ERROR: installed modification marker is missing or duplicated.\n' >&2; return 1; fi
+    if [[ $(grep -Fc '>Tx TG/Ref</th>' "$TARGET") -ne 2 ]]; then printf 'ERROR: installed Tx TG/Ref card labels are missing or duplicated.\n' >&2; return 1; fi
+    if [[ $(grep -Fc 'formatReflectorLink(' "$TARGET") -ne 2 ]]; then printf 'ERROR: P25/NXDN friendly-name wrappers were not preserved.\n' >&2; return 1; fi
 }
 
 run_check() {
@@ -185,7 +185,13 @@ run_install() {
     begin_backup
     INSTALL_ACTIVE=1
     atomic_replace
-    verify_installed
+    if ! verify_installed; then
+        if restore_backup_dir "$ACTIVE_BACKUP"; then
+            INSTALL_ACTIVE=0
+            die "Installation validation failed; automatic rollback completed."
+        fi
+        die "Installation validation failed and automatic rollback failed; use the protected backup."
+    fi
     INSTALL_ACTIVE=0
     printf 'PASS: D-Star Tx TG/Ref modification installed atomically.\nBackup: %s\n' "$ACTIVE_BACKUP"
 }
