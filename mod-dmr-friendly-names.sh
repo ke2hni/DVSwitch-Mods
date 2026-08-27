@@ -8,14 +8,15 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="0.1.0-dev"
+readonly SCRIPT_VERSION="0.1.1-dev"
 readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly BM_LIST="/var/lib/mmdvm/TGList_BM.txt"
 readonly TGIF_LIST="/var/lib/mmdvm/TGList_TGIF.txt"
 readonly STATE_FILE="/var/lib/mmdvm/dvswitch-mods-dmr-state.json"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dmr-friendly-names"
 readonly SUPPORTED_HASH="cdd063d6974e459fca279abc8c8ad6a112de89a6dbaa0fa92e03a1933b671831"
-readonly MOD_MARKER="// DVSwitch-Mods: DMR Master friendly-name display v1"
+readonly SUPPORTED_V1_HASH="c1a910a0f6e486f7e5077056a73208a8291e35a979897b4e250aeb492707fc64"
+readonly MOD_MARKER="// DVSwitch-Mods: DMR Master friendly-name display v2"
 
 WORK_DIR=""
 ACTIVE_BACKUP=""
@@ -100,18 +101,20 @@ PY_STATE
 }
 
 patch_candidate() {
-    STATUS_CANDIDATE="$WORK_DIR/status.php" DVS_SUPPORTED_HASH="$SUPPORTED_HASH" DVS_MOD_MARKER="$MOD_MARKER" python3 - <<'PY_PATCH'
+    STATUS_CANDIDATE="$WORK_DIR/status.php" DVS_SUPPORTED_HASH="$SUPPORTED_HASH" DVS_SUPPORTED_V1_HASH="$SUPPORTED_V1_HASH" DVS_MOD_MARKER="$MOD_MARKER" python3 - <<'PY_PATCH'
 from pathlib import Path
 import hashlib
 import os
 
 path = Path(os.environ["STATUS_CANDIDATE"])
 supported_hash = os.environ["DVS_SUPPORTED_HASH"]
+supported_v1_hash = os.environ["DVS_SUPPORTED_V1_HASH"]
 marker = os.environ["DVS_MOD_MARKER"]
+v1_marker = "// DVSwitch-Mods: DMR Master friendly-name display v1"
 
 include_anchor = "include_once dirname(dirname(__FILE__)).'/include/functions.php';\n"
 helper = r'''
-// DVSwitch-Mods: DMR Master friendly-name display v1
+// DVSwitch-Mods: DMR Master friendly-name display v2
 function dvsModsDmrNetwork($master) {
         $master = strtoupper(str_replace('_', ' ', (string)$master));
         if (strpos($master, 'TGIF') !== false) { return 'TGIF'; }
@@ -161,10 +164,10 @@ function dvsModsDmrName($network, $talkgroup) {
 function dvsModsDmrMasterDisplay($master, $abinfo) {
         $state = dvsModsDmrStateRead();
         $mode = isset($abinfo['tlv']['ambe_mode']) ? strtoupper(trim((string)$abinfo['tlv']['ambe_mode'])) : '';
-        $network = dvsModsDmrNetwork($master);
-        if ($mode === 'DMR') {
+        $network = ($mode === 'STFU') ? 'BM' : dvsModsDmrNetwork($master);
+        if ($mode === 'DMR' || $mode === 'STFU') {
                 $talkgroup = dvsModsDmrTalkgroup($abinfo);
-                if ($talkgroup !== '' && !($network === 'TGIF' && $talkgroup === '9')) {
+                if ($talkgroup !== '' && !($mode === 'DMR' && $network === 'TGIF' && $talkgroup === '9')) {
                         $state[$network] = array('tg' => $talkgroup);
                         $state['current_network'] = $network;
                         dvsModsDmrStateWrite($state);
@@ -177,7 +180,7 @@ function dvsModsDmrMasterDisplay($master, $abinfo) {
                 $candidate = trim((string)$state[$network]['tg']);
                 if (preg_match('/^[0-9]+$/', $candidate) && $candidate !== '0') { $talkgroup = $candidate; }
         }
-        if ($talkgroup === '' && $mode === 'DMR') { $talkgroup = dvsModsDmrTalkgroup($abinfo); }
+        if ($talkgroup === '' && ($mode === 'DMR' || $mode === 'STFU')) { $talkgroup = dvsModsDmrTalkgroup($abinfo); }
         if ($talkgroup === '') { return htmlspecialchars((string)$master, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
         $name = dvsModsDmrName($network, $talkgroup);
         $display = ($name !== '') ? $name : 'TG '.$talkgroup;
@@ -194,8 +197,20 @@ def digest(value):
 
 text = path.read_text(encoding="utf-8")
 markers = text.count(marker)
+v1_markers = text.count(v1_marker)
 
-if markers == 0:
+old_logic = r'''        $network = dvsModsDmrNetwork($master);
+        if ($mode === 'DMR') {
+                $talkgroup = dvsModsDmrTalkgroup($abinfo);
+                if ($talkgroup !== '' && !($network === 'TGIF' && $talkgroup === '9')) {'''
+new_logic = r'''        $network = ($mode === 'STFU') ? 'BM' : dvsModsDmrNetwork($master);
+        if ($mode === 'DMR' || $mode === 'STFU') {
+                $talkgroup = dvsModsDmrTalkgroup($abinfo);
+                if ($talkgroup !== '' && !($mode === 'DMR' && $network === 'TGIF' && $talkgroup === '9')) {'''
+old_fallback = "        if ($talkgroup === '' && $mode === 'DMR') { $talkgroup = dvsModsDmrTalkgroup($abinfo); }"
+new_fallback = "        if ($talkgroup === '' && ($mode === 'DMR' || $mode === 'STFU')) { $talkgroup = dvsModsDmrTalkgroup($abinfo); }"
+
+if markers == 0 and v1_markers == 0:
     if digest(text) != supported_hash:
         raise SystemExit("ERROR: unsupported unmodified status.php hash: " + digest(text))
     counts = (text.count(include_anchor), text.count(old_output), text.count(new_output))
@@ -205,14 +220,23 @@ if markers == 0:
         raise SystemExit("ERROR: unexpected existing DMR friendly-name code")
     text = text.replace(include_anchor, include_anchor + helper, 1)
     text = text.replace(old_output, new_output, 1)
-elif markers == 1:
+elif markers == 0 and v1_markers == 1:
+    if digest(text) != supported_v1_hash:
+        raise SystemExit("ERROR: unsupported or altered v1 status.php hash: " + digest(text))
+    counts = (text.count(old_logic), text.count(new_logic), text.count(old_fallback), text.count(new_fallback))
+    if counts != (1, 0, 1, 0):
+        raise SystemExit("ERROR: incomplete or ambiguous v1 STFU upgrade anchors: " + repr(counts))
+    text = text.replace(v1_marker, marker, 1)
+    text = text.replace(old_logic, new_logic, 1)
+    text = text.replace(old_fallback, new_fallback, 1)
+elif markers == 1 and v1_markers == 0:
     if text.count(helper) != 1 or text.count(new_output) != 1 or text.count(old_output) != 0:
         raise SystemExit("ERROR: incomplete or ambiguous DMR friendly-name modification")
     recovered = text.replace(helper, '', 1).replace(new_output, old_output, 1)
     if digest(recovered) != supported_hash:
         raise SystemExit("ERROR: modified status.php does not reverse to the supported Mod 3 file")
 else:
-    raise SystemExit("ERROR: duplicate DMR friendly-name modification markers")
+    raise SystemExit("ERROR: duplicate or mixed DMR friendly-name modification markers")
 
 path.write_text(text, encoding="utf-8")
 PY_PATCH
