@@ -70,15 +70,15 @@ PY_JSON
 
 patch_candidates() {
     FUNCTIONS_CANDIDATE="$WORK_DIR/functions.php" STATUS_CANDIDATE="$WORK_DIR/status.php" \
-    SUPPORTED_FUNCTIONS_HASH="$SUPPORTED_FUNCTIONS_HASH" SUPPORTED_STATUS_HASH="$SUPPORTED_STATUS_HASH" \
-    MOD_MARKER="$MOD_MARKER" python3 - <<'PY_PATCH'
+    DVS_SUPPORTED_FUNCTIONS_HASH="$SUPPORTED_FUNCTIONS_HASH" DVS_SUPPORTED_STATUS_HASH="$SUPPORTED_STATUS_HASH" \
+    DVS_MOD_MARKER="$MOD_MARKER" python3 - <<'PY_PATCH'
 from pathlib import Path
 import hashlib
 import os
 
 functions_path = Path(os.environ["FUNCTIONS_CANDIDATE"])
 status_path = Path(os.environ["STATUS_CANDIDATE"])
-marker = os.environ["MOD_MARKER"]
+marker = os.environ["DVS_MOD_MARKER"]
 
 php_function = r'''// DVSwitch-Mods: P25/NXDN friendly-name display v1
 function formatReflectorLink($linkText, $mode) {
@@ -125,9 +125,9 @@ functions_markers = functions.count(marker)
 status_wrappers = status.count("formatReflectorLink(")
 
 if functions_markers == 0 and status_wrappers == 0:
-    if digest(functions) != os.environ["SUPPORTED_FUNCTIONS_HASH"]:
+    if digest(functions) != os.environ["DVS_SUPPORTED_FUNCTIONS_HASH"]:
         raise SystemExit("ERROR: unsupported unmodified functions.php hash: " + digest(functions))
-    if digest(status) != os.environ["SUPPORTED_STATUS_HASH"]:
+    if digest(status) != os.environ["DVS_SUPPORTED_STATUS_HASH"]:
         raise SystemExit("ERROR: unsupported unmodified status.php hash: " + digest(status))
     if functions.count(p25_parser) != 1 or functions.count(repaired_filter) != 2:
         raise SystemExit("ERROR: completed Stage 3 P25 parser structure is missing or ambiguous")
@@ -148,9 +148,9 @@ elif functions_markers == 1 and status_wrappers == 2:
         raise SystemExit("ERROR: unexpected duplicate dashboard status calls")
     recovered_functions = functions.replace(php_function, "", 1)
     recovered_status = status.replace(p25_wrapped, p25_plain, 1).replace(nxdn_wrapped, nxdn_plain, 1)
-    if digest(recovered_functions) != os.environ["SUPPORTED_FUNCTIONS_HASH"]:
+    if digest(recovered_functions) != os.environ["DVS_SUPPORTED_FUNCTIONS_HASH"]:
         raise SystemExit("ERROR: modified functions.php does not reverse to the supported Stage 3 file")
-    if digest(recovered_status) != os.environ["SUPPORTED_STATUS_HASH"]:
+    if digest(recovered_status) != os.environ["DVS_SUPPORTED_STATUS_HASH"]:
         raise SystemExit("ERROR: modified status.php does not reverse to the supported stock file")
 else:
     raise SystemExit(f"ERROR: partial or mixed friendly-name state (function_markers={functions_markers}, status_wrappers={status_wrappers})")
