@@ -8,7 +8,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="0.2.1-test"
+readonly SCRIPT_VERSION="0.2.2-test"
 readonly TARGET="/opt/P25Gateway/P25Gateway"
 readonly SOURCE_URL="https://github.com/g4klx/P25Clients.git"
 readonly SOURCE_COMMIT="99b3c15b33a4d16b632cb2393695a74c76c66da7"
@@ -144,9 +144,9 @@ prepare_candidate() {
     make -C "$WORK_DIR/build" -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" >/dev/null
     require_regular "$WORK_DIR/build/P25Gateway"
     file -b "$WORK_DIR/build/P25Gateway" | grep -q 'ELF 64-bit.*ARM aarch64' || die "Built candidate is not an AArch64 ELF executable."
-    candidate_version=$("$WORK_DIR/build/P25Gateway" -v 2>&1 | head -n 1)
-    printf 'Candidate version: %s\n' "$candidate_version"
-    version_is_patched "$candidate_version" || die "Built candidate version is incorrect: $candidate_version"
+    candidate_version=$(strings "$WORK_DIR/build/P25Gateway" | grep -Fx '20201105-p25voice2' | head -n 1)
+    [[ "$candidate_version" == '20201105-p25voice2' ]] || die "Built candidate version marker is incorrect."
+    printf 'Candidate version marker: %s\n' "$candidate_version"
     grep -qF 'voice->eof();' "$WORK_DIR/build/P25Gateway.cpp" || die "Immediate-announcement source validation failed."
     grep -qF 'LEADING_SILENCE_LENGTH = 40U' "$WORK_DIR/build/Voice.cpp" || die "800 ms lead-in source validation failed."
 }
