@@ -8,9 +8,10 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="0.1.0-test"
+readonly SCRIPT_VERSION="0.2.0-test"
 readonly TARGET="/opt/P25Gateway/P25Gateway"
-readonly SOURCE_DIR="/opt/P25Gateway"
+readonly SOURCE_URL="https://github.com/g4klx/P25Clients.git"
+readonly SOURCE_COMMIT="99b3c15b33a4d16b632cb2393695a74c76c66da7"
 readonly SERVICE="p25gateway.service"
 readonly DASHBOARD="https://127.0.0.1/dvswitch/"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/p25-audio-announcement"
@@ -60,19 +61,19 @@ require_regular() { [[ -f "$1" && ! -L "$1" ]] || die "Required regular non-syml
 current_version() { "$TARGET" -v 2>&1 | head -n 1; }
 
 check_source_hashes() {
-    [[ $(hash_of "$SOURCE_DIR/P25Gateway.cpp") == "$STOCK_GATEWAY_CPP_HASH" ]] || die "Unsupported P25Gateway.cpp."
-    [[ $(hash_of "$SOURCE_DIR/Voice.cpp") == "$STOCK_VOICE_CPP_HASH" ]] || die "Unsupported Voice.cpp."
-    [[ $(hash_of "$SOURCE_DIR/Version.h") == "$STOCK_VERSION_H_HASH" ]] || die "Unsupported Version.h."
-    [[ $(hash_of "$SOURCE_DIR/Makefile") == "$STOCK_MAKEFILE_HASH" ]] || die "Unsupported Makefile."
+    local directory=$1
+    [[ $(hash_of "$directory/P25Gateway.cpp") == "$STOCK_GATEWAY_CPP_HASH" ]] || die "Unsupported P25Gateway.cpp."
+    [[ $(hash_of "$directory/Voice.cpp") == "$STOCK_VOICE_CPP_HASH" ]] || die "Unsupported Voice.cpp."
+    [[ $(hash_of "$directory/Version.h") == "$STOCK_VERSION_H_HASH" ]] || die "Unsupported Version.h."
+    [[ $(hash_of "$directory/Makefile") == "$STOCK_MAKEFILE_HASH" ]] || die "Unsupported Makefile."
 }
 
 preflight() {
     require_root
-    for command in awk bash chmod chown cmp cp curl date file grep install make mktemp mv python3 readelf rm sha256sum stat strings systemctl; do require_command "$command"; done
+    for command in awk bash chmod chown cmp cp curl date file git grep install make mktemp mv python3 readelf rm sha256sum stat strings systemctl; do require_command "$command"; done
     [[ $(dpkg --print-architecture) == arm64 ]] || die "Only Debian arm64 is supported."
     [[ $(uname -m) == aarch64 ]] || die "Only an AArch64 kernel is supported."
     require_regular "$TARGET"
-    for file in P25Gateway.cpp Voice.cpp Version.h Makefile; do require_regular "$SOURCE_DIR/$file"; done
     systemctl cat "$SERVICE" >/dev/null
 }
 
@@ -128,8 +129,11 @@ PY
 
 prepare_candidate() {
     WORK_DIR=$(mktemp -d /tmp/dvswitch-p25-audio.XXXXXX)
-    install -d -m 0700 "$WORK_DIR/build"
-    cp -a -- "$SOURCE_DIR/." "$WORK_DIR/build/"
+    git clone --quiet --no-checkout "$SOURCE_URL" "$WORK_DIR/source"
+    git -C "$WORK_DIR/source" checkout --quiet --detach "$SOURCE_COMMIT"
+    [[ $(git -C "$WORK_DIR/source" rev-parse HEAD) == "$SOURCE_COMMIT" ]] || die "Pinned source commit validation failed."
+    mv -- "$WORK_DIR/source/P25Gateway" "$WORK_DIR/build"
+    check_source_hashes "$WORK_DIR/build"
     patch_sources
     make -C "$WORK_DIR/build" clean >/dev/null
     make -C "$WORK_DIR/build" -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" >/dev/null
@@ -151,7 +155,7 @@ run_check() {
     preflight
     case $(state) in
         PATCHED) printf 'PASS: P25 audio-announcement repair is already installed. No files changed.\n' ;;
-        STOCK) check_source_hashes; prepare_candidate; printf 'PASS: exact stock P25Gateway and source are compatible. Candidate built successfully. No installed files changed.\n' ;;
+        STOCK) prepare_candidate; printf 'PASS: exact stock P25Gateway and pinned source are compatible. Candidate built successfully. No installed files changed.\n' ;;
         *) die "Installed P25Gateway is neither the supported stock binary nor this repair." ;;
     esac
 }
@@ -164,7 +168,6 @@ run_install() {
         return
     fi
     [[ $(state) == STOCK ]] || die "Unsupported installed P25Gateway."
-    check_source_hashes
     prepare_candidate
 
     install -d -o root -g root -m 0700 "$BACKUP_ROOT"
