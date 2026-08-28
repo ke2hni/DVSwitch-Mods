@@ -8,7 +8,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="0.2.0-test"
+readonly SCRIPT_VERSION="0.2.1-test"
 readonly TARGET="/opt/P25Gateway/P25Gateway"
 readonly SOURCE_URL="https://github.com/g4klx/P25Clients.git"
 readonly SOURCE_COMMIT="99b3c15b33a4d16b632cb2393695a74c76c66da7"
@@ -60,6 +60,10 @@ require_regular() { [[ -f "$1" && ! -L "$1" ]] || die "Required regular non-syml
 
 current_version() { "$TARGET" -v 2>&1 | head -n 1; }
 
+version_is_patched() {
+    [[ "$1" == "$PATCHED_VERSION" || "$1" == "$PATCHED_VERSION git #"* ]]
+}
+
 check_source_hashes() {
     local directory=$1
     [[ $(hash_of "$directory/P25Gateway.cpp") == "$STOCK_GATEWAY_CPP_HASH" ]] || die "Unsupported P25Gateway.cpp."
@@ -81,7 +85,7 @@ state() {
     local binary_hash version
     binary_hash=$(hash_of "$TARGET")
     version=$(current_version)
-    if [[ "$version" == "$PATCHED_VERSION" ]]; then
+    if version_is_patched "$version"; then
         printf 'PATCHED\n'
     elif [[ "$binary_hash" == "$STOCK_BINARY_HASH" && "$version" == "P25Gateway version 20201105" ]]; then
         printf 'STOCK\n'
@@ -128,6 +132,7 @@ PY
 }
 
 prepare_candidate() {
+    local candidate_version
     WORK_DIR=$(mktemp -d /tmp/dvswitch-p25-audio.XXXXXX)
     git clone --quiet --no-checkout "$SOURCE_URL" "$WORK_DIR/source"
     git -C "$WORK_DIR/source" checkout --quiet --detach "$SOURCE_COMMIT"
@@ -139,7 +144,9 @@ prepare_candidate() {
     make -C "$WORK_DIR/build" -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" >/dev/null
     require_regular "$WORK_DIR/build/P25Gateway"
     file -b "$WORK_DIR/build/P25Gateway" | grep -q 'ELF 64-bit.*ARM aarch64' || die "Built candidate is not an AArch64 ELF executable."
-    [[ $("$WORK_DIR/build/P25Gateway" -v 2>&1 | head -n 1) == "$PATCHED_VERSION" ]] || die "Built candidate version is incorrect."
+    candidate_version=$("$WORK_DIR/build/P25Gateway" -v 2>&1 | head -n 1)
+    printf 'Candidate version: %s\n' "$candidate_version"
+    version_is_patched "$candidate_version" || die "Built candidate version is incorrect: $candidate_version"
     grep -qF 'voice->eof();' "$WORK_DIR/build/P25Gateway.cpp" || die "Immediate-announcement source validation failed."
     grep -qF 'LEADING_SILENCE_LENGTH = 40U' "$WORK_DIR/build/Voice.cpp" || die "800 ms lead-in source validation failed."
 }
@@ -188,7 +195,7 @@ run_install() {
     chmod --reference="$TARGET" "$temporary"
     systemctl stop "$SERVICE"
     mv -fT -- "$temporary" "$TARGET"
-    [[ $(current_version) == "$PATCHED_VERSION" ]] || die "Installed version validation failed."
+    version_is_patched "$(current_version)" || die "Installed version validation failed: $(current_version)"
     systemctl start "$SERVICE"
     sleep 2
     health_check
