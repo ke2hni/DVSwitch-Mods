@@ -1,103 +1,89 @@
-# DVSwitch Mods
+# DVSwitch-Mods
 
-Unofficial, independently developed repair and modification tools for an
-existing DVSwitch installation.
+Tested repairs and optional modifications for current DVSwitch installations.
 
-## Project status
+This repository patches files already installed on a DVSwitch system. It does not distribute upstream DVSwitch executables, PHP files, packages, or firmware.
 
-This project is under staged development and is not ready for production use.
+## Supported test systems
 
-The old `0.3.0-rc2` combined installer remains development history. Do not run
-`install-dvswitch-mods.sh` until every standalone repair and modification stage
-has passed and the combined installer has been rebuilt and retested.
+The current scripts were validated on fresh default ASL3/DVSwitch installations:
 
-## Important notice
+- Raspberry Pi 4, Debian 12 Bookworm, ARM64
+- Raspberry Pi 5, Debian 13 Trixie, ARM64
 
-This project is not affiliated with, endorsed by, or maintained by the
-DVSwitch project or its contributors.
+Exact compatibility checks in each script prevent unsupported installed files from being changed.
 
-This repository does not distribute DVSwitch executables, complete upstream
-source files, patched binaries, DEBs, or package contents. Its independently
-written tools create temporary candidates from files already installed on the
-user's system and apply narrow local transformations.
+## Repairs
 
-DVSwitch and its original components remain the property of their respective
-copyright holders and are governed by their respective licenses and
-permissions. See `THIRD_PARTY_NOTICES.md`.
+Repairs correct confirmed defects in the installed DVSwitch software.
+
+| Script | Purpose | Status |
+| --- | --- | --- |
+| `repair-mmdvm-spacing.sh` | Corrects malformed P25 and five-digit YSF remote-command spacing in `MMDVM_Bridge` | Completed and tested |
+| `repair-dvswitch-txt-updater.sh` | Repairs and validates DVSwitch TXT database downloads with atomic replacement | Completed and tested |
+| `repair-p25-dashboard.sh` | Recognizes current P25Gateway `Switched to reflector` link-status messages | Completed and tested |
+| `repair-ysf-dashboard-null.sh` | Corrects case-sensitive YSF room matching and prevents a literal null fallback | Completed and tested |
+
+## Optional modifications
+
+Modifications add optional behavior and are separate from repairs.
+
+| Script | Purpose | Status |
+| --- | --- | --- |
+| `mod-p25-nxdn-json.sh` | Adds validated P25 and NXDN JSON database downloads | Completed and tested |
+| `mod-p25-nxdn-friendly-names.sh` | Displays P25 and NXDN reflector names with sponsor and numeric fallbacks | Completed and tested |
+| `mod-dstar-tx-ref.sh` | Adds D-Star Tx TG/Ref and reflector/module display | Completed and tested |
+| `mod-dmr-friendly-names.sh` | Displays BrandMeister, TGIF, and STFU talkgroup names and retains DMR state | Completed and tested |
+
+## Script operation
+
+Run scripts from the repository directory. Use `--check` before installation.
+
+```bash
+sudo ./SCRIPT_NAME.sh --check
+sudo ./SCRIPT_NAME.sh --install
+sudo ./SCRIPT_NAME.sh --restore BACKUP_NAME
+```
+
+Each script performs compatibility checks, creates protected timestamped backups outside live directories, replaces files atomically, validates its results, preserves installed metadata and user-selected values, rolls back automatically on failure, supports named restoration, and avoids unnecessary backups when already installed.
+
+Backups are stored below:
+
+```text
+/var/backups/dvswitch-mods/
+```
+
+Use the exact backup name printed by a successful installation, such as `install-YYYYMMDD-HHMMSS`.
+
+## Recommended order
+
+Apply only the scripts you need. Where all current repairs and modifications are wanted, use this order:
+
+1. `repair-mmdvm-spacing.sh`
+2. `repair-dvswitch-txt-updater.sh`
+3. `repair-p25-dashboard.sh`
+4. `mod-p25-nxdn-json.sh`
+5. `mod-p25-nxdn-friendly-names.sh`
+6. `mod-dstar-tx-ref.sh`
+7. `mod-dmr-friendly-names.sh`
+8. `repair-ysf-dashboard-null.sh`
+
+The order matters because later dashboard scripts recognize the hashes produced by earlier completed scripts.
+
+## Repository contents
+
+The repository contains only the completed repair and modification scripts, their currently required shared implementation files, licensing information, and basic Git configuration files.
+
+The paused INI compatibility project and obsolete development tests and notes are intentionally excluded.
+
+## Safety and scope
+
+- Test on a non-production system first.
+- Do not bypass a compatibility failure.
+- Do not copy patched binaries or complete upstream files between systems.
+- Use `--restore` with the named backup if a change must be reversed.
+- These scripts are not affiliated with or endorsed by the upstream DVSwitch project.
 
 ## License
 
-The independently written installers, patchers, validation logic,
-documentation, tests, and original support code are licensed under the MIT
-License. This license does not grant rights to DVSwitch software or other
-third-party components.
-
-This is practical compliance work and is not a guarantee against legal claims.
-
-## Staged development model
-
-Repairs restore intended stock behavior. Modifications add new data or display
-behavior. Each stage must have its own installer or patcher, tests,
-documentation, protected backup, rollback, restore, idempotency, and validation
-before it can enter the combined installer.
-
-| Stage | Classification | Status |
-| --- | --- | --- |
-| 1. MMDVM command spacing | Repair | Standalone Raspberry Pi 4 and Pi 5 validation passed |
-| 2. Stock TXT updater | Repair | Standalone development and validation in progress |
-| 3. P25 dashboard compatibility | Repair | Pending |
-| 4. PHP 8 dashboard guard | Repair | Pending |
-| 5. P25/NXDN JSON databases | Modification | Pending separation and validation |
-| 6. Friendly P25/NXDN names | Modification | Pending separation and validation |
-| 7. Combined installer | Integration | Blocked until every standalone stage passes |
-
-## Stage 1: MMDVM command-spacing repair
-
-Stage 1 locally repairs two fixed-length command strings in the installed
-`MMDVM_Bridge` executable:
-
-- P25 `TalkGroup%d` becomes `TalkGroup %d`.
-- Five-digit YSF `Link%c%c%c%05d` becomes `Link%c%c%c %05d`.
-
-The standalone files are:
-
-```text
-repair-mmdvm-spacing.sh
-lib/patch_mmdvm_binary.py
-tests/test-repair-mmdvm-spacing.sh
-tests/test-mmdvm-binary-patcher.py
-MODULE-MMDVM-COMPATIBILITY.md
-```
-
-## Stage 2: TXT database updater repair
-
-Stage 2 locally repairs `/opt/MMDVM_Bridge/dvswitch.sh` so existing TXT
-talkgroup and reflector databases are downloaded to temporary files, validated,
-and atomically installed without destroying last-known-good data.
-
-It repairs YSF, TGIF, P25, NXDN, BrandMeister, and D-Star update behavior while
-retaining the existing TXT paths and formats. It does not add JSON databases or
-change the dashboard.
-
-The standalone files are:
-
-```text
-repair-dvswitch-txt-updater.sh
-lib/patch_dvswitch_txt_updater.py
-tests/test-dvswitch-txt-updater-patcher.py
-tests/test-repair-dvswitch-txt-updater.sh
-MODULE-DVSWITCH-TXT-UPDATER.md
-```
-
-See `MODULE-DVSWITCH-TXT-UPDATER.md` for sources, safety behavior, exclusions,
-validation order, and restore instructions.
-
-## Development safety rules
-
-- Test standalone stages only on designated non-production nodes.
-- Apply and validate one layer at a time.
-- Do not combine repairs and modifications during development.
-- Do not run the combined installer until every standalone stage passes.
-- Review the reported protected backup before proceeding to the next stage.
-- Never commit credentials, private configuration, complete upstream files, or
-  compiled third-party binaries.
+Repository-authored code is licensed under the MIT License. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.
