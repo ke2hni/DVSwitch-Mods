@@ -8,7 +8,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.1.0"
+readonly SCRIPT_VERSION="1.1.1"
 readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly BM_LIST="/var/lib/mmdvm/TGList_BM.txt"
 readonly TGIF_LIST="/var/lib/mmdvm/TGList_TGIF.txt"
@@ -16,6 +16,8 @@ readonly STATE_FILE="/var/lib/mmdvm/dvswitch-mods-dmr-state.json"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dmr-friendly-names"
 readonly SUPPORTED_HASH="cdd063d6974e459fca279abc8c8ad6a112de89a6dbaa0fa92e03a1933b671831"
 readonly SUPPORTED_V1_HASH="c1a910a0f6e486f7e5077056a73208a8291e35a979897b4e250aeb492707fc64"
+readonly DMR_V2_STATUS_HASH="3f2d81aad9fed503b38271fee033821d27aafea969ca6348fc0afc1c1a994d55"
+readonly YSF_STATUS_HASH="d3ba63a6e57801697797e6a3ea747ec8def51cad9deb48054a48dfe436f34e09"
 readonly MOD_MARKER="// DVSwitch-Mods: DMR Master friendly-name display v2"
 
 WORK_DIR=""
@@ -101,7 +103,8 @@ PY_STATE
 }
 
 patch_candidate() {
-    STATUS_CANDIDATE="$WORK_DIR/status.php" DVS_SUPPORTED_HASH="$SUPPORTED_HASH" DVS_SUPPORTED_V1_HASH="$SUPPORTED_V1_HASH" DVS_MOD_MARKER="$MOD_MARKER" python3 - <<'PY_PATCH'
+    STATUS_CANDIDATE="$WORK_DIR/status.php" DVS_SUPPORTED_HASH="$SUPPORTED_HASH" DVS_SUPPORTED_V1_HASH="$SUPPORTED_V1_HASH" \
+    DVS_DMR_V2_STATUS_HASH="$DMR_V2_STATUS_HASH" DVS_YSF_STATUS_HASH="$YSF_STATUS_HASH" DVS_MOD_MARKER="$MOD_MARKER" python3 - <<'PY_PATCH'
 from pathlib import Path
 import hashlib
 import os
@@ -233,8 +236,17 @@ elif markers == 1 and v1_markers == 0:
     if text.count(helper) != 1 or text.count(new_output) != 1 or text.count(old_output) != 0:
         raise SystemExit("ERROR: incomplete or ambiguous DMR friendly-name modification")
     recovered = text.replace(helper, '', 1).replace(new_output, old_output, 1)
-    if digest(recovered) != supported_hash:
-        raise SystemExit("ERROR: modified status.php does not reverse to the supported Mod 3 file")
+    value = digest(text)
+    if value == os.environ["DVS_DMR_V2_STATUS_HASH"]:
+        if digest(recovered) != supported_hash:
+            raise SystemExit("ERROR: DMR status.php does not reverse to the supported D-Star file")
+        if text.count("// DVSwitch-Mods: YSF dashboard null repair v1") != 0:
+            raise SystemExit("ERROR: unexpected YSF marker in DMR-only dashboard state")
+    elif value == os.environ["DVS_YSF_STATUS_HASH"]:
+        if text.count("// DVSwitch-Mods: YSF dashboard null repair v1") != 1:
+            raise SystemExit("ERROR: final dashboard YSF marker is missing or ambiguous")
+    else:
+        raise SystemExit("ERROR: unsupported modified status.php hash: " + value)
 else:
     raise SystemExit("ERROR: duplicate or mixed DMR friendly-name modification markers")
 
