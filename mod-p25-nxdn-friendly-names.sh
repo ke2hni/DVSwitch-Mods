@@ -8,7 +8,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.1.0"
+readonly SCRIPT_VERSION="1.1.1"
 readonly FUNCTIONS_TARGET="/usr/share/dvswitch/include/functions.php"
 readonly STATUS_TARGET="/usr/share/dvswitch/include/status.php"
 readonly P25_JSON="/var/lib/mmdvm/P25Hosts.json"
@@ -17,6 +17,11 @@ readonly BACKUP_ROOT="/var/backups/dvswitch-mods/p25-nxdn-friendly-names"
 readonly SUPPORTED_FUNCTIONS_V1_HASH="7d1fa4c52ec2d4c5a9b25ded011cdb1990badd025579274aebe582d8f4611b10"
 readonly SUPPORTED_FUNCTIONS_V2_HASH="840fcb4e8af7520c8f691fb108cb5b7f6146e38b13d3f1f7c751e0507eb737dd"
 readonly SUPPORTED_STATUS_HASH="b573126d4d0ac54fdb8c331de6d75e260419f65a1d66fff6f711e4f7bfd0f2ab"
+readonly FRIENDLY_STATUS_HASH="5b21a7a8e4e4a753ba3881bc3077ea4a1047c2e1d969cbd8f2b1c3a6c15976f3"
+readonly DSTAR_STATUS_HASH="cdd063d6974e459fca279abc8c8ad6a112de89a6dbaa0fa92e03a1933b671831"
+readonly DMR_V1_STATUS_HASH="c1a910a0f6e486f7e5077056a73208a8291e35a979897b4e250aeb492707fc64"
+readonly DMR_V2_STATUS_HASH="3f2d81aad9fed503b38271fee033821d27aafea969ca6348fc0afc1c1a994d55"
+readonly YSF_STATUS_HASH="d3ba63a6e57801697797e6a3ea747ec8def51cad9deb48054a48dfe436f34e09"
 readonly MOD_MARKER="// DVSwitch-Mods: P25/NXDN friendly-name display v1"
 
 WORK_DIR=""
@@ -73,6 +78,9 @@ patch_candidates() {
     FUNCTIONS_CANDIDATE="$WORK_DIR/functions.php" STATUS_CANDIDATE="$WORK_DIR/status.php" \
     DVS_SUPPORTED_FUNCTIONS_V1_HASH="$SUPPORTED_FUNCTIONS_V1_HASH" \
     DVS_SUPPORTED_FUNCTIONS_V2_HASH="$SUPPORTED_FUNCTIONS_V2_HASH" DVS_SUPPORTED_STATUS_HASH="$SUPPORTED_STATUS_HASH" \
+    DVS_FRIENDLY_STATUS_HASH="$FRIENDLY_STATUS_HASH" DVS_DSTAR_STATUS_HASH="$DSTAR_STATUS_HASH" \
+    DVS_DMR_V1_STATUS_HASH="$DMR_V1_STATUS_HASH" DVS_DMR_V2_STATUS_HASH="$DMR_V2_STATUS_HASH" \
+    DVS_YSF_STATUS_HASH="$YSF_STATUS_HASH" \
     DVS_MOD_MARKER="$MOD_MARKER" python3 - <<'PY_PATCH'
 from pathlib import Path
 import hashlib
@@ -136,6 +144,33 @@ def validate_functions_base(text):
     else:
         raise SystemExit("ERROR: unsupported functions.php base hash: " + value)
 
+def require_markers(text, dstar, dmr_v1, dmr_v2, ysf):
+    counts = (
+        text.count("// DVSwitch-Mods: D-Star Tx TG/Ref display v1"),
+        text.count("// DVSwitch-Mods: DMR Master friendly-name display v1"),
+        text.count("// DVSwitch-Mods: DMR Master friendly-name display v2"),
+        text.count("// DVSwitch-Mods: YSF dashboard null repair v1"),
+    )
+    if counts != (dstar, dmr_v1, dmr_v2, ysf):
+        raise SystemExit("ERROR: downstream dashboard markers are missing or ambiguous: " + repr(counts))
+
+def validate_modified_status(text, recovered):
+    value = digest(text)
+    if value == os.environ["DVS_FRIENDLY_STATUS_HASH"]:
+        if digest(recovered) != os.environ["DVS_SUPPORTED_STATUS_HASH"]:
+            raise SystemExit("ERROR: friendly-name status.php does not reverse to the supported stock file")
+        require_markers(text, 0, 0, 0, 0)
+    elif value == os.environ["DVS_DSTAR_STATUS_HASH"]:
+        require_markers(text, 1, 0, 0, 0)
+    elif value == os.environ["DVS_DMR_V1_STATUS_HASH"]:
+        require_markers(text, 1, 1, 0, 0)
+    elif value == os.environ["DVS_DMR_V2_STATUS_HASH"]:
+        require_markers(text, 1, 0, 1, 0)
+    elif value == os.environ["DVS_YSF_STATUS_HASH"]:
+        require_markers(text, 1, 0, 1, 1)
+    else:
+        raise SystemExit("ERROR: unsupported modified status.php hash: " + value)
+
 functions = functions_path.read_text(encoding="utf-8")
 status = status_path.read_text(encoding="utf-8")
 functions_markers = functions.count(marker)
@@ -161,8 +196,7 @@ elif functions_markers == 1 and status_wrappers == 2:
     recovered_functions = functions.replace(php_function, "", 1)
     recovered_status = status.replace(p25_wrapped, p25_plain, 1).replace(nxdn_wrapped, nxdn_plain, 1)
     validate_functions_base(recovered_functions)
-    if digest(recovered_status) != os.environ["DVS_SUPPORTED_STATUS_HASH"]:
-        raise SystemExit("ERROR: modified status.php does not reverse to the supported stock file")
+    validate_modified_status(status, recovered_status)
 else:
     raise SystemExit(f"ERROR: partial or mixed friendly-name state (function_markers={functions_markers}, status_wrappers={status_wrappers})")
 
