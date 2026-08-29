@@ -8,13 +8,14 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="0.1.0-dev"
+readonly SCRIPT_VERSION="1.1.0"
 readonly FUNCTIONS_TARGET="/usr/share/dvswitch/include/functions.php"
 readonly STATUS_TARGET="/usr/share/dvswitch/include/status.php"
 readonly P25_JSON="/var/lib/mmdvm/P25Hosts.json"
 readonly NXDN_JSON="/var/lib/mmdvm/NXDNHosts.json"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/p25-nxdn-friendly-names"
-readonly SUPPORTED_FUNCTIONS_HASH="7d1fa4c52ec2d4c5a9b25ded011cdb1990badd025579274aebe582d8f4611b10"
+readonly SUPPORTED_FUNCTIONS_V1_HASH="7d1fa4c52ec2d4c5a9b25ded011cdb1990badd025579274aebe582d8f4611b10"
+readonly SUPPORTED_FUNCTIONS_V2_HASH="840fcb4e8af7520c8f691fb108cb5b7f6146e38b13d3f1f7c751e0507eb737dd"
 readonly SUPPORTED_STATUS_HASH="b573126d4d0ac54fdb8c331de6d75e260419f65a1d66fff6f711e4f7bfd0f2ab"
 readonly MOD_MARKER="// DVSwitch-Mods: P25/NXDN friendly-name display v1"
 
@@ -70,7 +71,8 @@ PY_JSON
 
 patch_candidates() {
     FUNCTIONS_CANDIDATE="$WORK_DIR/functions.php" STATUS_CANDIDATE="$WORK_DIR/status.php" \
-    DVS_SUPPORTED_FUNCTIONS_HASH="$SUPPORTED_FUNCTIONS_HASH" DVS_SUPPORTED_STATUS_HASH="$SUPPORTED_STATUS_HASH" \
+    DVS_SUPPORTED_FUNCTIONS_V1_HASH="$SUPPORTED_FUNCTIONS_V1_HASH" \
+    DVS_SUPPORTED_FUNCTIONS_V2_HASH="$SUPPORTED_FUNCTIONS_V2_HASH" DVS_SUPPORTED_STATUS_HASH="$SUPPORTED_STATUS_HASH" \
     DVS_MOD_MARKER="$MOD_MARKER" python3 - <<'PY_PATCH'
 from pathlib import Path
 import hashlib
@@ -109,8 +111,10 @@ function formatReflectorLink($linkText, $mode) {
 '''
 
 function_anchor = "function getActualReflector("
-p25_parser = 'preg_match("/Switched to reflector ([0-9]+)/", $logLine, $matches)'
-repaired_filter = '"Link|Starting|Unlink|unlinking|Switched"'
+p25_parser_v1 = 'preg_match("/Switched to reflector ([0-9]+)/", $logLine, $matches)'
+p25_parser_v2 = 'preg_match("/(?:Switched|Statically linked) to reflector ([0-9]+)/", $logLine, $matches)'
+repaired_filter_v1 = '"Link|Starting|Unlink|unlinking|Switched"'
+repaired_filter_v2 = '"Link|Starting|Unlink|unlinking|Switched|Statically linked"'
 p25_plain = 'getActualLink($logLinesP25Gateway, "P25")'
 nxdn_plain = 'getActualLink($logLinesNXDNGateway, "NXDN")'
 p25_wrapped = 'formatReflectorLink(getActualLink($logLinesP25Gateway, "P25"), "P25")'
@@ -119,18 +123,28 @@ nxdn_wrapped = 'formatReflectorLink(getActualLink($logLinesNXDNGateway, "NXDN"),
 def digest(text):
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
+def validate_functions_base(text):
+    value = digest(text)
+    if value == os.environ["DVS_SUPPORTED_FUNCTIONS_V1_HASH"]:
+        expected = (text.count(p25_parser_v1), text.count(repaired_filter_v1), text.count(p25_parser_v2), text.count(repaired_filter_v2))
+        if expected != (1, 2, 0, 0):
+            raise SystemExit("ERROR: legacy P25 dashboard structure is missing or ambiguous: " + repr(expected))
+    elif value == os.environ["DVS_SUPPORTED_FUNCTIONS_V2_HASH"]:
+        expected = (text.count(p25_parser_v1), text.count(repaired_filter_v1), text.count(p25_parser_v2), text.count(repaired_filter_v2))
+        if expected != (0, 0, 1, 2):
+            raise SystemExit("ERROR: current P25 dashboard structure is missing or ambiguous: " + repr(expected))
+    else:
+        raise SystemExit("ERROR: unsupported functions.php base hash: " + value)
+
 functions = functions_path.read_text(encoding="utf-8")
 status = status_path.read_text(encoding="utf-8")
 functions_markers = functions.count(marker)
 status_wrappers = status.count("formatReflectorLink(")
 
 if functions_markers == 0 and status_wrappers == 0:
-    if digest(functions) != os.environ["DVS_SUPPORTED_FUNCTIONS_HASH"]:
-        raise SystemExit("ERROR: unsupported unmodified functions.php hash: " + digest(functions))
+    validate_functions_base(functions)
     if digest(status) != os.environ["DVS_SUPPORTED_STATUS_HASH"]:
         raise SystemExit("ERROR: unsupported unmodified status.php hash: " + digest(status))
-    if functions.count(p25_parser) != 1 or functions.count(repaired_filter) != 2:
-        raise SystemExit("ERROR: completed Stage 3 P25 parser structure is missing or ambiguous")
     if functions.count(function_anchor) != 1 or "function formatReflectorLink(" in functions:
         raise SystemExit("ERROR: friendly-name insertion structure is missing or ambiguous")
     if status.count(p25_plain) != 1 or status.count(nxdn_plain) != 1:
@@ -140,16 +154,13 @@ if functions_markers == 0 and status_wrappers == 0:
 elif functions_markers == 1 and status_wrappers == 2:
     if functions.count("function formatReflectorLink(") != 1 or functions.count(php_function) != 1:
         raise SystemExit("ERROR: modified functions.php is incomplete or ambiguous")
-    if functions.count(p25_parser) != 1 or functions.count(repaired_filter) != 2:
-        raise SystemExit("ERROR: Stage 3 P25 parser was altered after modification")
     if status.count(p25_wrapped) != 1 or status.count(nxdn_wrapped) != 1:
         raise SystemExit("ERROR: modified status.php is incomplete or ambiguous")
     if status.count(p25_plain) != 1 or status.count(nxdn_plain) != 1:
         raise SystemExit("ERROR: unexpected duplicate dashboard status calls")
     recovered_functions = functions.replace(php_function, "", 1)
     recovered_status = status.replace(p25_wrapped, p25_plain, 1).replace(nxdn_wrapped, nxdn_plain, 1)
-    if digest(recovered_functions) != os.environ["DVS_SUPPORTED_FUNCTIONS_HASH"]:
-        raise SystemExit("ERROR: modified functions.php does not reverse to the supported Stage 3 file")
+    validate_functions_base(recovered_functions)
     if digest(recovered_status) != os.environ["DVS_SUPPORTED_STATUS_HASH"]:
         raise SystemExit("ERROR: modified status.php does not reverse to the supported stock file")
 else:
@@ -248,7 +259,10 @@ verify_installed() {
     php -l "$STATUS_TARGET" >/dev/null
     [[ $(grep -Fc "$MOD_MARKER" "$FUNCTIONS_TARGET") -eq 1 ]] || die "Installed friendly-name marker is missing or duplicated."
     [[ $(grep -Fc 'formatReflectorLink(' "$STATUS_TARGET") -eq 2 ]] || die "Installed status wrappers are missing or duplicated."
-    [[ $(grep -Fc 'preg_match("/Switched to reflector ([0-9]+)/", $logLine, $matches)' "$FUNCTIONS_TARGET") -eq 1 ]] || die "Stage 3 P25 parser was not preserved."
+    local parser_count
+    parser_count=$(grep -Fc 'preg_match("/Switched to reflector ([0-9]+)/", $logLine, $matches)' "$FUNCTIONS_TARGET" || true)
+    parser_count=$((parser_count + $(grep -Fc 'preg_match("/(?:Switched|Statically linked) to reflector ([0-9]+)/", $logLine, $matches)' "$FUNCTIONS_TARGET" || true)))
+    [[ $parser_count -eq 1 ]] || die "Supported P25 parser was not preserved."
 }
 
 run_check() {

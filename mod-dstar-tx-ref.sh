@@ -8,7 +8,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="0.1.1-dev"
+readonly SCRIPT_VERSION="1.0.0"
 readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dstar-tx-ref"
 readonly SUPPORTED_HASH="5b21a7a8e4e4a753ba3881bc3077ea4a1047c2e1d969cbd8f2b1c3a6c15976f3"

@@ -2,13 +2,13 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Jeff Milne, KE2HNI
 
-# Repair P25Gateway remote-command voice announcements using the locally
-# installed upstream source tree. No upstream source or binary is distributed.
+# Repair P25Gateway remote-command voice announcements using a pinned upstream
+# source revision. No upstream source or binary is distributed.
 
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="0.2.2-test"
+readonly SCRIPT_VERSION="1.0.0"
 readonly TARGET="/opt/P25Gateway/P25Gateway"
 readonly SOURCE_URL="https://github.com/g4klx/P25Clients.git"
 readonly SOURCE_COMMIT="99b3c15b33a4d16b632cb2393695a74c76c66da7"

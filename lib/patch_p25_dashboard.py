@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Jeff Milne, KE2HNI
 
-"""Repair P25 remote-command link detection in a temporary functions.php copy."""
+"""Repair P25 remote-command and static-startup detection in functions.php."""
 
 from __future__ import annotations
 

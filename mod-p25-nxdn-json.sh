@@ -8,7 +8,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="0.1.3-dev"
+readonly SCRIPT_VERSION="1.1.0"
 readonly TARGET="/opt/MMDVM_Bridge/dvswitch.sh"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/p25-nxdn-json"
 readonly STAGE2_HASH="59ee01e069ae489ff0e5c7525876f4621e7215e8d54e7f8e726b573f4d937203"

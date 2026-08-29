@@ -8,7 +8,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="0.4.0-dev"
+readonly SCRIPT_VERSION="1.0.0"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PATCHER="$SCRIPT_DIR/lib/patch_dvswitch_txt_updater.py"
 readonly TRANSACTION_LIBRARY="$SCRIPT_DIR/lib/transaction.sh"
@@ -38,7 +38,6 @@ preflight() {
     check_regular_file "$TRANSACTION_LIBRARY"
     check_regular_file "$TARGET"
     bash -n "$TARGET"
-    python3 -m py_compile "$PATCHER"
     python3 "$PATCHER" --help >/dev/null
 }
 
