@@ -21,7 +21,7 @@ Repairs correct confirmed defects in the installed DVSwitch software.
 | --- | --- | --- |
 | `repair-mmdvm-spacing.sh` | Corrects malformed P25 and five-digit YSF remote-command spacing in `MMDVM_Bridge` | Completed and tested |
 | `repair-dvswitch-txt-updater.sh` | Repairs and validates DVSwitch TXT database downloads with atomic replacement | Completed and tested |
-| `repair-p25-dashboard.sh` | Recognizes current P25Gateway `Switched to reflector` link-status messages | Completed and tested |
+| `repair-p25-dashboard.sh` | Recognizes P25Gateway `Switched to reflector` and `Statically linked to reflector` link-status messages | Completed and tested |
 | `repair-ysf-dashboard-null.sh` | Corrects case-sensitive YSF room matching and prevents a literal null fallback | Completed and tested |
 
 ## Optional modifications
