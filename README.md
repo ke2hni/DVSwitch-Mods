@@ -32,9 +32,9 @@ Modifications add optional behavior and are separate from repairs.
 | Script | Version | Purpose | Status |
 | --- | ---: | --- | --- |
 | `mod-p25-nxdn-json.sh` | 1.1.0 | Adds validated P25 and NXDN JSON database downloads | Completed and tested |
-| `mod-p25-nxdn-friendly-names.sh` | 1.1.1 | Displays P25 and NXDN reflector names with sponsor and numeric fallbacks | Compatibility revision under test |
-| `mod-dstar-tx-ref.sh` | 1.0.1 | Adds D-Star Tx TG/Ref and reflector/module display | Compatibility revision under test |
-| `mod-dmr-friendly-names.sh` | 1.1.1 | Displays BrandMeister, TGIF, and STFU talkgroup names and retains DMR state | Compatibility revision under test |
+| `mod-p25-nxdn-friendly-names.sh` | 1.1.1 | Displays P25 and NXDN reflector names with sponsor and numeric fallbacks | Completed and tested |
+| `mod-dstar-tx-ref.sh` | 1.0.1 | Adds D-Star Tx TG/Ref and reflector/module display | Completed and tested |
+| `mod-dmr-friendly-names.sh` | 1.1.1 | Displays BrandMeister, TGIF, and STFU talkgroup names and retains DMR state | Completed and tested |
 
 ## Script operation
 
