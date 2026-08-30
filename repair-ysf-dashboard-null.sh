@@ -9,7 +9,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.0.0"
+readonly SCRIPT_VERSION="1.0.1"
 readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly HOSTS_FILE="/var/lib/mmdvm/YSFHosts.txt"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/ysf-dashboard-null"
@@ -79,10 +79,24 @@ new_match = '                        if ((strcasecmp($ysfRoomTxtLine[0], $ysfLin
 def digest(value):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
+dmr_v2_marker = "// DVSwitch-Mods: DMR Master friendly-name display v2"
+dmr_v3_marker = "// DVSwitch-Mods: DMR Master friendly-name display v3"
+dmr_v2_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight: bold\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
+dmr_v3_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;text-align:center;\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
+
+def supported_base(value):
+    if digest(value) == supported_hash:
+        return True
+    counts = (value.count(dmr_v2_marker), value.count(dmr_v3_marker), value.count(dmr_v2_output), value.count(dmr_v3_output))
+    if counts != (0, 1, 0, 1):
+        return False
+    v2_value = value.replace(dmr_v3_marker, dmr_v2_marker, 1).replace(dmr_v3_output, dmr_v2_output, 1)
+    return digest(v2_value) == supported_hash
+
 text = path.read_text(encoding="utf-8")
 markers = text.count(marker)
 if markers == 0:
-    if digest(text) != supported_hash:
+    if not supported_base(text):
         raise SystemExit("ERROR: unsupported unmodified status.php hash: " + digest(text))
     counts = (text.count(anchor), text.count(old_fallback), text.count(new_fallback), text.count(old_match), text.count(new_match))
     if counts != (1, 1, 0, 1, 0):
@@ -95,7 +109,7 @@ elif markers == 1:
     if counts != (1, 0, 1, 0, 1):
         raise SystemExit("ERROR: incomplete or ambiguous YSF dashboard repair")
     recovered = text.replace(marker + "\n", "", 1).replace(new_fallback, old_fallback, 1).replace(new_match, old_match, 1)
-    if digest(recovered) != supported_hash:
+    if not supported_base(recovered):
         raise SystemExit("ERROR: repaired status.php does not reverse to the supported dashboard file")
 else:
     raise SystemExit("ERROR: duplicate YSF dashboard repair markers")
@@ -191,7 +205,10 @@ verify_installed() {
     [[ $(grep -Fc "$REPAIR_MARKER" "$TARGET") -eq 1 ]] || return 1
     [[ $(grep -Fc 'strcasecmp($ysfRoomTxtLine[0], $ysfLinkedTo)' "$TARGET") -eq 1 ]] || return 1
     [[ $(grep -Fc '$ysfLinkedToTxt = $ysfLinkedTo;' "$TARGET") -eq 1 ]] || return 1
-    [[ $(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v2' "$TARGET") -eq 1 ]] || return 1
+    local dmr_v2_count dmr_v3_count
+    dmr_v2_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v2' "$TARGET" || true)
+    dmr_v3_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v3' "$TARGET" || true)
+    [[ $((dmr_v2_count + dmr_v3_count)) -eq 1 ]] || return 1
     [[ $(grep -Fc '>Tx TG/Ref</th>' "$TARGET") -eq 2 ]] || return 1
     [[ $(grep -Fc 'formatReflectorLink(' "$TARGET") -eq 2 ]] || return 1
     dashboard_health

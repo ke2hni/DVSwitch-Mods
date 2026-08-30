@@ -8,7 +8,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.1.1"
+readonly SCRIPT_VERSION="1.1.2"
 readonly FUNCTIONS_TARGET="/usr/share/dvswitch/include/functions.php"
 readonly STATUS_TARGET="/usr/share/dvswitch/include/status.php"
 readonly P25_JSON="/var/lib/mmdvm/P25Hosts.json"
@@ -22,6 +22,7 @@ readonly DSTAR_STATUS_HASH="cdd063d6974e459fca279abc8c8ad6a112de89a6dbaa0fa92e03
 readonly DMR_V1_STATUS_HASH="c1a910a0f6e486f7e5077056a73208a8291e35a979897b4e250aeb492707fc64"
 readonly DMR_V2_STATUS_HASH="3f2d81aad9fed503b38271fee033821d27aafea969ca6348fc0afc1c1a994d55"
 readonly YSF_STATUS_HASH="d3ba63a6e57801697797e6a3ea747ec8def51cad9deb48054a48dfe436f34e09"
+readonly DMR_V3_YSF_STATUS_HASH="75ff8fa3363c79e2109e32b83f4a2fb75f99b2a435072d18177a40fabacb301f"
 readonly MOD_MARKER="// DVSwitch-Mods: P25/NXDN friendly-name display v1"
 
 WORK_DIR=""
@@ -80,7 +81,7 @@ patch_candidates() {
     DVS_SUPPORTED_FUNCTIONS_V2_HASH="$SUPPORTED_FUNCTIONS_V2_HASH" DVS_SUPPORTED_STATUS_HASH="$SUPPORTED_STATUS_HASH" \
     DVS_FRIENDLY_STATUS_HASH="$FRIENDLY_STATUS_HASH" DVS_DSTAR_STATUS_HASH="$DSTAR_STATUS_HASH" \
     DVS_DMR_V1_STATUS_HASH="$DMR_V1_STATUS_HASH" DVS_DMR_V2_STATUS_HASH="$DMR_V2_STATUS_HASH" \
-    DVS_YSF_STATUS_HASH="$YSF_STATUS_HASH" \
+    DVS_YSF_STATUS_HASH="$YSF_STATUS_HASH" DVS_DMR_V3_YSF_STATUS_HASH="$DMR_V3_YSF_STATUS_HASH" \
     DVS_MOD_MARKER="$MOD_MARKER" python3 - <<'PY_PATCH'
 from pathlib import Path
 import hashlib
@@ -144,14 +145,15 @@ def validate_functions_base(text):
     else:
         raise SystemExit("ERROR: unsupported functions.php base hash: " + value)
 
-def require_markers(text, dstar, dmr_v1, dmr_v2, ysf):
+def require_markers(text, dstar, dmr_v1, dmr_v2, dmr_v3, ysf):
     counts = (
         text.count("// DVSwitch-Mods: D-Star Tx TG/Ref display v1"),
         text.count("// DVSwitch-Mods: DMR Master friendly-name display v1"),
         text.count("// DVSwitch-Mods: DMR Master friendly-name display v2"),
+        text.count("// DVSwitch-Mods: DMR Master friendly-name display v3"),
         text.count("// DVSwitch-Mods: YSF dashboard null repair v1"),
     )
-    if counts != (dstar, dmr_v1, dmr_v2, ysf):
+    if counts != (dstar, dmr_v1, dmr_v2, dmr_v3, ysf):
         raise SystemExit("ERROR: downstream dashboard markers are missing or ambiguous: " + repr(counts))
 
 def validate_modified_status(text, recovered):
@@ -159,15 +161,17 @@ def validate_modified_status(text, recovered):
     if value == os.environ["DVS_FRIENDLY_STATUS_HASH"]:
         if digest(recovered) != os.environ["DVS_SUPPORTED_STATUS_HASH"]:
             raise SystemExit("ERROR: friendly-name status.php does not reverse to the supported stock file")
-        require_markers(text, 0, 0, 0, 0)
+        require_markers(text, 0, 0, 0, 0, 0)
     elif value == os.environ["DVS_DSTAR_STATUS_HASH"]:
-        require_markers(text, 1, 0, 0, 0)
+        require_markers(text, 1, 0, 0, 0, 0)
     elif value == os.environ["DVS_DMR_V1_STATUS_HASH"]:
-        require_markers(text, 1, 1, 0, 0)
+        require_markers(text, 1, 1, 0, 0, 0)
     elif value == os.environ["DVS_DMR_V2_STATUS_HASH"]:
-        require_markers(text, 1, 0, 1, 0)
+        require_markers(text, 1, 0, 1, 0, 0)
     elif value == os.environ["DVS_YSF_STATUS_HASH"]:
-        require_markers(text, 1, 0, 1, 1)
+        require_markers(text, 1, 0, 1, 0, 1)
+    elif value == os.environ["DVS_DMR_V3_YSF_STATUS_HASH"]:
+        require_markers(text, 1, 0, 0, 1, 1)
     else:
         raise SystemExit("ERROR: unsupported modified status.php hash: " + value)
 
