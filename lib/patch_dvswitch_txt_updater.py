@@ -272,7 +272,12 @@ def patch_text(text: str) -> str:
     stock_count = text.count(STOCK_FUNCTION_START)
 
     if marker_count == 1:
-        if stock_count != 1 or text.count(REPAIRED_CALLS) != 1 or text.count(REPAIRED_DSTAR_CALLS) != 1:
+        repaired_calls_valid = all(
+            text.count(call) == 1
+            for call in REPAIRED_CALLS.splitlines()
+            if call.strip()
+        )
+        if stock_count != 1 or not repaired_calls_valid or text.count(REPAIRED_DSTAR_CALLS) != 1:
             raise PatchError("incomplete or ambiguous repaired updater")
         if STOCK_CALLS in text or STOCK_DSTAR_CALLS in text:
             raise PatchError("mixed stock and repaired updater calls")
