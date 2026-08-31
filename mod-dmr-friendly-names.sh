@@ -266,13 +266,13 @@ old_output = '''                        echo "<tr><td  style=\\"background: #fff
 v2_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight: bold\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
 new_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;text-align:center;\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
 
-old_log_lookup = '''                 if (file_exists("/var/log/mmdvm/MMDVM_Bridge-".gmdate("Y-m-d").".log")) { $dmrstat = exec('grep -a \\'DMR, Logged\\|DMR, Closing DMR\\|DMR, Opening DMR\\|DMR, Connection\\' /var/log/mmdvm/MMDVM_Bridge-'.gmdate("Y-m-d").'.log | tail -1 | awk \\'{print $5 " " $10}\\'');
-                 } else {$dmrstat = exec('grep -a \\'DMR, Logged\\|DMR, Closing DMR\\|DMR, Opening DMR\\|DMR, Connection\\' /var/log/mmdvm/MMDVM_Bridge-'.gmdate("Y-m-d", time() - 86340).'.log | tail -1 | awk \\'{print $5 " " $10}\\''); }'''
-new_log_lookup = '''                 $dmrstat = '';
-                 if (file_exists("/var/log/mmdvm/MMDVM_Bridge-".gmdate("Y-m-d").".log")) { $dmrstat = exec('grep -a \\'DMR, Logged\\|DMR, Closing DMR\\|DMR, Opening DMR\\|DMR, Connection\\' /var/log/mmdvm/MMDVM_Bridge-'.gmdate("Y-m-d").'.log | tail -1 | awk \\'{print $5 " " $10}\\''); }
-                 if ($dmrstat === '' && file_exists("/var/log/mmdvm/MMDVM_Bridge-".gmdate("Y-m-d", time() - 86340).".log")) { $dmrstat = exec('grep -a \\'DMR, Logged\\|DMR, Closing DMR\\|DMR, Opening DMR\\|DMR, Connection\\' /var/log/mmdvm/MMDVM_Bridge-'.gmdate("Y-m-d", time() - 86340).'.log | tail -1 | awk \\'{print $5 " " $10}\\''); }'''
-old_status_condition = "                else if (strpos($dmrstat, 'Opening') !== false || strpos($dmrstatus, 'Closing') !== false || strpos($dmrstatus, 'Connection') !== false) { "
-new_status_condition = "                else if (strpos($dmrstat, 'Opening') !== false || strpos($dmrstat, 'Closing') !== false || strpos($dmrstat, 'Connection') !== false) { "
+old_log_lookup = '''\t\tif (file_exists("/var/log/mmdvm/MMDVM_Bridge-".gmdate("Y-m-d").".log")) { $dmrstat = exec('grep -a \\'DMR, Logged\\|DMR, Closing DMR\\|DMR, Opening DMR\\|DMR, Connection\\' /var/log/mmdvm/MMDVM_Bridge-'.gmdate("Y-m-d").'.log | tail -1 | awk \\'{print $5 " " $10}\\'');
+\t\t} else {$dmrstat = exec('grep -a \\'DMR, Logged\\|DMR, Closing DMR\\|DMR, Opening DMR\\|DMR, Connection\\' /var/log/mmdvm/MMDVM_Bridge-'.gmdate("Y-m-d", time() - 86340).'.log | tail -1 | awk \\'{print $5 " " $10}\\''); }'''
+new_log_lookup = '''\t\t$dmrstat = '';
+\t\tif (file_exists("/var/log/mmdvm/MMDVM_Bridge-".gmdate("Y-m-d").".log")) { $dmrstat = exec('grep -a \\'DMR, Logged\\|DMR, Closing DMR\\|DMR, Opening DMR\\|DMR, Connection\\' /var/log/mmdvm/MMDVM_Bridge-'.gmdate("Y-m-d").'.log | tail -1 | awk \\'{print $5 " " $10}\\''); }
+\t\tif ($dmrstat === '' && file_exists("/var/log/mmdvm/MMDVM_Bridge-".gmdate("Y-m-d", time() - 86340).".log")) { $dmrstat = exec('grep -a \\'DMR, Logged\\|DMR, Closing DMR\\|DMR, Opening DMR\\|DMR, Connection\\' /var/log/mmdvm/MMDVM_Bridge-'.gmdate("Y-m-d", time() - 86340).'.log | tail -1 | awk \\'{print $5 " " $10}\\''); }'''
+old_status_condition = "\t\telse if (strpos($dmrstat, 'Opening') !== false || strpos($dmrstatus, 'Closing') !== false || strpos($dmrstatus, 'Connection') !== false) { "
+new_status_condition = "\t\telse if (strpos($dmrstat, 'Opening') !== false || strpos($dmrstat, 'Closing') !== false || strpos($dmrstat, 'Connection') !== false) { "
 
 v3_master = r'''function dvsModsDmrMasterDisplay($master, $abinfo) {
         $state = dvsModsDmrStateRead();
