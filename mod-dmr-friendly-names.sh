@@ -8,7 +8,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.2.0"
+readonly SCRIPT_VERSION="1.3.0"
 readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly BM_LIST="/var/lib/mmdvm/TGList_BM.txt"
 readonly TGIF_LIST="/var/lib/mmdvm/TGList_TGIF.txt"
@@ -18,7 +18,8 @@ readonly SUPPORTED_HASH="cdd063d6974e459fca279abc8c8ad6a112de89a6dbaa0fa92e03a19
 readonly SUPPORTED_V1_HASH="c1a910a0f6e486f7e5077056a73208a8291e35a979897b4e250aeb492707fc64"
 readonly DMR_V2_STATUS_HASH="3f2d81aad9fed503b38271fee033821d27aafea969ca6348fc0afc1c1a994d55"
 readonly YSF_STATUS_HASH="d3ba63a6e57801697797e6a3ea747ec8def51cad9deb48054a48dfe436f34e09"
-readonly MOD_MARKER="// DVSwitch-Mods: DMR Master friendly-name display v3"
+readonly DMR_V3_YSF_STATUS_HASH="75ff8fa3363c79e2109e32b83f4a2fb75f99b2a435072d18177a40fabacb301f"
+readonly MOD_MARKER="// DVSwitch-Mods: DMR Master friendly-name display v4"
 
 WORK_DIR=""
 ACTIVE_BACKUP=""
@@ -91,6 +92,18 @@ try:
             if value not in ("BM", "TGIF"):
                 raise ValueError("invalid current network")
             continue
+        if key == "observed_mode":
+            if value not in ("DMR", "STFU", "YSF", "YSFN", "YSFW", "P25", "NXDN", "DSTAR", "ASL"):
+                raise ValueError("invalid observed mode")
+            continue
+        if key == "observed_network":
+            if value not in ("BM", "TGIF"):
+                raise ValueError("invalid observed network")
+            continue
+        if key in ("observed_tg", "blocked_tg"):
+            if not isinstance(value, str) or not value.isdigit() or value == "0":
+                raise ValueError("invalid transition talkgroup")
+            continue
         if key not in ("BM", "TGIF") or not isinstance(value, dict):
             raise ValueError("invalid network state")
         tg = str(value.get("tg", ""))
@@ -104,7 +117,8 @@ PY_STATE
 
 patch_candidate() {
     STATUS_CANDIDATE="$WORK_DIR/status.php" DVS_SUPPORTED_HASH="$SUPPORTED_HASH" DVS_SUPPORTED_V1_HASH="$SUPPORTED_V1_HASH" \
-    DVS_DMR_V2_STATUS_HASH="$DMR_V2_STATUS_HASH" DVS_YSF_STATUS_HASH="$YSF_STATUS_HASH" DVS_MOD_MARKER="$MOD_MARKER" python3 - <<'PY_PATCH'
+    DVS_DMR_V2_STATUS_HASH="$DMR_V2_STATUS_HASH" DVS_YSF_STATUS_HASH="$YSF_STATUS_HASH" \
+    DVS_DMR_V3_YSF_STATUS_HASH="$DMR_V3_YSF_STATUS_HASH" DVS_MOD_MARKER="$MOD_MARKER" python3 - <<'PY_PATCH'
 from pathlib import Path
 import hashlib
 import os
@@ -115,10 +129,11 @@ supported_v1_hash = os.environ["DVS_SUPPORTED_V1_HASH"]
 marker = os.environ["DVS_MOD_MARKER"]
 v1_marker = "// DVSwitch-Mods: DMR Master friendly-name display v1"
 v2_marker = "// DVSwitch-Mods: DMR Master friendly-name display v2"
+v3_marker = "// DVSwitch-Mods: DMR Master friendly-name display v3"
 
 include_anchor = "include_once dirname(dirname(__FILE__)).'/include/functions.php';\n"
 helper = r'''
-// DVSwitch-Mods: DMR Master friendly-name display v3
+// DVSwitch-Mods: DMR Master friendly-name display v4
 function dvsModsDmrNetwork($master) {
         $master = strtoupper(str_replace('_', ' ', (string)$master));
         if (strpos($master, 'TGIF') !== false) { return 'TGIF'; }
@@ -165,7 +180,90 @@ function dvsModsDmrName($network, $talkgroup) {
         return '';
 }
 
+function dvsModsDmrForeignTalkgroup($talkgroup) {
+        foreach (array('/var/lib/mmdvm/YSFHosts.txt', '/var/lib/mmdvm/P25Hosts.txt', '/var/lib/mmdvm/NXDNHosts.txt') as $file) {
+                if (!is_readable($file)) { continue; }
+                $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                if (!is_array($lines)) { continue; }
+                foreach ($lines as $line) {
+                        if ($line === '' || strpos($line, '#') === 0) { continue; }
+                        $fields = explode(';', $line, 2);
+                        if (trim($fields[0]) === (string)$talkgroup) { return true; }
+                }
+        }
+        foreach (array('/var/lib/mmdvm/P25Hosts.json', '/var/lib/mmdvm/NXDNHosts.json') as $file) {
+                if (!is_readable($file)) { continue; }
+                $json = json_decode(file_get_contents($file), true);
+                if (!isset($json['reflectors']) || !is_array($json['reflectors'])) { continue; }
+                foreach ($json['reflectors'] as $row) {
+                        if (is_array($row) && isset($row['designator']) && (string)$row['designator'] === (string)$talkgroup) { return true; }
+                }
+        }
+        return false;
+}
+
 function dvsModsDmrMasterDisplay($master, $abinfo) {
+        $state = dvsModsDmrStateRead();
+        $originalState = $state;
+        $mode = isset($abinfo['tlv']['ambe_mode']) ? strtoupper(trim((string)$abinfo['tlv']['ambe_mode'])) : '';
+        $network = ($mode === 'STFU') ? 'BM' : dvsModsDmrNetwork($master);
+        $liveTalkgroup = dvsModsDmrTalkgroup($abinfo);
+        $previousMode = isset($state['observed_mode']) ? strtoupper(trim((string)$state['observed_mode'])) : '';
+        $previousNetwork = isset($state['observed_network']) ? strtoupper(trim((string)$state['observed_network'])) : '';
+        $previousTalkgroup = isset($state['observed_tg']) ? trim((string)$state['observed_tg']) : '';
+        $isDmr = ($mode === 'DMR' || $mode === 'STFU');
+        if (!$isDmr) {
+                unset($state['blocked_tg']);
+        } else {
+                $blocked = isset($state['blocked_tg']) ? trim((string)$state['blocked_tg']) : '';
+                $transition = ($previousMode !== '' && $previousMode !== $mode) || ($previousNetwork !== '' && $previousNetwork !== $network);
+                if ($transition && $liveTalkgroup !== '' && $liveTalkgroup === $previousTalkgroup) {
+                        $blocked = $liveTalkgroup;
+                }
+                if ($previousMode === '' && $liveTalkgroup !== '' && isset($state[$network]['tg']) && (string)$state[$network]['tg'] === $liveTalkgroup && dvsModsDmrName($network, $liveTalkgroup) === '' && dvsModsDmrForeignTalkgroup($liveTalkgroup)) {
+                        $blocked = $liveTalkgroup;
+                        unset($state[$network]);
+                }
+                if ($blocked !== '' && $liveTalkgroup !== '' && $liveTalkgroup !== $blocked) { $blocked = ''; }
+                if ($blocked !== '' && isset($state[$network]['tg']) && (string)$state[$network]['tg'] === $blocked && dvsModsDmrName($network, $blocked) === '' && dvsModsDmrForeignTalkgroup($blocked)) {
+                        unset($state[$network]);
+                }
+                if ($blocked !== '') { $state['blocked_tg'] = $blocked; }
+                else { unset($state['blocked_tg']); }
+                if ($liveTalkgroup !== '' && $liveTalkgroup !== $blocked && !($mode === 'DMR' && $network === 'TGIF' && $liveTalkgroup === '9')) {
+                        $state[$network] = array('tg' => $liveTalkgroup);
+                        $state['current_network'] = $network;
+                }
+        }
+        $state['observed_mode'] = ($mode !== '') ? $mode : 'ASL';
+        if ($isDmr) { $state['observed_network'] = $network; }
+        else { unset($state['observed_network']); }
+        if ($liveTalkgroup !== '') { $state['observed_tg'] = $liveTalkgroup; }
+        else { unset($state['observed_tg']); }
+        if ($state !== $originalState) { dvsModsDmrStateWrite($state); }
+        if (!$isDmr && isset($state['current_network']) && ($state['current_network'] === 'BM' || $state['current_network'] === 'TGIF')) {
+                $network = $state['current_network'];
+        }
+        $talkgroup = '';
+        if (isset($state[$network]) && is_array($state[$network]) && isset($state[$network]['tg'])) {
+                $candidate = trim((string)$state[$network]['tg']);
+                if (preg_match('/^[0-9]+$/', $candidate) && $candidate !== '0') { $talkgroup = $candidate; }
+        }
+        $blocked = isset($state['blocked_tg']) ? trim((string)$state['blocked_tg']) : '';
+        if ($talkgroup === '' && $isDmr && $liveTalkgroup !== $blocked) { $talkgroup = $liveTalkgroup; }
+        if ($talkgroup === '') { return htmlspecialchars((string)$master, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
+        $name = dvsModsDmrName($network, $talkgroup);
+        $display = ($name !== '') ? $name : 'TG '.$talkgroup;
+        return htmlspecialchars($display, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+'''
+
+old_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight: bold\\">".$dmrMasterHost."</span></td></tr>\\n";}'''
+v2_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight: bold\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
+new_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;text-align:center;\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
+
+v3_master = r'''function dvsModsDmrMasterDisplay($master, $abinfo) {
         $state = dvsModsDmrStateRead();
         $mode = isset($abinfo['tlv']['ambe_mode']) ? strtoupper(trim((string)$abinfo['tlv']['ambe_mode'])) : '';
         $network = ($mode === 'STFU') ? 'BM' : dvsModsDmrNetwork($master);
@@ -190,12 +288,9 @@ function dvsModsDmrMasterDisplay($master, $abinfo) {
         $display = ($name !== '') ? $name : 'TG '.$talkgroup;
         return htmlspecialchars($display, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
-
 '''
-
-old_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight: bold\\">".$dmrMasterHost."</span></td></tr>\\n";}'''
-v2_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight: bold\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
-new_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;text-align:center;\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
+v4_start = helper.index('function dvsModsDmrForeignTalkgroup(')
+v4_master = helper[v4_start:].rstrip() + "\n"
 
 def digest(value):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
@@ -204,7 +299,9 @@ text = path.read_text(encoding="utf-8")
 markers = text.count(marker)
 v1_markers = text.count(v1_marker)
 v2_markers = text.count(v2_marker)
-v2_helper = helper.replace(marker, v2_marker, 1)
+v3_markers = text.count(v3_marker)
+v3_helper = helper.replace(marker, v3_marker, 1).replace(v4_master, v3_master, 1)
+v2_helper = v3_helper.replace(v3_marker, v2_marker, 1)
 
 old_logic = r'''        $network = dvsModsDmrNetwork($master);
         if ($mode === 'DMR') {
@@ -217,7 +314,7 @@ new_logic = r'''        $network = ($mode === 'STFU') ? 'BM' : dvsModsDmrNetwork
 old_fallback = "        if ($talkgroup === '' && $mode === 'DMR') { $talkgroup = dvsModsDmrTalkgroup($abinfo); }"
 new_fallback = "        if ($talkgroup === '' && ($mode === 'DMR' || $mode === 'STFU')) { $talkgroup = dvsModsDmrTalkgroup($abinfo); }"
 
-if markers == 0 and v1_markers == 0 and v2_markers == 0:
+if markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0:
     if digest(text) != supported_hash:
         raise SystemExit("ERROR: unsupported unmodified status.php hash: " + digest(text))
     counts = (text.count(include_anchor), text.count(old_output), text.count(v2_output), text.count(new_output))
@@ -227,7 +324,7 @@ if markers == 0 and v1_markers == 0 and v2_markers == 0:
         raise SystemExit("ERROR: unexpected existing DMR friendly-name code")
     text = text.replace(include_anchor, include_anchor + helper, 1)
     text = text.replace(old_output, new_output, 1)
-elif markers == 0 and v1_markers == 1 and v2_markers == 0:
+elif markers == 0 and v1_markers == 1 and v2_markers == 0 and v3_markers == 0:
     if digest(text) != supported_v1_hash:
         raise SystemExit("ERROR: unsupported or altered v1 status.php hash: " + digest(text))
     counts = (text.count(old_logic), text.count(new_logic), text.count(old_fallback), text.count(new_fallback), text.count(v2_output), text.count(new_output))
@@ -236,8 +333,9 @@ elif markers == 0 and v1_markers == 1 and v2_markers == 0:
     text = text.replace(v1_marker, marker, 1)
     text = text.replace(old_logic, new_logic, 1)
     text = text.replace(old_fallback, new_fallback, 1)
+    text = text.replace(v3_master, v4_master, 1)
     text = text.replace(v2_output, new_output, 1)
-elif markers == 0 and v1_markers == 0 and v2_markers == 1:
+elif markers == 0 and v1_markers == 0 and v2_markers == 1 and v3_markers == 0:
     value = digest(text)
     if value not in (os.environ["DVS_DMR_V2_STATUS_HASH"], os.environ["DVS_YSF_STATUS_HASH"]):
         raise SystemExit("ERROR: unsupported modified v2 status.php hash: " + value)
@@ -249,11 +347,22 @@ elif markers == 0 and v1_markers == 0 and v2_markers == 1:
     if value == os.environ["DVS_YSF_STATUS_HASH"] and ysf_markers != 1:
         raise SystemExit("ERROR: final dashboard YSF marker is missing or ambiguous")
     text = text.replace(v2_marker, marker, 1)
+    text = text.replace(v3_master, v4_master, 1)
     text = text.replace(v2_output, new_output, 1)
-elif markers == 1 and v1_markers == 0 and v2_markers == 0:
+elif markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 1:
+    if text.count(v3_helper) != 1 or text.count(new_output) != 1 or text.count(v2_output) != 0 or text.count(old_output) != 0:
+        raise SystemExit("ERROR: incomplete or ambiguous DMR v3 friendly-name modification")
+    v2_text = text.replace(v3_marker, v2_marker, 1).replace(new_output, v2_output, 1)
+    v2_value = digest(v2_text)
+    if v2_value not in (os.environ["DVS_DMR_V2_STATUS_HASH"], os.environ["DVS_YSF_STATUS_HASH"]):
+        raise SystemExit("ERROR: DMR v3 status.php does not reverse to a supported v2 state: " + v2_value)
+    text = text.replace(v3_marker, marker, 1)
+    text = text.replace(v3_master, v4_master, 1)
+elif markers == 1 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0:
     if text.count(helper) != 1 or text.count(new_output) != 1 or text.count(v2_output) != 0 or text.count(old_output) != 0:
         raise SystemExit("ERROR: incomplete or ambiguous DMR friendly-name modification")
-    v2_text = text.replace(marker, v2_marker, 1).replace(new_output, v2_output, 1)
+    v3_text = text.replace(marker, v3_marker, 1).replace(v4_master, v3_master, 1)
+    v2_text = v3_text.replace(v3_marker, v2_marker, 1).replace(new_output, v2_output, 1)
     v2_value = digest(v2_text)
     if v2_value not in (os.environ["DVS_DMR_V2_STATUS_HASH"], os.environ["DVS_YSF_STATUS_HASH"]):
         raise SystemExit("ERROR: DMR v3 status.php does not reverse to a supported v2 state: " + v2_value)
