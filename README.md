@@ -23,7 +23,7 @@ Repairs correct confirmed defects in installed DVSwitch software.
 | `repair-dvswitch-txt-updater.sh` | 1.0.0 | Repairs and validates DVSwitch TXT database downloads with atomic replacement | Completed and tested |
 | `repair-p25-audio-announcement.sh` | 1.0.0 | Repairs immediate P25 remote voice announcements and adds an 800 ms silent lead-in | Completed and tested |
 | `repair-p25-dashboard.sh` | 1.1.0 | Recognizes P25Gateway remote-command and static-startup link messages | Completed and tested |
-| `repair-ysf-dashboard-null.sh` | 1.0.2 | Corrects case-sensitive YSF room matching and prevents a literal `null` fallback | Completed and tested |
+| `repair-ysf-dashboard-null.sh` | 1.0.3 | Corrects case-sensitive YSF room matching and prevents a literal `null` fallback | Completed and tested |
 
 ## Optional modifications
 
@@ -32,9 +32,9 @@ Modifications add optional behavior and are separate from repairs.
 | Script | Version | Purpose | Status |
 | --- | ---: | --- | --- |
 | `mod-p25-nxdn-json.sh` | 1.1.0 | Adds validated P25 and NXDN JSON database downloads | Completed and tested |
-| `mod-p25-nxdn-friendly-names.sh` | 1.1.3 | Displays P25 and NXDN reflector names with sponsor and numeric fallbacks | Completed and tested |
-| `mod-dstar-tx-ref.sh` | 1.0.3 | Adds D-Star Tx TG/Ref and reflector/module display | Completed and tested |
-| `mod-dmr-friendly-names.sh` | 1.4.0 | Displays BrandMeister, TGIF, and STFU talkgroup names, blocks stale cross-mode talkgroups, wraps long names, and preserves DMR status across an empty UTC-day log | Completed and tested |
+| `mod-p25-nxdn-friendly-names.sh` | 1.1.4 | Displays P25 and NXDN reflector names with sponsor and numeric fallbacks | Completed and tested |
+| `mod-dstar-tx-ref.sh` | 1.0.4 | Adds D-Star Tx TG/Ref and reflector/module display | Completed and tested |
+| `mod-dmr-friendly-names.sh` | 1.4.1 | Displays BrandMeister, TGIF, and STFU talkgroup names, removes saved foreign-mode pollution behind TGIF placeholder 9, blocks stale cross-mode talkgroups, wraps long names, and preserves DMR status across an empty UTC-day log | Completed and tested |
 
 ## Script operation
 
@@ -70,7 +70,7 @@ Use the exact backup name printed by a successful installation, such as `install
 | `mod-dmr-friendly-names.sh` | `mod-dstar-tx-ref.sh` and valid BrandMeister/TGIF lists |
 | `repair-ysf-dashboard-null.sh` | `mod-dmr-friendly-names.sh` and a valid YSF host list |
 
-The dashboard scripts intentionally validate the completed state produced by their prerequisites. They are not interchangeable or safely reorderable. Their compatibility checks also recognize the fully completed dashboard chain, including the DMR v4 transition protection and v5 log-status repair, so every script can be rechecked safely after all nine stages are installed.
+The dashboard scripts intentionally validate the completed state produced by their prerequisites. They are not interchangeable or safely reorderable. Their compatibility checks also recognize the fully completed dashboard chain, including the DMR v4 transition protection, v5 log-status repair, and v6 TGIF placeholder cleanup, so every script can be rechecked safely after all nine stages are installed.
 
 ## Complete installation order
 

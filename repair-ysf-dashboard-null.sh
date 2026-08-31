@@ -9,13 +9,14 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.0.2"
+readonly SCRIPT_VERSION="1.0.3"
 readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly HOSTS_FILE="/var/lib/mmdvm/YSFHosts.txt"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/ysf-dashboard-null"
 readonly SUPPORTED_HASH="3f2d81aad9fed503b38271fee033821d27aafea969ca6348fc0afc1c1a994d55"
 readonly DMR_V4_YSF_STATUS_HASH="628c5b2debc3b658a132b2e3b10c1e656ff59f9e5412af4a15afc5bb7b292aee"
 readonly DMR_V5_YSF_STATUS_HASH="02f4e7c6c5208d4f44bb559711cc006e0d8da7f4ad7ba5005ea47a4062330cf8"
+readonly DMR_V6_YSF_STATUS_HASH="9c7f1749a37830d5adf51912c880d4c9faf6a79157bba249156f03f86e81b09d"
 readonly REPAIR_MARKER="// DVSwitch-Mods: YSF dashboard null repair v1"
 readonly DASHBOARD_URL="https://127.0.0.1/dvswitch/"
 
@@ -66,6 +67,7 @@ PY_HOSTS
 patch_candidate() {
     STATUS_CANDIDATE="$WORK_DIR/status.php" DVS_SUPPORTED_HASH="$SUPPORTED_HASH" \
     DVS_DMR_V4_YSF_STATUS_HASH="$DMR_V4_YSF_STATUS_HASH" DVS_DMR_V5_YSF_STATUS_HASH="$DMR_V5_YSF_STATUS_HASH" \
+    DVS_DMR_V6_YSF_STATUS_HASH="$DMR_V6_YSF_STATUS_HASH" \
     DVS_REPAIR_MARKER="$REPAIR_MARKER" python3 - <<'PY_PATCH'
 from pathlib import Path
 import hashlib
@@ -113,7 +115,7 @@ elif markers == 1:
     if counts != (1, 0, 1, 0, 1):
         raise SystemExit("ERROR: incomplete or ambiguous YSF dashboard repair")
     recovered = text.replace(marker + "\n", "", 1).replace(new_fallback, old_fallback, 1).replace(new_match, old_match, 1)
-    if digest(text) not in (os.environ["DVS_DMR_V4_YSF_STATUS_HASH"], os.environ["DVS_DMR_V5_YSF_STATUS_HASH"]) and not supported_base(recovered):
+    if digest(text) not in (os.environ["DVS_DMR_V4_YSF_STATUS_HASH"], os.environ["DVS_DMR_V5_YSF_STATUS_HASH"], os.environ["DVS_DMR_V6_YSF_STATUS_HASH"]) and not supported_base(recovered):
         raise SystemExit("ERROR: repaired status.php does not reverse to the supported dashboard file")
 else:
     raise SystemExit("ERROR: duplicate YSF dashboard repair markers")
@@ -209,12 +211,13 @@ verify_installed() {
     [[ $(grep -Fc "$REPAIR_MARKER" "$TARGET") -eq 1 ]] || return 1
     [[ $(grep -Fc 'strcasecmp($ysfRoomTxtLine[0], $ysfLinkedTo)' "$TARGET") -eq 1 ]] || return 1
     [[ $(grep -Fc '$ysfLinkedToTxt = $ysfLinkedTo;' "$TARGET") -eq 1 ]] || return 1
-    local dmr_v2_count dmr_v3_count dmr_v4_count dmr_v5_count
+    local dmr_v2_count dmr_v3_count dmr_v4_count dmr_v5_count dmr_v6_count
     dmr_v2_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v2' "$TARGET" || true)
     dmr_v3_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v3' "$TARGET" || true)
     dmr_v4_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v4' "$TARGET" || true)
     dmr_v5_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v5' "$TARGET" || true)
-    [[ $((dmr_v2_count + dmr_v3_count + dmr_v4_count + dmr_v5_count)) -eq 1 ]] || return 1
+    dmr_v6_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v6' "$TARGET" || true)
+    [[ $((dmr_v2_count + dmr_v3_count + dmr_v4_count + dmr_v5_count + dmr_v6_count)) -eq 1 ]] || return 1
     [[ $(grep -Fc '>Tx TG/Ref</th>' "$TARGET") -eq 2 ]] || return 1
     [[ $(grep -Fc 'formatReflectorLink(' "$TARGET") -eq 2 ]] || return 1
     dashboard_health
