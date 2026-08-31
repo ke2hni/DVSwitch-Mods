@@ -8,7 +8,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.3.0"
+readonly SCRIPT_VERSION="1.4.0"
 readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly BM_LIST="/var/lib/mmdvm/TGList_BM.txt"
 readonly TGIF_LIST="/var/lib/mmdvm/TGList_TGIF.txt"
@@ -19,7 +19,8 @@ readonly SUPPORTED_V1_HASH="c1a910a0f6e486f7e5077056a73208a8291e35a979897b4e250a
 readonly DMR_V2_STATUS_HASH="3f2d81aad9fed503b38271fee033821d27aafea969ca6348fc0afc1c1a994d55"
 readonly YSF_STATUS_HASH="d3ba63a6e57801697797e6a3ea747ec8def51cad9deb48054a48dfe436f34e09"
 readonly DMR_V3_YSF_STATUS_HASH="75ff8fa3363c79e2109e32b83f4a2fb75f99b2a435072d18177a40fabacb301f"
-readonly MOD_MARKER="// DVSwitch-Mods: DMR Master friendly-name display v4"
+readonly DMR_V4_YSF_STATUS_HASH="628c5b2debc3b658a132b2e3b10c1e656ff59f9e5412af4a15afc5bb7b292aee"
+readonly MOD_MARKER="// DVSwitch-Mods: DMR Master friendly-name display v5"
 
 WORK_DIR=""
 ACTIVE_BACKUP=""
@@ -118,7 +119,8 @@ PY_STATE
 patch_candidate() {
     STATUS_CANDIDATE="$WORK_DIR/status.php" DVS_SUPPORTED_HASH="$SUPPORTED_HASH" DVS_SUPPORTED_V1_HASH="$SUPPORTED_V1_HASH" \
     DVS_DMR_V2_STATUS_HASH="$DMR_V2_STATUS_HASH" DVS_YSF_STATUS_HASH="$YSF_STATUS_HASH" \
-    DVS_DMR_V3_YSF_STATUS_HASH="$DMR_V3_YSF_STATUS_HASH" DVS_MOD_MARKER="$MOD_MARKER" python3 - <<'PY_PATCH'
+    DVS_DMR_V3_YSF_STATUS_HASH="$DMR_V3_YSF_STATUS_HASH" DVS_DMR_V4_YSF_STATUS_HASH="$DMR_V4_YSF_STATUS_HASH" \
+    DVS_MOD_MARKER="$MOD_MARKER" python3 - <<'PY_PATCH'
 from pathlib import Path
 import hashlib
 import os
@@ -130,10 +132,11 @@ marker = os.environ["DVS_MOD_MARKER"]
 v1_marker = "// DVSwitch-Mods: DMR Master friendly-name display v1"
 v2_marker = "// DVSwitch-Mods: DMR Master friendly-name display v2"
 v3_marker = "// DVSwitch-Mods: DMR Master friendly-name display v3"
+v4_marker = "// DVSwitch-Mods: DMR Master friendly-name display v4"
 
 include_anchor = "include_once dirname(dirname(__FILE__)).'/include/functions.php';\n"
 helper = r'''
-// DVSwitch-Mods: DMR Master friendly-name display v4
+// DVSwitch-Mods: DMR Master friendly-name display v5
 function dvsModsDmrNetwork($master) {
         $master = strtoupper(str_replace('_', ' ', (string)$master));
         if (strpos($master, 'TGIF') !== false) { return 'TGIF'; }
@@ -263,6 +266,14 @@ old_output = '''                        echo "<tr><td  style=\\"background: #fff
 v2_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight: bold\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
 new_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;text-align:center;\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
 
+old_log_lookup = '''                 if (file_exists("/var/log/mmdvm/MMDVM_Bridge-".gmdate("Y-m-d").".log")) { $dmrstat = exec('grep -a \\'DMR, Logged\\|DMR, Closing DMR\\|DMR, Opening DMR\\|DMR, Connection\\' /var/log/mmdvm/MMDVM_Bridge-'.gmdate("Y-m-d").'.log | tail -1 | awk \\'{print $5 " " $10}\\'');
+                 } else {$dmrstat = exec('grep -a \\'DMR, Logged\\|DMR, Closing DMR\\|DMR, Opening DMR\\|DMR, Connection\\' /var/log/mmdvm/MMDVM_Bridge-'.gmdate("Y-m-d", time() - 86340).'.log | tail -1 | awk \\'{print $5 " " $10}\\''); }'''
+new_log_lookup = '''                 $dmrstat = '';
+                 if (file_exists("/var/log/mmdvm/MMDVM_Bridge-".gmdate("Y-m-d").".log")) { $dmrstat = exec('grep -a \\'DMR, Logged\\|DMR, Closing DMR\\|DMR, Opening DMR\\|DMR, Connection\\' /var/log/mmdvm/MMDVM_Bridge-'.gmdate("Y-m-d").'.log | tail -1 | awk \\'{print $5 " " $10}\\''); }
+                 if ($dmrstat === '' && file_exists("/var/log/mmdvm/MMDVM_Bridge-".gmdate("Y-m-d", time() - 86340).".log")) { $dmrstat = exec('grep -a \\'DMR, Logged\\|DMR, Closing DMR\\|DMR, Opening DMR\\|DMR, Connection\\' /var/log/mmdvm/MMDVM_Bridge-'.gmdate("Y-m-d", time() - 86340).'.log | tail -1 | awk \\'{print $5 " " $10}\\''); }'''
+old_status_condition = "                else if (strpos($dmrstat, 'Opening') !== false || strpos($dmrstatus, 'Closing') !== false || strpos($dmrstatus, 'Connection') !== false) { "
+new_status_condition = "                else if (strpos($dmrstat, 'Opening') !== false || strpos($dmrstat, 'Closing') !== false || strpos($dmrstat, 'Connection') !== false) { "
+
 v3_master = r'''function dvsModsDmrMasterDisplay($master, $abinfo) {
         $state = dvsModsDmrStateRead();
         $mode = isset($abinfo['tlv']['ambe_mode']) ? strtoupper(trim((string)$abinfo['tlv']['ambe_mode'])) : '';
@@ -300,8 +311,10 @@ markers = text.count(marker)
 v1_markers = text.count(v1_marker)
 v2_markers = text.count(v2_marker)
 v3_markers = text.count(v3_marker)
+v4_markers = text.count(v4_marker)
 v3_helper = helper.replace(marker, v3_marker, 1).replace(v4_master, v3_master, 1)
 v2_helper = v3_helper.replace(v3_marker, v2_marker, 1)
+v4_helper = helper.replace(marker, v4_marker, 1)
 
 old_logic = r'''        $network = dvsModsDmrNetwork($master);
         if ($mode === 'DMR') {
@@ -314,7 +327,7 @@ new_logic = r'''        $network = ($mode === 'STFU') ? 'BM' : dvsModsDmrNetwork
 old_fallback = "        if ($talkgroup === '' && $mode === 'DMR') { $talkgroup = dvsModsDmrTalkgroup($abinfo); }"
 new_fallback = "        if ($talkgroup === '' && ($mode === 'DMR' || $mode === 'STFU')) { $talkgroup = dvsModsDmrTalkgroup($abinfo); }"
 
-if markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0:
+if markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 and v4_markers == 0:
     if digest(text) != supported_hash:
         raise SystemExit("ERROR: unsupported unmodified status.php hash: " + digest(text))
     counts = (text.count(include_anchor), text.count(old_output), text.count(v2_output), text.count(new_output))
@@ -324,7 +337,7 @@ if markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0:
         raise SystemExit("ERROR: unexpected existing DMR friendly-name code")
     text = text.replace(include_anchor, include_anchor + helper, 1)
     text = text.replace(old_output, new_output, 1)
-elif markers == 0 and v1_markers == 1 and v2_markers == 0 and v3_markers == 0:
+elif markers == 0 and v1_markers == 1 and v2_markers == 0 and v3_markers == 0 and v4_markers == 0:
     if digest(text) != supported_v1_hash:
         raise SystemExit("ERROR: unsupported or altered v1 status.php hash: " + digest(text))
     counts = (text.count(old_logic), text.count(new_logic), text.count(old_fallback), text.count(new_fallback), text.count(v2_output), text.count(new_output))
@@ -335,7 +348,7 @@ elif markers == 0 and v1_markers == 1 and v2_markers == 0 and v3_markers == 0:
     text = text.replace(old_fallback, new_fallback, 1)
     text = text.replace(v3_master, v4_master, 1)
     text = text.replace(v2_output, new_output, 1)
-elif markers == 0 and v1_markers == 0 and v2_markers == 1 and v3_markers == 0:
+elif markers == 0 and v1_markers == 0 and v2_markers == 1 and v3_markers == 0 and v4_markers == 0:
     value = digest(text)
     if value not in (os.environ["DVS_DMR_V2_STATUS_HASH"], os.environ["DVS_YSF_STATUS_HASH"]):
         raise SystemExit("ERROR: unsupported modified v2 status.php hash: " + value)
@@ -349,7 +362,7 @@ elif markers == 0 and v1_markers == 0 and v2_markers == 1 and v3_markers == 0:
     text = text.replace(v2_marker, marker, 1)
     text = text.replace(v3_master, v4_master, 1)
     text = text.replace(v2_output, new_output, 1)
-elif markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 1:
+elif markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 1 and v4_markers == 0:
     if text.count(v3_helper) != 1 or text.count(new_output) != 1 or text.count(v2_output) != 0 or text.count(old_output) != 0:
         raise SystemExit("ERROR: incomplete or ambiguous DMR v3 friendly-name modification")
     v2_text = text.replace(v3_marker, v2_marker, 1).replace(new_output, v2_output, 1)
@@ -358,10 +371,17 @@ elif markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 1:
         raise SystemExit("ERROR: DMR v3 status.php does not reverse to a supported v2 state: " + v2_value)
     text = text.replace(v3_marker, marker, 1)
     text = text.replace(v3_master, v4_master, 1)
-elif markers == 1 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0:
+elif markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 and v4_markers == 1:
+    if digest(text) != os.environ["DVS_DMR_V4_YSF_STATUS_HASH"]:
+        raise SystemExit("ERROR: unsupported or altered DMR v4 status.php hash: " + digest(text))
+    if text.count(v4_helper) != 1 or text.count(new_output) != 1 or text.count(v2_output) != 0 or text.count(old_output) != 0:
+        raise SystemExit("ERROR: incomplete or ambiguous DMR v4 friendly-name modification")
+    text = text.replace(v4_marker, marker, 1)
+elif markers == 1 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 and v4_markers == 0:
     if text.count(helper) != 1 or text.count(new_output) != 1 or text.count(v2_output) != 0 or text.count(old_output) != 0:
         raise SystemExit("ERROR: incomplete or ambiguous DMR friendly-name modification")
-    v3_text = text.replace(marker, v3_marker, 1).replace(v4_master, v3_master, 1)
+    reversible_text = text.replace(new_log_lookup, old_log_lookup, 1).replace(new_status_condition, old_status_condition, 1)
+    v3_text = reversible_text.replace(marker, v3_marker, 1).replace(v4_master, v3_master, 1)
     v2_text = v3_text.replace(v3_marker, v2_marker, 1).replace(new_output, v2_output, 1)
     v2_value = digest(v2_text)
     if v2_value not in (os.environ["DVS_DMR_V2_STATUS_HASH"], os.environ["DVS_YSF_STATUS_HASH"]):
@@ -373,6 +393,13 @@ elif markers == 1 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0:
         raise SystemExit("ERROR: final dashboard YSF marker is missing or ambiguous")
 else:
     raise SystemExit("ERROR: duplicate or mixed DMR friendly-name modification markers")
+
+log_counts = (text.count(old_log_lookup), text.count(new_log_lookup), text.count(old_status_condition), text.count(new_status_condition))
+if log_counts == (1, 0, 1, 0):
+    text = text.replace(old_log_lookup, new_log_lookup, 1)
+    text = text.replace(old_status_condition, new_status_condition, 1)
+elif log_counts != (0, 1, 0, 1):
+    raise SystemExit("ERROR: incomplete or ambiguous DMR log-status repair anchors: " + repr(log_counts))
 
 path.write_text(text, encoding="utf-8")
 PY_PATCH
@@ -483,6 +510,8 @@ verify_installed() {
     if [[ $(grep -Fc "$MOD_MARKER" "$TARGET") -ne 1 ]]; then printf 'ERROR: installed modification marker is missing or duplicated.\n' >&2; return 1; fi
     if [[ $(grep -Fc 'dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)' "$TARGET") -ne 1 ]]; then printf 'ERROR: DMR Master display wrapper is missing or duplicated.\n' >&2; return 1; fi
     if [[ $(grep -Fc 'white-space:normal;word-break:normal;overflow-wrap:anywhere;text-align:center;' "$TARGET") -ne 1 ]]; then printf 'ERROR: DMR Master wrapping style is missing or duplicated.\n' >&2; return 1; fi
+    if [[ $(grep -Fc "\$dmrstat === '' && file_exists(\"/var/log/mmdvm/MMDVM_Bridge-\".gmdate(\"Y-m-d\", time() - 86340).\".log\")" "$TARGET") -ne 1 ]]; then printf 'ERROR: DMR previous-log fallback is missing or duplicated.\n' >&2; return 1; fi
+    if grep -Fq 'strpos($dmrstatus,' "$TARGET"; then printf 'ERROR: obsolete DMR status variable remains installed.\n' >&2; return 1; fi
     if [[ $(grep -Fc '>Tx TG/Ref</th>' "$TARGET") -ne 2 ]]; then printf 'ERROR: D-Star Tx TG/Ref labels were not preserved.\n' >&2; return 1; fi
     if [[ $(grep -Fc 'formatReflectorLink(' "$TARGET") -ne 2 ]]; then printf 'ERROR: P25/NXDN friendly-name wrappers were not preserved.\n' >&2; return 1; fi
     if [[ ! -f "$STATE_FILE" || -L "$STATE_FILE" ]]; then printf 'ERROR: DMR state file is missing or unsafe.\n' >&2; return 1; fi
