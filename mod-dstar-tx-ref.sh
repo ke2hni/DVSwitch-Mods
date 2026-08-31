@@ -8,7 +8,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.0.2"
+readonly SCRIPT_VERSION="1.0.3"
 readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dstar-tx-ref"
 readonly SUPPORTED_HASH="5b21a7a8e4e4a753ba3881bc3077ea4a1047c2e1d969cbd8f2b1c3a6c15976f3"
@@ -17,6 +17,8 @@ readonly DMR_V1_STATUS_HASH="c1a910a0f6e486f7e5077056a73208a8291e35a979897b4e250
 readonly DMR_V2_STATUS_HASH="3f2d81aad9fed503b38271fee033821d27aafea969ca6348fc0afc1c1a994d55"
 readonly YSF_STATUS_HASH="d3ba63a6e57801697797e6a3ea747ec8def51cad9deb48054a48dfe436f34e09"
 readonly DMR_V3_YSF_STATUS_HASH="75ff8fa3363c79e2109e32b83f4a2fb75f99b2a435072d18177a40fabacb301f"
+readonly DMR_V4_YSF_STATUS_HASH="628c5b2debc3b658a132b2e3b10c1e656ff59f9e5412af4a15afc5bb7b292aee"
+readonly DMR_V5_YSF_STATUS_HASH="02f4e7c6c5208d4f44bb559711cc006e0d8da7f4ad7ba5005ea47a4062330cf8"
 readonly MOD_MARKER="// DVSwitch-Mods: D-Star Tx TG/Ref display v1"
 
 WORK_DIR=""
@@ -42,7 +44,8 @@ patch_candidate() {
     STATUS_CANDIDATE="$WORK_DIR/status.php" DVS_SUPPORTED_HASH="$SUPPORTED_HASH" DVS_MOD_MARKER="$MOD_MARKER" \
     DVS_DSTAR_STATUS_HASH="$DSTAR_STATUS_HASH" DVS_DMR_V1_STATUS_HASH="$DMR_V1_STATUS_HASH" \
     DVS_DMR_V2_STATUS_HASH="$DMR_V2_STATUS_HASH" DVS_YSF_STATUS_HASH="$YSF_STATUS_HASH" \
-    DVS_DMR_V3_YSF_STATUS_HASH="$DMR_V3_YSF_STATUS_HASH" python3 - <<'PY_PATCH'
+    DVS_DMR_V3_YSF_STATUS_HASH="$DMR_V3_YSF_STATUS_HASH" DVS_DMR_V4_YSF_STATUS_HASH="$DMR_V4_YSF_STATUS_HASH" \
+    DVS_DMR_V5_YSF_STATUS_HASH="$DMR_V5_YSF_STATUS_HASH" python3 - <<'PY_PATCH'
 from pathlib import Path
 import hashlib
 import os
@@ -68,14 +71,16 @@ row_new = '''    echo "<tr><th width=50%>Tx TG/Ref</th><td style=\\"background: 
 def digest(value):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
-def require_downstream_markers(value, dmr_v1, dmr_v2, dmr_v3, ysf):
+def require_downstream_markers(value, dmr_v1, dmr_v2, dmr_v3, dmr_v4, dmr_v5, ysf):
     counts = (
         value.count("// DVSwitch-Mods: DMR Master friendly-name display v1"),
         value.count("// DVSwitch-Mods: DMR Master friendly-name display v2"),
         value.count("// DVSwitch-Mods: DMR Master friendly-name display v3"),
+        value.count("// DVSwitch-Mods: DMR Master friendly-name display v4"),
+        value.count("// DVSwitch-Mods: DMR Master friendly-name display v5"),
         value.count("// DVSwitch-Mods: YSF dashboard null repair v1"),
     )
-    if counts != (dmr_v1, dmr_v2, dmr_v3, ysf):
+    if counts != (dmr_v1, dmr_v2, dmr_v3, dmr_v4, dmr_v5, ysf):
         raise SystemExit("ERROR: downstream dashboard markers are missing or ambiguous: " + repr(counts))
 
 text = path.read_text(encoding="utf-8")
@@ -102,15 +107,19 @@ elif markers == 1:
     if value == os.environ["DVS_DSTAR_STATUS_HASH"]:
         if digest(recovered) != supported_hash:
             raise SystemExit("ERROR: D-Star status.php does not reverse to the supported friendly-name file")
-        require_downstream_markers(text, 0, 0, 0, 0)
+        require_downstream_markers(text, 0, 0, 0, 0, 0, 0)
     elif value == os.environ["DVS_DMR_V1_STATUS_HASH"]:
-        require_downstream_markers(text, 1, 0, 0, 0)
+        require_downstream_markers(text, 1, 0, 0, 0, 0, 0)
     elif value == os.environ["DVS_DMR_V2_STATUS_HASH"]:
-        require_downstream_markers(text, 0, 1, 0, 0)
+        require_downstream_markers(text, 0, 1, 0, 0, 0, 0)
     elif value == os.environ["DVS_YSF_STATUS_HASH"]:
-        require_downstream_markers(text, 0, 1, 0, 1)
+        require_downstream_markers(text, 0, 1, 0, 0, 0, 1)
     elif value == os.environ["DVS_DMR_V3_YSF_STATUS_HASH"]:
-        require_downstream_markers(text, 0, 0, 1, 1)
+        require_downstream_markers(text, 0, 0, 1, 0, 0, 1)
+    elif value == os.environ["DVS_DMR_V4_YSF_STATUS_HASH"]:
+        require_downstream_markers(text, 0, 0, 0, 1, 0, 1)
+    elif value == os.environ["DVS_DMR_V5_YSF_STATUS_HASH"]:
+        require_downstream_markers(text, 0, 0, 0, 0, 1, 1)
     else:
         raise SystemExit("ERROR: unsupported modified status.php hash: " + value)
 else:
