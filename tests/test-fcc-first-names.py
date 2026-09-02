@@ -102,6 +102,8 @@ patcher.SUPPORTED["lh.php"].add(patcher.digest(lh))
 patcher.SUPPORTED["localtx.php"].add(patcher.digest(localtx))
 patched_lh = patcher.patch_text(lh, "lh.php")
 patched_local = patcher.patch_text(localtx, "localtx.php")
+patcher.SUPPORTED_MODIFIED["lh.php"].add(patcher.digest(patched_lh))
+patcher.SUPPORTED_MODIFIED["localtx.php"].add(patcher.digest(patched_local))
 for value in (patched_lh, patched_local):
     require(value.count(patcher.MARKER) == 1, "marker missing")
     require(value.count(patcher.INCLUDE) == 1, "helper include missing")
@@ -110,6 +112,12 @@ for value in (patched_lh, patched_local):
     require(value.count("echo '<td align=\"left\" style=\"font-weight:bold;color:#464646;\">&nbsp;<b>'.htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, \"UTF-8\").'</b></td>';" ) == 1, "safe PHP name-cell output is missing")
 require(patcher.patch_text(patched_lh, "lh.php") == patched_lh, "lh patch is not idempotent")
 require(patcher.patch_text(patched_local, "localtx.php") == patched_local, "localtx patch is not idempotent")
+try:
+    patcher.patch_text(patched_lh + "<!-- altered -->\n", "lh.php")
+except patcher.PatchError:
+    pass
+else:
+    raise AssertionError("altered modified checksum was accepted")
 
 with tempfile.TemporaryDirectory() as directory:
     root = Path(directory)

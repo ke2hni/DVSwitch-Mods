@@ -22,6 +22,16 @@ SUPPORTED = {
         "cd0fa845874efe221546b54055b9cb20a9631badcd9ec63f1cd544337a2f1b9e",
     },
 }
+SUPPORTED_MODIFIED = {
+    "lh.php": {
+        "464e3540d1cb8e61a6a9731840000e544bd49972b64939db3198e9d1637df343",
+        "98f0347584ad7f409a6111ed1bd53beec69ba9ecd80838f0c5599cb465337b30",
+    },
+    "localtx.php": {
+        "fab0efbc0b540d87996c886a63b0b1f68248641404d8afb5eafa7cfd9f818f6c",
+        "ba27d38ed7a72cdd48516c1269c904c19ddcf7b152700cbf3941e6fd02ff2fb9",
+    },
+}
 
 
 class PatchError(RuntimeError):
@@ -94,6 +104,8 @@ def patch_text(text: str, name: str) -> str:
     if text.count(MARKER) == 1:
         if text.count(INCLUDE) != 1 or text.count("dvsModsFccFirstName($listElem[2])") != 1 or text.count("<th>Name</th>") != 1:
             raise PatchError(f"incomplete modified {name}")
+        if digest(text) not in SUPPORTED_MODIFIED[name]:
+            raise PatchError(f"unsupported modified {name} hash: {digest(text)}")
         return text
     if MARKER in text:
         raise PatchError(f"duplicate markers in {name}")
