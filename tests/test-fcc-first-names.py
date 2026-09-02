@@ -10,6 +10,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+INSTALLER = ROOT / "mod-dashboard-fcc-first-names.sh"
 
 
 def load(name, path):
@@ -130,5 +131,9 @@ with tempfile.TemporaryDirectory() as directory:
         first = raw
         patcher.patch_file(path)
         require(path.read_bytes() == first, f"{name} CRLF patch is not idempotent")
+
+installer = INSTALLER.read_text(encoding="utf-8")
+require('readonly WORK_ROOT="/var/lib/mmdvm"' in installer, "installer work root is not on persistent storage")
+require("/var/tmp/dvswitch-fcc-firstnames" not in installer and "/tmp/dvswitch-fcc-firstnames" not in installer, "installer still uses a size-limited temporary filesystem")
 
 print("PASS: FCC first-name builder and dashboard patcher tests")

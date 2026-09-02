@@ -15,6 +15,7 @@ readonly LH_TARGET="/usr/share/dvswitch/include/lh.php"
 readonly LOCALTX_TARGET="/usr/share/dvswitch/include/localtx.php"
 readonly HELPER_TARGET="/usr/share/dvswitch/include/dvswitch_mods_fcc_first_names.php"
 readonly DATABASE_TARGET="/var/lib/mmdvm/dvswitch-mods-fcc-first-names.dat"
+readonly WORK_ROOT="/var/lib/mmdvm"
 readonly FCC_URL="https://data.fcc.gov/download/pub/uls/complete/l_amat.zip"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"
 readonly DASHBOARD_URL="https://127.0.0.1/dvswitch/"
@@ -66,7 +67,8 @@ preflight() {
 }
 
 prepare_dashboard() {
-    [[ -n "$WORK_DIR" ]] || WORK_DIR=$(mktemp -d /var/tmp/dvswitch-fcc-firstnames.XXXXXX)
+    [[ -d "$WORK_ROOT" && ! -L "$WORK_ROOT" ]] || die "Required work root is unavailable: $WORK_ROOT"
+    [[ -n "$WORK_DIR" ]] || WORK_DIR=$(mktemp -d "$WORK_ROOT/.dvswitch-fcc-firstnames.XXXXXX")
     cp -- "$LH_TARGET" "$WORK_DIR/lh.php"
     cp -- "$LOCALTX_TARGET" "$WORK_DIR/localtx.php"
     python3 "$PATCHER" --lh "$WORK_DIR/lh.php" --localtx "$WORK_DIR/localtx.php"
@@ -78,7 +80,8 @@ prepare_dashboard() {
 }
 
 build_database() {
-    [[ -n "$WORK_DIR" ]] || WORK_DIR=$(mktemp -d /var/tmp/dvswitch-fcc-firstnames.XXXXXX)
+    [[ -d "$WORK_ROOT" && ! -L "$WORK_ROOT" ]] || die "Required work root is unavailable: $WORK_ROOT"
+    [[ -n "$WORK_DIR" ]] || WORK_DIR=$(mktemp -d "$WORK_ROOT/.dvswitch-fcc-firstnames.XXXXXX")
     local archive="$WORK_DIR/l_amat.zip"
     printf 'Downloading FCC weekly Amateur Radio Service archive...\n'
     curl --fail --location --silent --show-error --connect-timeout 30 --max-time 900 --retry 2 --output "$archive" "$FCC_URL"
