@@ -35,6 +35,7 @@ Modifications add optional behavior and are separate from repairs.
 | `mod-p25-nxdn-friendly-names.sh` | 1.1.5 | Displays P25 and NXDN reflector names with sponsor and numeric fallbacks; recognizes the completed DMR v7 dashboard checksum | Completed and tested |
 | `mod-dstar-tx-ref.sh` | 1.0.5 | Adds D-Star Tx TG/Ref and reflector/module display; recognizes the completed DMR v7 dashboard checksum | Completed and tested |
 | `mod-dmr-friendly-names.sh` | 1.5.0 | Displays dynamic `DMR BM Master` and `DMR TGIF Master` headings plus BrandMeister, TGIF, and STFU talkgroup names; retains the last DMR network outside DMR mode; removes saved foreign-mode pollution behind TGIF placeholder 9; blocks stale cross-mode talkgroups; wraps long names; and preserves DMR status across an empty UTC-day log | Completed and tested |
+| `mod-dashboard-fcc-first-names.sh` | 0.1.0-dev | Adds FCC first names to Gateway and Local Activity using an atomically updated local weekly database | Development; test-node validation pending |
 
 ## Script operation
 
@@ -45,6 +46,8 @@ sudo ./SCRIPT_NAME.sh --check
 sudo ./SCRIPT_NAME.sh --install
 sudo ./SCRIPT_NAME.sh --restore BACKUP_NAME
 ```
+
+`mod-dashboard-fcc-first-names.sh` also provides `--update` to download, validate, and atomically replace only its local FCC first-name database.
 
 Each script provides exact compatibility checks, protected timestamped backups outside live directories, atomic replacement, changed-file validation, automatic installation rollback, named restoration, idempotency, and no unnecessary backup when already installed. Installers preserve the existing owner, group, and permission mode of replaced files; protected backups retain the original files for exact restoration.
 
@@ -69,6 +72,7 @@ Use the exact backup name printed by a successful installation, such as `install
 | `mod-dstar-tx-ref.sh` | `mod-p25-nxdn-friendly-names.sh` |
 | `mod-dmr-friendly-names.sh` | `mod-dstar-tx-ref.sh` and valid BrandMeister/TGIF lists |
 | `repair-ysf-dashboard-null.sh` | `mod-dmr-friendly-names.sh` and a valid YSF host list |
+| `mod-dashboard-fcc-first-names.sh` | Independent of the nine-stage chain; Internet access is required for `--install` and `--update` |
 
 The dashboard scripts intentionally validate the completed state produced by their prerequisites. They are not interchangeable or safely reorderable. Their compatibility checks also recognize the fully completed dashboard chain, including the DMR v4 transition protection, v5 log-status repair, v6 TGIF placeholder cleanup, and v7 BM/TGIF network heading, so every script can be rechecked safely after all nine stages are installed.
 
@@ -85,6 +89,7 @@ When every repair and modification is wanted, use this order:
 7. `mod-dstar-tx-ref.sh`
 8. `mod-dmr-friendly-names.sh`
 9. `repair-ysf-dashboard-null.sh`
+10. `mod-dashboard-fcc-first-names.sh` (optional and independent after the dashboard baseline is established)
 
 The three independent repairs may be performed separately when their corresponding defects apply. Follow the dependency table before selecting anything from the dashboard or database chain.
 
