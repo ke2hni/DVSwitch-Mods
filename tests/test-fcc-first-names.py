@@ -107,6 +107,8 @@ v1_lh = patched_lh.replace("width:115px", "width:140px", 1)
 v1_local = patched_local.replace("width:115px", "width:140px", 1)
 patcher.SUPPORTED_MODIFIED_V1["lh.php"].add(patcher.digest(v1_lh))
 patcher.SUPPORTED_MODIFIED_V1["localtx.php"].add(patcher.digest(v1_local))
+patcher.SUPPORTED_MODIFIED_V2["lh.php"].add(patcher.digest(patched_lh))
+patcher.SUPPORTED_MODIFIED_V2["localtx.php"].add(patcher.digest(patched_local))
 for value in (patched_lh, patched_local):
     require(value.count(patcher.MARKER) == 1, "marker missing")
     require(value.count(patcher.INCLUDE) == 1, "helper include missing")

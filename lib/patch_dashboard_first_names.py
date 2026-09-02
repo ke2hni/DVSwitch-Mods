@@ -32,6 +32,16 @@ SUPPORTED_MODIFIED_V1 = {
         "ba27d38ed7a72cdd48516c1269c904c19ddcf7b152700cbf3941e6fd02ff2fb9",
     },
 }
+SUPPORTED_MODIFIED_V2 = {
+    "lh.php": {
+        "d3ec7d18720de2e14d20de0ea6cbbfd232acb4c33b304195242962dfd1c6b4cd",
+        "ff5a497ed23e8c0fd467e69cd730d9d45a0c243d5ac54d9040a24500b4b449f0",
+    },
+    "localtx.php": {
+        "c231c522a29aa486f37c9e8c944ce82a25b188e301fb6a7a50ae1cd2469e3d02",
+        "bf39a188d3bab2ed46386a4bd716cde476c78e5db3cf818afc906c455a3d441f",
+    },
+}
 
 
 class PatchError(RuntimeError):
@@ -105,6 +115,8 @@ def patch_text(text: str, name: str) -> str:
         if text.count(INCLUDE) != 1 or text.count("dvsModsFccFirstName($listElem[2])") != 1 or text.count("<th>Name</th>") != 1:
             raise PatchError(f"incomplete modified {name}")
         value = digest(text)
+        if value in SUPPORTED_MODIFIED_V2[name]:
+            return text
         if value in SUPPORTED_MODIFIED_V1[name]:
             if text.count("white-space:nowrap;width:140px;") != 1:
                 raise PatchError(f"invalid v1 time width in {name}")

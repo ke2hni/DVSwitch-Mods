@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="0.1.0-dev"
+readonly SCRIPT_VERSION="1.0.0"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PATCHER="$SCRIPT_DIR/lib/patch_dashboard_first_names.py"
 readonly BUILDER="$SCRIPT_DIR/lib/build_fcc_first_names.py"
