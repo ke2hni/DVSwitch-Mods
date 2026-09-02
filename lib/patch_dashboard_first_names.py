@@ -54,16 +54,18 @@ def patch_lh(text: str) -> str:
     if (DISPLAYNAME == "YES" && file_exists(DMRIDDATPATH."/DMRIds.dat") && ! empty(DMRIDDATPATH."/DMRIds.dat")) { echo "<th>Name</th>"; }
 ?>'''
     text = replace_once(text, old_header, "      <th>Callsign</th>\n      <th>Name</th>", "lh stock name header")
-    start = "                // Display NAME by DV8AWC\n"
-    end = "                if (strlen($listElem[4]) == 1)"
-    if text.count(start) != 1 or text.count(end) != 1:
+    start_token = "// Display NAME by DV8AWC"
+    end_token = "if (strlen($listElem[4]) == 1)"
+    if text.count(start_token) != 1 or text.count(end_token) != 1:
         raise PatchError("unsupported or ambiguous lh stock name block")
-    before, remainder = text.split(start, 1)
-    _old, after = remainder.split(end, 1)
+    start = text.rfind("\n", 0, text.index(start_token)) + 1
+    end = text.rfind("\n", 0, text.index(end_token)) + 1
+    if start >= end:
+        raise PatchError("invalid lh stock name-block order")
     replacement = '''                $dvsModsFirstName = dvsModsFccFirstName($listElem[2]);
                 echo "<td align=\"left\" style=\"font-weight:bold;color:#464646;\">&nbsp;<b>".htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')."</b></td>";
 '''
-    return before + replacement + end + after
+    return text[:start] + replacement + text[end:]
 
 
 def patch_localtx(text: str) -> str:
@@ -78,13 +80,14 @@ def patch_localtx(text: str) -> str:
     )
     text = replace_once(text, "      <th>Time (<?php echo date('T')?>)</th>", "      <th style=\"white-space:nowrap;width:140px;\">Time (<?php echo date('T')?>)</th>", "localtx time header")
     text = replace_once(text, "      <th>Callsign</th>\n      <th>Target</th>", "      <th>Callsign</th>\n      <th>Name</th>\n      <th>Target</th>", "localtx name header")
-    anchor = '''                    }
-                        if (strlen($listElem[4]) == 1)'''
-    replacement = '''                    }
-                        $dvsModsFirstName = dvsModsFccFirstName($listElem[2]);
+    token = "if (strlen($listElem[4]) == 1)"
+    if text.count(token) != 1:
+        raise PatchError(f"unsupported or ambiguous localtx callsign block: {text.count(token)} matches")
+    insertion = text.rfind("\n", 0, text.index(token)) + 1
+    replacement = '''                        $dvsModsFirstName = dvsModsFccFirstName($listElem[2]);
                         echo "<td align=\"left\" style=\"font-weight:bold;color:#464646;\">&nbsp;<b>".htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')."</b></td>";
-                        if (strlen($listElem[4]) == 1)'''
-    return replace_once(text, anchor, replacement, "localtx callsign block")
+'''
+    return text[:insertion] + replacement + text[insertion:]
 
 
 def patch_text(text: str, name: str) -> str:
