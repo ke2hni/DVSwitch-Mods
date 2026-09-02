@@ -107,6 +107,7 @@ for value in (patched_lh, patched_local):
     require(value.count(patcher.INCLUDE) == 1, "helper include missing")
     require(value.count("<th>Name</th>") == 1, "Name heading missing")
     require(value.count("dvsModsFccFirstName($listElem[2])") == 1, "lookup call missing")
+    require(value.count("echo '<td align=\"left\" style=\"font-weight:bold;color:#464646;\">&nbsp;<b>'.htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, \"UTF-8\").'</b></td>';" ) == 1, "safe PHP name-cell output is missing")
 require(patcher.patch_text(patched_lh, "lh.php") == patched_lh, "lh patch is not idempotent")
 require(patcher.patch_text(patched_local, "localtx.php") == patched_local, "localtx patch is not idempotent")
 

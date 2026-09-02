@@ -63,7 +63,7 @@ def patch_lh(text: str) -> str:
     if start >= end:
         raise PatchError("invalid lh stock name-block order")
     replacement = '''                $dvsModsFirstName = dvsModsFccFirstName($listElem[2]);
-                echo "<td align=\"left\" style=\"font-weight:bold;color:#464646;\">&nbsp;<b>".htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')."</b></td>";
+                echo '<td align="left" style="font-weight:bold;color:#464646;">&nbsp;<b>'.htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").'</b></td>';
 '''
     return text[:start] + replacement + text[end:]
 
@@ -85,7 +85,7 @@ def patch_localtx(text: str) -> str:
         raise PatchError(f"unsupported or ambiguous localtx callsign block: {text.count(token)} matches")
     insertion = text.rfind("\n", 0, text.index(token)) + 1
     replacement = '''                        $dvsModsFirstName = dvsModsFccFirstName($listElem[2]);
-                        echo "<td align=\"left\" style=\"font-weight:bold;color:#464646;\">&nbsp;<b>".htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')."</b></td>";
+                        echo '<td align="left" style="font-weight:bold;color:#464646;">&nbsp;<b>'.htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").'</b></td>';
 '''
     return text[:insertion] + replacement + text[insertion:]
 
