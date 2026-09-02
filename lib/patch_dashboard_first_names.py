@@ -14,12 +14,12 @@ MARKER = "// DVSwitch-Mods: FCC first-name activity columns v1"
 INCLUDE = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_fcc_first_names.php';"
 SUPPORTED = {
     "lh.php": {
-        "f45377136d9163f835a89b8d628fb3c1bdd17005d34b5ed0a30e86fce0c9e45e",
-        "44c49fa71aeeafcb82fe7237aceab990f0706e829d5b12ff7a3548ba189904fb",
+        "f8e6c9801c2613796f070921cee442943ed2dfdd4ec2466a266a6df369a8dc70",
+        "8cca963621cd9e1dd393826cb48d71df9f4fb0d6a88a578e5043bf9c5915926d",
     },
     "localtx.php": {
-        "82b1b8077799748200904149eac1f18c3fdca0b35210b21640691d3a2de60206",
-        "1b36452504c9d483eea618b4764da092a3f266b48ebf3c8d1095c6251ba823f7",
+        "decf6b59e0eba78877381e2b3d9bdf70dbbeab4d9fdb24f3eefb62e3233453b4",
+        "cd0fa845874efe221546b54055b9cb20a9631badcd9ec63f1cd544337a2f1b9e",
     },
 }
 
@@ -103,8 +103,18 @@ def patch_text(text: str, name: str) -> str:
 
 
 def patch_file(path: Path) -> None:
-    text = path.read_text(encoding="utf-8")
-    path.write_text(patch_text(text, path.name), encoding="utf-8")
+    raw = path.read_bytes()
+    if b"\r\n" in raw and raw.count(b"\r\n") == raw.count(b"\n"):
+        newline = "\r\n"
+    elif b"\r" not in raw:
+        newline = "\n"
+    else:
+        raise PatchError(f"unsupported mixed line endings in {path.name}")
+    text = raw.decode("utf-8").replace("\r\n", "\n")
+    result = patch_text(text, path.name)
+    if newline == "\r\n":
+        result = result.replace("\n", "\r\n")
+    path.write_bytes(result.encode("utf-8"))
 
 
 def main() -> None:

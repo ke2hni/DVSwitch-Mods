@@ -110,4 +110,16 @@ for value in (patched_lh, patched_local):
 require(patcher.patch_text(patched_lh, "lh.php") == patched_lh, "lh patch is not idempotent")
 require(patcher.patch_text(patched_local, "localtx.php") == patched_local, "localtx patch is not idempotent")
 
+with tempfile.TemporaryDirectory() as directory:
+    root = Path(directory)
+    for name, fixture in (("lh.php", lh), ("localtx.php", localtx)):
+        path = root / name
+        path.write_bytes(fixture.replace("\n", "\r\n").encode())
+        patcher.patch_file(path)
+        raw = path.read_bytes()
+        require(raw.count(b"\r\n") == raw.count(b"\n"), f"{name} CRLF endings were not preserved")
+        first = raw
+        patcher.patch_file(path)
+        require(path.read_bytes() == first, f"{name} CRLF patch is not idempotent")
+
 print("PASS: FCC first-name builder and dashboard patcher tests")
