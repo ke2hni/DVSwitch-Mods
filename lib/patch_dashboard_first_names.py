@@ -22,7 +22,7 @@ SUPPORTED = {
         "cd0fa845874efe221546b54055b9cb20a9631badcd9ec63f1cd544337a2f1b9e",
     },
 }
-SUPPORTED_MODIFIED = {
+SUPPORTED_MODIFIED_V1 = {
     "lh.php": {
         "464e3540d1cb8e61a6a9731840000e544bd49972b64939db3198e9d1637df343",
         "98f0347584ad7f409a6111ed1bd53beec69ba9ecd80838f0c5599cb465337b30",
@@ -58,7 +58,7 @@ def patch_lh(text: str) -> str:
         "include_once dirname(dirname(__FILE__)).'/include/functions.php';    \n" + INCLUDE + "\n",
         "lh include anchor",
     )
-    text = replace_once(text, "      <th>Time (<?php echo date('T')?>)</th>", "      <th style=\"white-space:nowrap;width:140px;\">Time (<?php echo date('T')?>)</th>", "lh time header")
+    text = replace_once(text, "      <th>Time (<?php echo date('T')?>)</th>", "      <th style=\"white-space:nowrap;width:115px;\">Time (<?php echo date('T')?>)</th>", "lh time header")
     old_header = '''      <th>Callsign</th>
 <?php
     if (DISPLAYNAME == "YES" && file_exists(DMRIDDATPATH."/DMRIds.dat") && ! empty(DMRIDDATPATH."/DMRIds.dat")) { echo "<th>Name</th>"; }
@@ -88,7 +88,7 @@ def patch_localtx(text: str) -> str:
         "include_once dirname(dirname(__FILE__)).'/include/functions.php';    \n" + INCLUDE + "\n",
         "localtx include anchor",
     )
-    text = replace_once(text, "      <th>Time (<?php echo date('T')?>)</th>", "      <th style=\"white-space:nowrap;width:140px;\">Time (<?php echo date('T')?>)</th>", "localtx time header")
+    text = replace_once(text, "      <th>Time (<?php echo date('T')?>)</th>", "      <th style=\"white-space:nowrap;width:115px;\">Time (<?php echo date('T')?>)</th>", "localtx time header")
     text = replace_once(text, "      <th>Callsign</th>\n      <th>Target</th>", "      <th>Callsign</th>\n      <th>Name</th>\n      <th>Target</th>", "localtx name header")
     token = "if (strlen($listElem[4]) == 1)"
     if text.count(token) != 1:
@@ -104,9 +104,16 @@ def patch_text(text: str, name: str) -> str:
     if text.count(MARKER) == 1:
         if text.count(INCLUDE) != 1 or text.count("dvsModsFccFirstName($listElem[2])") != 1 or text.count("<th>Name</th>") != 1:
             raise PatchError(f"incomplete modified {name}")
-        if digest(text) not in SUPPORTED_MODIFIED[name]:
-            raise PatchError(f"unsupported modified {name} hash: {digest(text)}")
-        return text
+        value = digest(text)
+        if value in SUPPORTED_MODIFIED_V1[name]:
+            if text.count("white-space:nowrap;width:140px;") != 1:
+                raise PatchError(f"invalid v1 time width in {name}")
+            return text.replace("white-space:nowrap;width:140px;", "white-space:nowrap;width:115px;", 1)
+        if text.count("white-space:nowrap;width:115px;") == 1:
+            recovered = text.replace("white-space:nowrap;width:115px;", "white-space:nowrap;width:140px;", 1)
+            if digest(recovered) in SUPPORTED_MODIFIED_V1[name]:
+                return text
+        raise PatchError(f"unsupported modified {name} hash: {value}")
     if MARKER in text:
         raise PatchError(f"duplicate markers in {name}")
     if digest(text) not in SUPPORTED[name]:
