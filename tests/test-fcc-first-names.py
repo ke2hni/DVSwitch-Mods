@@ -5,12 +5,17 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import tempfile
 import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = ROOT / "mod-dashboard-fcc-first-names.sh"
+UPDATER = ROOT / "lib/dvswitch_fcc_first_names_update.sh"
+SERVICE = ROOT / "systemd/dvswitch-fcc-first-names-update.service"
+TIMER = ROOT / "systemd/dvswitch-fcc-first-names-update.timer"
+README = ROOT / "README.md"
 
 
 def load(name, path):
@@ -141,5 +146,40 @@ with tempfile.TemporaryDirectory() as directory:
 installer = INSTALLER.read_text(encoding="utf-8")
 require('readonly WORK_ROOT="/var/lib/mmdvm"' in installer, "installer work root is not on persistent storage")
 require("/var/tmp/dvswitch-fcc-firstnames" not in installer and "/tmp/dvswitch-fcc-firstnames" not in installer, "installer still uses a size-limited temporary filesystem")
+require("--remove-updater" in installer, "installer lacks the updater removal utility")
+require("--uninstall" in installer and "uninstall_backup_file" in installer, "installer lacks protected full uninstallation")
+require('systemctl enable --now "$TIMER_UNIT"' in installer, "installer does not enable the weekly timer")
+require('verify_updater_components' in installer, "installer does not validate permanent updater files")
+
+updater = UPDATER.read_text(encoding="utf-8")
+builder_checksum = hashlib.sha256((ROOT / "lib/build_fcc_first_names.py").read_bytes()).hexdigest()
+transaction_checksum = hashlib.sha256((ROOT / "lib/transaction.sh").read_bytes()).hexdigest()
+require(f'readonly BUILDER_SHA256="{builder_checksum}"' in updater, "permanent updater builder checksum is stale")
+require(f'readonly TRANSACTION_SHA256="{transaction_checksum}"' in updater, "permanent updater transaction checksum is stale")
+for value in (
+    'readonly WORK_ROOT="/var/lib/mmdvm"',
+    'verify_installed_modification',
+    'flock -n 9',
+    'curl --fail --location',
+    'dvsm_backup_file "$DATABASE_TARGET"',
+    'dvsm_install_candidate "$candidate" "$DATABASE_TARGET"',
+    'cmp -s "$candidate" "$DATABASE_TARGET"',
+    'trap cleanup EXIT',
+    '--remove-updater) run_remove_updater',
+):
+    require(value in updater, f"permanent updater safety requirement missing: {value}")
+require("/tmp/dvswitch-fcc-firstnames" not in updater and "/var/tmp/dvswitch-fcc-firstnames" not in updater, "permanent updater uses a size-limited temporary filesystem")
+require("--force-update" not in updater, "unapproved force-update option was added")
+
+service = SERVICE.read_text(encoding="utf-8")
+require("ExecStart=/usr/local/sbin/dvswitch-fcc-first-names-update" in service, "service depends on the repository checkout")
+require("ReadWritePaths=/var/lib/mmdvm /var/backups/dvswitch-mods /run/lock" in service, "service write access is not narrowly limited")
+timer = TIMER.read_text(encoding="utf-8")
+require("OnCalendar=Mon *-*-* 04:15:00" in timer, "weekly timer schedule changed unexpectedly")
+require("Persistent=true" in timer and "RandomizedDelaySec=2h" in timer, "timer resilience settings are missing")
+
+readme = README.read_text(encoding="utf-8")
+for component in (INSTALLER, UPDATER, ROOT / "lib/build_fcc_first_names.py", ROOT / "lib/transaction.sh", SERVICE, TIMER, ROOT / "lib/dvswitch_mods_fcc_first_names.php"):
+    require(hashlib.sha256(component.read_bytes()).hexdigest() in readme, f"README checksum is stale or missing: {component.relative_to(ROOT)}")
 
 print("PASS: FCC first-name builder and dashboard patcher tests")

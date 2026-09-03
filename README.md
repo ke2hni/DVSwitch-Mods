@@ -35,7 +35,7 @@ Modifications add optional behavior and are separate from repairs.
 | `mod-p25-nxdn-friendly-names.sh` | 1.1.5 | Displays P25 and NXDN reflector names with sponsor and numeric fallbacks; recognizes the completed DMR v7 dashboard checksum | Completed and tested |
 | `mod-dstar-tx-ref.sh` | 1.0.5 | Adds D-Star Tx TG/Ref and reflector/module display; recognizes the completed DMR v7 dashboard checksum | Completed and tested |
 | `mod-dmr-friendly-names.sh` | 1.5.0 | Displays dynamic `DMR BM Master` and `DMR TGIF Master` headings plus BrandMeister, TGIF, and STFU talkgroup names; retains the last DMR network outside DMR mode; removes saved foreign-mode pollution behind TGIF placeholder 9; blocks stale cross-mode talkgroups; wraps long names; and preserves DMR status across an empty UTC-day log | Completed and tested |
-| `mod-dashboard-fcc-first-names.sh` | 1.0.0 | Adds FCC first names to Gateway and Local Activity using an atomically updated local weekly database | Completed and tested |
+| `mod-dashboard-fcc-first-names.sh` | 1.1.0 | Adds FCC first names to Gateway and Local Activity plus a self-contained automatic weekly database updater | Completed locally; node validation pending |
 
 ## Script operation
 
@@ -47,7 +47,31 @@ sudo ./SCRIPT_NAME.sh --install
 sudo ./SCRIPT_NAME.sh --restore BACKUP_NAME
 ```
 
-`mod-dashboard-fcc-first-names.sh` also provides `--update` to download, validate, and atomically replace only its local FCC first-name database.
+`mod-dashboard-fcc-first-names.sh` installs a self-contained systemd updater that remains available if the cloned repository is deleted. It runs each Monday at 04:15 local time, permits a randomized delay of up to two hours, and runs after startup if the scheduled update was missed while the node was off. The timer never downloads unless the exact supported FCC Name dashboard modification, helper, database, ownership, and permissions are installed.
+
+Manual updating remains available through either command:
+
+```bash
+sudo ./mod-dashboard-fcc-first-names.sh --update
+sudo /usr/local/sbin/dvswitch-fcc-first-names-update
+```
+
+Remove only the automatic updater while preserving the Name columns, helper, and working database with:
+
+```bash
+sudo ./mod-dashboard-fcc-first-names.sh --remove-updater
+sudo /usr/local/sbin/dvswitch-fcc-first-names-update --remove-updater
+```
+
+The removal creates a protected backup. A later `--install` safely reinstalls the updater without downloading or rebuilding an already valid database.
+
+Completely remove the Name modification, database, and automatic updater by supplying the original installation backup printed when the modification was first installed:
+
+```bash
+sudo ./mod-dashboard-fcc-first-names.sh --uninstall install-YYYYMMDD-HHMMSS
+```
+
+The uninstaller first verifies that the named backup contains supported original `lh.php` and `localtx.php` files. It then creates a new safety backup of the complete current installation before restoring the original dashboard and removing the FCC-specific installed files. An update-only or updater-only backup is rejected.
 
 Each script provides exact compatibility checks, protected timestamped backups outside live directories, atomic replacement, changed-file validation, automatic installation rollback, named restoration, idempotency, and no unnecessary backup when already installed. Installers preserve the existing owner, group, and permission mode of replaced files; protected backups retain the original files for exact restoration.
 
@@ -72,7 +96,7 @@ Use the exact backup name printed by a successful installation, such as `install
 | `mod-dstar-tx-ref.sh` | `mod-p25-nxdn-friendly-names.sh` |
 | `mod-dmr-friendly-names.sh` | `mod-dstar-tx-ref.sh` and valid BrandMeister/TGIF lists |
 | `repair-ysf-dashboard-null.sh` | `mod-dmr-friendly-names.sh` and a valid YSF host list |
-| `mod-dashboard-fcc-first-names.sh` | Independent of the nine-stage chain; Internet access is required for `--install` and `--update` |
+| `mod-dashboard-fcc-first-names.sh` | Independent of the nine-stage chain; Internet access is required for the initial database build and weekly/manual updates |
 
 The dashboard scripts intentionally validate the completed state produced by their prerequisites. They are not interchangeable or safely reorderable. Their compatibility checks also recognize the fully completed dashboard chain, including the DMR v4 transition protection, v5 log-status repair, v6 TGIF placeholder cleanup, and v7 BM/TGIF network heading, so every script can be rechecked safely after all nine stages are installed.
 
@@ -97,6 +121,7 @@ The three independent repairs may be performed separately when their correspondi
 
 - Top-level executable repair and modification scripts are the public commands.
 - `lib/` contains shared transaction and narrowly scoped patching logic.
+- `systemd/` contains the FCC first-name weekly updater service and timer installed by `mod-dashboard-fcc-first-names.sh`.
 - `LICENSE` covers repository-authored code.
 - `THIRD_PARTY_NOTICES.md` describes upstream ownership and license boundaries.
 
@@ -109,6 +134,39 @@ The paused INI compatibility project and obsolete development files are intentio
 - Do not copy patched binaries or complete upstream files between systems.
 - Use `--restore` with the named backup if a change must be reversed.
 - These scripts are not affiliated with or endorsed by the upstream DVSwitch project.
+
+## FCC first-name updater safety
+
+The installed updater and its private support files are located at:
+
+```text
+/usr/local/sbin/dvswitch-fcc-first-names-update
+/usr/local/lib/dvswitch-mods/build_fcc_first_names.py
+/usr/local/lib/dvswitch-mods/transaction.sh
+/etc/systemd/system/dvswitch-fcc-first-names-update.service
+/etc/systemd/system/dvswitch-fcc-first-names-update.timer
+```
+
+Version 1.1.0 component SHA256 values:
+
+| Component | SHA256 |
+| --- | --- |
+| `mod-dashboard-fcc-first-names.sh` | `2c8cc0dffbfc9704e4719c8829897d446b7b0fb2356d3b2a88f4136964644aeb` |
+| Installed updater | `cccb47f9f0dec56556f239372fc722dd83623ab8b65f679da1c1eaa685a738bc` |
+| Installed builder | `d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2` |
+| Installed transaction helper | `13d743d6065f88888725a1aefe98c8d4ad957974ec5cd991a52ff20ac44a6532` |
+| systemd service | `78c0b1da92560f27aae8db1faa3630498055c3e48663f709f9217463c7eb0267` |
+| systemd timer | `5624772150bd1d71f231417b23cd0e48eccd624591523e7f1c0ef9ffae1dea99` |
+| Dashboard lookup helper | `df8606e288b996c2189372d8b10a9c8e5b2ab3f935cd732589ed12a6df9fd257` |
+
+Every update downloads the FCC weekly Amateur Radio Service archive into a private workspace below `/var/lib/mmdvm`, never `/tmp` or `/var/tmp`. The complete archive is integrity-checked, its exact FCC file set and declared record counts are verified, and the replacement database is built and validated before the installed database is touched. The updater reports record count, byte size, and SHA256. An identical database creates no backup and is not replaced. A changed database receives a protected timestamped backup and atomic replacement. Download, ZIP, extraction, build, validation, checksum, ownership, permission, or installation failure returns a nonzero status and preserves the last known-good database. The archive and entire workspace are removed after success or failure.
+
+Inspect the schedule and recent update log with:
+
+```bash
+systemctl list-timers dvswitch-fcc-first-names-update.timer
+sudo journalctl -u dvswitch-fcc-first-names-update.service -n 100 --no-pager
+```
 
 ## License
 

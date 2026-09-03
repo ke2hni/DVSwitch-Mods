@@ -5,16 +5,26 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.0.0"
+readonly SCRIPT_VERSION="1.1.0"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PATCHER="$SCRIPT_DIR/lib/patch_dashboard_first_names.py"
 readonly BUILDER="$SCRIPT_DIR/lib/build_fcc_first_names.py"
 readonly HELPER_SOURCE="$SCRIPT_DIR/lib/dvswitch_mods_fcc_first_names.php"
 readonly TRANSACTION_LIBRARY="$SCRIPT_DIR/lib/transaction.sh"
+readonly UPDATER_SOURCE="$SCRIPT_DIR/lib/dvswitch_fcc_first_names_update.sh"
+readonly SERVICE_SOURCE="$SCRIPT_DIR/systemd/dvswitch-fcc-first-names-update.service"
+readonly TIMER_SOURCE="$SCRIPT_DIR/systemd/dvswitch-fcc-first-names-update.timer"
 readonly LH_TARGET="/usr/share/dvswitch/include/lh.php"
 readonly LOCALTX_TARGET="/usr/share/dvswitch/include/localtx.php"
 readonly HELPER_TARGET="/usr/share/dvswitch/include/dvswitch_mods_fcc_first_names.php"
 readonly DATABASE_TARGET="/var/lib/mmdvm/dvswitch-mods-fcc-first-names.dat"
+readonly UPDATER_TARGET="/usr/local/sbin/dvswitch-fcc-first-names-update"
+readonly INSTALLED_LIBRARY_DIR="/usr/local/lib/dvswitch-mods"
+readonly BUILDER_TARGET="$INSTALLED_LIBRARY_DIR/build_fcc_first_names.py"
+readonly TRANSACTION_TARGET="$INSTALLED_LIBRARY_DIR/transaction.sh"
+readonly SERVICE_TARGET="/etc/systemd/system/dvswitch-fcc-first-names-update.service"
+readonly TIMER_TARGET="/etc/systemd/system/dvswitch-fcc-first-names-update.timer"
+readonly TIMER_UNIT="dvswitch-fcc-first-names-update.timer"
 readonly WORK_ROOT="/var/lib/mmdvm"
 readonly FCC_URL="https://data.fcc.gov/download/pub/uls/complete/l_amat.zip"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"
@@ -24,7 +34,7 @@ WORK_DIR=""
 INSTALL_ACTIVE=0
 
 die() { printf 'ERROR: %s\n' "$1" >&2; exit 1; }
-usage() { printf 'FCC first-name dashboard modification %s\nUsage: sudo %s {--check|--install|--update|--restore BACKUP-NAME}\n' "$SCRIPT_VERSION" "$(basename "$0")"; }
+usage() { printf 'FCC first-name dashboard modification %s\nUsage: sudo %s {--check|--install|--update|--remove-updater|--restore BACKUP-NAME|--uninstall BACKUP-NAME}\n' "$SCRIPT_VERSION" "$(basename "$0")"; }
 cleanup() { [[ -z "$WORK_DIR" || ! -d "$WORK_DIR" ]] || rm -rf -- "$WORK_DIR"; }
 require_command() { command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"; }
 require_file() { [[ -f "$1" && ! -L "$1" ]] || die "Required regular non-symlink file not found: $1"; }
@@ -37,6 +47,9 @@ on_error() {
     printf 'ERROR: failed near line %s (status %s).\n' "$line" "$status" >&2
     if [[ $INSTALL_ACTIVE -eq 1 ]]; then
         dvsm_transaction_rollback >&2 || printf 'ERROR: automatic rollback failed; use the protected backup.\n' >&2
+        systemctl daemon-reload >/dev/null 2>&1 || true
+        if [[ -f "$TIMER_TARGET" && ! -L "$TIMER_TARGET" ]]; then systemctl enable --now "$TIMER_UNIT" >/dev/null 2>&1 || true
+        else systemctl disable --now "$TIMER_UNIT" >/dev/null 2>&1 || true; fi
         systemctl reload apache2.service >/dev/null 2>&1 || true
     fi
     cleanup
@@ -61,9 +74,58 @@ preflight() {
     check_platform
     for command in awk chmod chown cmp cp curl date install mktemp mv php python3 rm sha256sum stat systemctl; do require_command "$command"; done
     require_file "$PATCHER"; require_file "$BUILDER"; require_file "$HELPER_SOURCE"; require_file "$TRANSACTION_LIBRARY"
+    require_file "$UPDATER_SOURCE"; require_file "$SERVICE_SOURCE"; require_file "$TIMER_SOURCE"
     require_file "$LH_TARGET"; require_file "$LOCALTX_TARGET"
     php -l "$LH_TARGET" >/dev/null; php -l "$LOCALTX_TARGET" >/dev/null; php -l "$HELPER_SOURCE" >/dev/null
     dashboard_health || die "Apache or the HTTPS dashboard is not healthy."
+}
+
+updater_targets() {
+    printf '%s\n' "$UPDATER_TARGET" "$BUILDER_TARGET" "$TRANSACTION_TARGET" "$SERVICE_TARGET" "$TIMER_TARGET"
+}
+
+updater_state() {
+    local present=0 missing=0 target
+    while IFS= read -r target; do
+        if [[ -f "$target" && ! -L "$target" ]]; then present=$((present + 1))
+        elif [[ ! -e "$target" && ! -L "$target" ]]; then missing=$((missing + 1))
+        else die "Refusing unsupported updater target state: $target"; fi
+    done < <(updater_targets)
+    if [[ $present -eq 0 ]]; then printf 'absent'
+    elif [[ $missing -eq 0 ]]; then printf 'present'
+    else die "FCC updater installation is incomplete ($present present, $missing missing)."; fi
+}
+
+verify_updater_components() {
+    [[ "$(updater_state)" == present ]] || return 1
+    cmp -s "$UPDATER_SOURCE" "$UPDATER_TARGET" || die "Installed FCC updater does not match this release."
+    cmp -s "$BUILDER" "$BUILDER_TARGET" || die "Installed FCC builder does not match this release."
+    cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die "Installed FCC transaction helper does not match this release."
+    cmp -s "$SERVICE_SOURCE" "$SERVICE_TARGET" || die "Installed FCC systemd service does not match this release."
+    cmp -s "$TIMER_SOURCE" "$TIMER_TARGET" || die "Installed FCC systemd timer does not match this release."
+    [[ "$(stat -c '%U:%G:%a' "$UPDATER_TARGET")" == root:root:755 ]] || die "Incorrect updater ownership or mode."
+    for target in "$BUILDER_TARGET" "$TRANSACTION_TARGET" "$SERVICE_TARGET" "$TIMER_TARGET"; do
+        [[ "$(stat -c '%U:%G:%a' "$target")" == root:root:644 ]] || die "Incorrect ownership or mode: $target"
+    done
+    systemctl is-enabled --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not enabled."
+    systemctl is-active --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not active."
+}
+
+report_updater_checksums() {
+    printf 'Updater SHA256: %s\nBuilder SHA256: %s\nService SHA256: %s\nTimer SHA256: %s\n' \
+        "$(file_hash "$UPDATER_TARGET")" "$(file_hash "$BUILDER_TARGET")" \
+        "$(file_hash "$SERVICE_TARGET")" "$(file_hash "$TIMER_TARGET")"
+}
+
+stage_updater_components() {
+    install -d -o root -g root -m 0755 "$INSTALLED_LIBRARY_DIR" "$(dirname "$UPDATER_TARGET")" "$(dirname "$SERVICE_TARGET")"
+    backup_target "$UPDATER_TARGET"; backup_target "$BUILDER_TARGET"; backup_target "$TRANSACTION_TARGET"
+    backup_target "$SERVICE_TARGET"; backup_target "$TIMER_TARGET"
+    install_one "$UPDATER_SOURCE" "$UPDATER_TARGET" root root 0755
+    install_one "$BUILDER" "$BUILDER_TARGET" root root 0644
+    install_one "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" root root 0644
+    install_one "$SERVICE_SOURCE" "$SERVICE_TARGET" root root 0644
+    install_one "$TIMER_SOURCE" "$TIMER_TARGET" root root 0644
 }
 
 prepare_dashboard() {
@@ -88,7 +150,10 @@ build_database() {
     printf 'Downloaded archive: %s bytes\n' "$(stat -c %s "$archive")"
     python3 "$BUILDER" --archive "$archive" --output "$WORK_DIR/fcc-first-names.dat" >/dev/null
     rm -f -- "$archive"
-    printf 'Validated FCC database: %s records, %s bytes\n' "$(python3 "$BUILDER" --validate "$WORK_DIR/fcc-first-names.dat")" "$(stat -c %s "$WORK_DIR/fcc-first-names.dat")"
+    printf 'Validated FCC database: %s records, %s bytes\nFCC database SHA256: %s\n' \
+        "$(python3 "$BUILDER" --validate "$WORK_DIR/fcc-first-names.dat")" \
+        "$(stat -c %s "$WORK_DIR/fcc-first-names.dat")" \
+        "$(file_hash "$WORK_DIR/fcc-first-names.dat")"
 }
 
 backup_target() {
@@ -112,27 +177,50 @@ run_check() {
         printf 'MODIFICATION READY:\nBefore lh.php:      %s\nAfter lh.php:       %s\nBefore localtx.php: %s\nAfter localtx.php:  %s\n' "$(file_hash "$LH_TARGET")" "$(file_hash "$WORK_DIR/lh.php")" "$(file_hash "$LOCALTX_TARGET")" "$(file_hash "$WORK_DIR/localtx.php")"
     fi
     if [[ -f "$DATABASE_TARGET" && ! -L "$DATABASE_TARGET" ]]; then
-        printf 'FCC database: %s validated records.\n' "$(python3 "$BUILDER" --validate "$DATABASE_TARGET")"
+        local database_count database_checksum
+        database_count=$(python3 "$BUILDER" --validate "$DATABASE_TARGET")
+        database_checksum=$(file_hash "$DATABASE_TARGET")
+        printf 'FCC database: %s validated records, %s bytes.\nFCC database SHA256: %s\n' "$database_count" "$(stat -c %s "$DATABASE_TARGET")" "$database_checksum"
     else printf 'FCC database: not installed; --install will download and build it.\n'; fi
+    if [[ "$(updater_state)" == present ]]; then
+        verify_updater_components; report_updater_checksums
+        printf 'FCC weekly updater: installed, enabled, and active.\n'
+    else
+        printf 'FCC weekly updater: not installed; --install will add it.\n'
+    fi
     printf 'PASS: supported activity-table structure. No files changed.\n'
 }
 
 run_install() {
     preflight; prepare_dashboard
-    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null; then
+    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_state)" == present ]]; then
+        verify_updater_components
         printf 'PASS: FCC first-name dashboard modification is already installed. No files changed.\n'; return
     fi
-    build_database
+    local database_ready=0
+    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" && ! -L "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$DATABASE_TARGET" && ! -L "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null; then
+        database_ready=1
+    else
+        build_database
+    fi
     . "$TRANSACTION_LIBRARY"
     dvsm_transaction_begin "$BACKUP_ROOT"
-    backup_target "$LH_TARGET"; backup_target "$LOCALTX_TARGET"; backup_target "$HELPER_TARGET"; backup_target "$DATABASE_TARGET"
+    if [[ $database_ready -eq 0 ]]; then
+        backup_target "$LH_TARGET"; backup_target "$LOCALTX_TARGET"; backup_target "$HELPER_TARGET"; backup_target "$DATABASE_TARGET"
+    fi
     INSTALL_ACTIVE=1
-    install_one "$WORK_DIR/lh.php" "$LH_TARGET" root root 0644
-    install_one "$WORK_DIR/localtx.php" "$LOCALTX_TARGET" root root 0644
-    install_one "$HELPER_SOURCE" "$HELPER_TARGET" root root 0644
-    install_one "$WORK_DIR/fcc-first-names.dat" "$DATABASE_TARGET" root www-data 0644
+    stage_updater_components
+    if [[ $database_ready -eq 0 ]]; then
+        install_one "$WORK_DIR/lh.php" "$LH_TARGET" root root 0644
+        install_one "$WORK_DIR/localtx.php" "$LOCALTX_TARGET" root root 0644
+        install_one "$HELPER_SOURCE" "$HELPER_TARGET" root root 0644
+        install_one "$WORK_DIR/fcc-first-names.dat" "$DATABASE_TARGET" root www-data 0644
+    fi
     php -l "$LH_TARGET" >/dev/null; php -l "$LOCALTX_TARGET" >/dev/null; php -l "$HELPER_TARGET" >/dev/null
     python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null
+    systemctl daemon-reload
+    systemctl enable --now "$TIMER_UNIT"
+    verify_updater_components
     systemctl reload apache2.service; dashboard_health
     INSTALL_ACTIVE=0
     printf 'PASS: FCC first-name dashboard modification installed atomically.\nBackup: %s\n' "$DVSM_TRANSACTION_DIR"
@@ -140,14 +228,50 @@ run_install() {
 
 run_update() {
     preflight
-    require_file "$HELPER_TARGET"; require_file "$DATABASE_TARGET"
-    build_database
-    if cmp -s "$WORK_DIR/fcc-first-names.dat" "$DATABASE_TARGET"; then printf 'PASS: FCC first-name database is already current. No files changed.\n'; return; fi
-    . "$TRANSACTION_LIBRARY"; dvsm_transaction_begin "$BACKUP_ROOT"; dvsm_backup_file "$DATABASE_TARGET"; INSTALL_ACTIVE=1
-    dvsm_install_candidate "$WORK_DIR/fcc-first-names.dat" "$DATABASE_TARGET"
-    python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null
+    verify_updater_components || die "Permanent FCC updater is not installed; run --install first."
+    "$UPDATER_TARGET"
+}
+
+run_remove_updater() {
+    preflight
+    if [[ "$(updater_state)" == absent ]]; then printf 'PASS: FCC weekly updater is already removed. No files changed.\n'; return; fi
+    verify_updater_components
+    "$UPDATER_TARGET" --remove-updater
+}
+
+uninstall_backup_file() {
+    local directory=$1 target=$2 result
+    result=$(awk -F '\t' -v wanted="$target" '$1 == "1" && $2 == wanted { print $3 }' "$directory/MANIFEST")
+    [[ -n "$result" && "$result" != *$'\n'* && "$result" == "$directory/"* ]] || die "Backup is not a complete original FCC Name installation backup: $target"
+    require_file "$result"
+    printf '%s' "$result"
+}
+
+run_uninstall() {
+    preflight
+    local name=$1 directory="$BACKUP_ROOT/$1" original_lh original_local target
+    [[ "$name" =~ ^install-[0-9]{8}-[0-9]{6}(-[0-9]+)?$ ]] || die "Invalid backup name."
+    [[ -d "$directory" && ! -L "$directory" ]] || die "Backup not found: $name"
+    require_file "$directory/MANIFEST"
+    original_lh=$(uninstall_backup_file "$directory" "$LH_TARGET")
+    original_local=$(uninstall_backup_file "$directory" "$LOCALTX_TARGET")
+    [[ -n "$WORK_DIR" ]] || WORK_DIR=$(mktemp -d "$WORK_ROOT/.dvswitch-fcc-firstnames.XXXXXX")
+    cp -- "$original_lh" "$WORK_DIR/original-lh.php"; cp -- "$original_local" "$WORK_DIR/original-localtx.php"
+    python3 "$PATCHER" --lh "$WORK_DIR/original-lh.php" --localtx "$WORK_DIR/original-localtx.php"
+    . "$TRANSACTION_LIBRARY"
+    dvsm_transaction_begin "$BACKUP_ROOT"
+    for target in "$LH_TARGET" "$LOCALTX_TARGET" "$HELPER_TARGET" "$DATABASE_TARGET"; do backup_target "$target"; done
+    while IFS= read -r target; do backup_target "$target"; done < <(updater_targets)
+    INSTALL_ACTIVE=1
+    systemctl disable --now "$TIMER_UNIT" >/dev/null 2>&1 || true
+    dvsm_restore_backup_set "$directory"
+    rm -f -- "$HELPER_TARGET" "$DATABASE_TARGET"
+    while IFS= read -r target; do rm -f -- "$target"; done < <(updater_targets)
+    php -l "$LH_TARGET" >/dev/null; php -l "$LOCALTX_TARGET" >/dev/null
+    systemctl daemon-reload
+    systemctl reload apache2.service; dashboard_health
     INSTALL_ACTIVE=0
-    printf 'PASS: FCC first-name database updated atomically.\nBackup: %s\n' "$DVSM_TRANSACTION_DIR"
+    printf 'PASS: FCC first-name dashboard modification and weekly updater uninstalled.\nSafety backup: %s\n' "$DVSM_TRANSACTION_DIR"
 }
 
 run_restore() {
@@ -155,8 +279,12 @@ run_restore() {
     local name=$1 directory="$BACKUP_ROOT/$1"
     [[ "$name" =~ ^install-[0-9]{8}-[0-9]{6}(-[0-9]+)?$ ]] || die "Invalid backup name."
     [[ -d "$directory" && ! -L "$directory" ]] || die "Backup not found: $name"
-    . "$TRANSACTION_LIBRARY"; dvsm_restore_backup_set "$directory"
+    . "$TRANSACTION_LIBRARY"
+    systemctl disable --now "$TIMER_UNIT" >/dev/null 2>&1 || true
+    dvsm_restore_backup_set "$directory"
     php -l "$LH_TARGET" >/dev/null; php -l "$LOCALTX_TARGET" >/dev/null
+    systemctl daemon-reload
+    if [[ "$(updater_state)" == present ]]; then systemctl enable --now "$TIMER_UNIT"; verify_updater_components; fi
     systemctl reload apache2.service; dashboard_health
     printf 'PASS: FCC first-name dashboard files restored from %s.\n' "$name"
 }
@@ -165,7 +293,9 @@ case "${1:-}" in
     --check) [[ $# -eq 1 ]] || die "Unexpected arguments."; run_check ;;
     --install) [[ $# -eq 1 ]] || die "Unexpected arguments."; run_install ;;
     --update) [[ $# -eq 1 ]] || die "Unexpected arguments."; run_update ;;
+    --remove-updater) [[ $# -eq 1 ]] || die "Unexpected arguments."; run_remove_updater ;;
     --restore) [[ $# -eq 2 ]] || die "--restore requires one backup name."; run_restore "$2" ;;
+    --uninstall) [[ $# -eq 2 ]] || die "--uninstall requires the original installation backup name."; run_uninstall "$2" ;;
     --help|-h) usage ;;
     "") usage; exit 2 ;;
     *) die "Unknown option: $1" ;;

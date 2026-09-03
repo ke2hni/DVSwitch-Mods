@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly DVSwitch FCC first-name database update
+
+[Timer]
+OnCalendar=Mon *-*-* 04:15:00
+Persistent=true
+RandomizedDelaySec=2h
+Unit=dvswitch-fcc-first-names-update.service
+
+[Install]
+WantedBy=timers.target

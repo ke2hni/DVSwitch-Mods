@@ -1,0 +1,17 @@
+[Unit]
+Description=Update the DVSwitch FCC first-name database
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/dvswitch-fcc-first-names-update
+User=root
+Group=root
+UMask=0077
+NoNewPrivileges=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/mmdvm /var/backups/dvswitch-mods /run/lock
+
