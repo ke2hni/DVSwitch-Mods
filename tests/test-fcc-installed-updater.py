@@ -43,7 +43,7 @@ def make_archive(path: Path, second_name: str) -> None:
         target.writestr("EN.dat", row("EN", {2: "1", 9: "Jeff"}, 30) + row("EN", {2: "2", 9: second_name}, 30))
 
 
-with tempfile.TemporaryDirectory() as directory:
+with tempfile.TemporaryDirectory(prefix=".fcc-updater-test-", dir=ROOT.parent) as directory:
     root = Path(directory)
     library = root / "lib"
     dashboard = root / "dashboard"
