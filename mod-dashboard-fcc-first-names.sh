@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.1.2"
+readonly SCRIPT_VERSION="1.1.3"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PATCHER="$SCRIPT_DIR/lib/patch_dashboard_first_names.py"
 readonly BUILDER="$SCRIPT_DIR/lib/build_fcc_first_names.py"
@@ -25,7 +25,8 @@ readonly TRANSACTION_TARGET="$INSTALLED_LIBRARY_DIR/transaction.sh"
 readonly SERVICE_TARGET="/etc/systemd/system/dvswitch-fcc-first-names-update.service"
 readonly TIMER_TARGET="/etc/systemd/system/dvswitch-fcc-first-names-update.timer"
 readonly TIMER_UNIT="dvswitch-fcc-first-names-update.timer"
-readonly PREVIOUS_TIMER_SHA256="5624772150bd1d71f231417b23cd0e48eccd624591523e7f1c0ef9ffae1dea99"
+readonly PREVIOUS_TIMER_SHA256_V110="5624772150bd1d71f231417b23cd0e48eccd624591523e7f1c0ef9ffae1dea99"
+readonly PREVIOUS_TIMER_SHA256_V112="5d929156ef445c6e3d0c7ee32609f8c2e9cf29042c4cd13b161cae7215f76974"
 readonly WORK_ROOT="/var/lib/mmdvm"
 readonly FCC_URL="https://data.fcc.gov/download/pub/uls/complete/l_amat.zip"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"
@@ -33,6 +34,7 @@ readonly DASHBOARD_URL="https://127.0.0.1/dvswitch/"
 
 WORK_DIR=""
 INSTALL_ACTIVE=0
+TIMER_CHANGED=0
 
 die() { printf 'ERROR: %s\n' "$1" >&2; exit 1; }
 usage() { printf 'FCC first-name dashboard modification %s\nUsage: sudo %s {--check|--install|--update|--remove-updater|--restore BACKUP-NAME|--uninstall BACKUP-NAME}\n' "$SCRIPT_VERSION" "$(basename "$0")"; }
@@ -109,9 +111,16 @@ updater_release_state() {
     done
     systemctl is-enabled --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not enabled."
     systemctl is-active --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not active."
-    if cmp -s "$TIMER_SOURCE" "$TIMER_TARGET"; then printf 'current'
-    elif [[ "$(file_hash "$TIMER_TARGET")" == "$PREVIOUS_TIMER_SHA256" ]]; then printf 'upgradeable'
-    else die "Installed FCC systemd timer has an unsupported checksum: $(file_hash "$TIMER_TARGET")"; fi
+    if cmp -s "$TIMER_SOURCE" "$TIMER_TARGET"; then
+        printf 'current'
+    else
+        local timer_hash
+        timer_hash=$(file_hash "$TIMER_TARGET")
+        case "$timer_hash" in
+            "$PREVIOUS_TIMER_SHA256_V110"|"$PREVIOUS_TIMER_SHA256_V112") printf 'upgradeable' ;;
+            *) die "Installed FCC systemd timer has an unsupported checksum: $timer_hash" ;;
+        esac
+    fi
 }
 
 verify_updater_components() {
@@ -129,6 +138,7 @@ stage_updater_component() {
     if [[ -f "$target" && ! -L "$target" ]] && cmp -s "$source" "$target" && [[ "$(stat -c '%U:%G:%a' "$target")" == "$owner:$group:${mode#0}" ]]; then return; fi
     backup_target "$target"
     install_one "$source" "$target" "$owner" "$group" "$mode"
+    [[ "$target" != "$TIMER_TARGET" ]] || TIMER_CHANGED=1
 }
 
 stage_updater_components() {
@@ -234,7 +244,12 @@ run_install() {
     php -l "$LH_TARGET" >/dev/null; php -l "$LOCALTX_TARGET" >/dev/null; php -l "$HELPER_TARGET" >/dev/null
     python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null
     systemctl daemon-reload
-    systemctl enable --now "$TIMER_UNIT"
+    if [[ $TIMER_CHANGED -eq 1 ]]; then
+        systemctl enable "$TIMER_UNIT"
+        systemctl restart "$TIMER_UNIT"
+    else
+        systemctl enable --now "$TIMER_UNIT"
+    fi
     verify_updater_components
     systemctl reload apache2.service; dashboard_health
     INSTALL_ACTIVE=0

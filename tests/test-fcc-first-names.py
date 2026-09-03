@@ -151,9 +151,12 @@ require("--uninstall" in installer and "uninstall_backup_file" in installer, "in
 require('"$WORK_DIR/original/lh.php"' in installer and '"$WORK_DIR/original/localtx.php"' in installer, "uninstaller does not preserve patcher-recognized dashboard basenames")
 require('systemctl enable --now "$TIMER_UNIT"' in installer, "installer does not enable the weekly timer")
 require('verify_updater_components' in installer, "installer does not validate permanent updater files")
-require('readonly PREVIOUS_TIMER_SHA256="5624772150bd1d71f231417b23cd0e48eccd624591523e7f1c0ef9ffae1dea99"' in installer, "known v1.1.0 timer upgrade checksum is missing")
+require('readonly PREVIOUS_TIMER_SHA256_V110="5624772150bd1d71f231417b23cd0e48eccd624591523e7f1c0ef9ffae1dea99"' in installer, "known v1.1.0 timer upgrade checksum is missing")
+require('readonly PREVIOUS_TIMER_SHA256_V112="5d929156ef445c6e3d0c7ee32609f8c2e9cf29042c4cd13b161cae7215f76974"' in installer, "known v1.1.2 timer upgrade checksum is missing")
 require('supported previous timer detected; --install will upgrade it' in installer, "supported timer upgrade is not reported")
 require('stage_updater_component' in installer and 'cmp -s "$source" "$target"' in installer, "unchanged updater components are not skipped during upgrade")
+require('[[ "$target" != "$TIMER_TARGET" ]] || TIMER_CHANGED=1' in installer, "timer changes are not tracked")
+require('if [[ $TIMER_CHANGED -eq 1 ]]' in installer and 'systemctl restart "$TIMER_UNIT"' in installer, "changed timer is not restarted")
 
 updater = UPDATER.read_text(encoding="utf-8")
 builder_checksum = hashlib.sha256((ROOT / "lib/build_fcc_first_names.py").read_bytes()).hexdigest()
@@ -180,7 +183,8 @@ require("ExecStart=/usr/local/sbin/dvswitch-fcc-first-names-update" in service, 
 require("ReadWritePaths=/var/lib/mmdvm /var/backups/dvswitch-mods /run/lock" in service, "service write access is not narrowly limited")
 timer = TIMER.read_text(encoding="utf-8")
 require("OnCalendar=Mon *-*-* 00:00:00" in timer, "weekly timer schedule changed unexpectedly")
-require("Persistent=true" in timer and "RandomizedDelaySec=96h" in timer and "FixedRandomDelay=true" in timer, "timer resilience settings are missing")
+require("Persistent=true" in timer and "RandomizedDelaySec=96h" in timer, "timer resilience settings are missing")
+require("FixedRandomDelay" not in timer, "timer still derives a fixed delay from machine identity")
 
 readme = README.read_text(encoding="utf-8")
 for component in (INSTALLER, UPDATER, ROOT / "lib/build_fcc_first_names.py", ROOT / "lib/transaction.sh", SERVICE, TIMER, ROOT / "lib/dvswitch_mods_fcc_first_names.php"):

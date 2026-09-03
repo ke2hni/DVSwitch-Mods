@@ -35,7 +35,7 @@ Modifications add optional behavior and are separate from repairs.
 | `mod-p25-nxdn-friendly-names.sh` | 1.1.5 | Displays P25 and NXDN reflector names with sponsor and numeric fallbacks; recognizes the completed DMR v7 dashboard checksum | Completed and tested |
 | `mod-dstar-tx-ref.sh` | 1.0.5 | Adds D-Star Tx TG/Ref and reflector/module display; recognizes the completed DMR v7 dashboard checksum | Completed and tested |
 | `mod-dmr-friendly-names.sh` | 1.5.0 | Displays dynamic `DMR BM Master` and `DMR TGIF Master` headings plus BrandMeister, TGIF, and STFU talkgroup names; retains the last DMR network outside DMR mode; removes saved foreign-mode pollution behind TGIF placeholder 9; blocks stale cross-mode talkgroups; wraps long names; and preserves DMR status across an empty UTC-day log | Completed and tested |
-| `mod-dashboard-fcc-first-names.sh` | 1.1.2 | Adds FCC first names to Gateway and Local Activity plus a self-contained automatic weekly database updater | Completed and tested |
+| `mod-dashboard-fcc-first-names.sh` | 1.1.3 | Adds FCC first names to Gateway and Local Activity plus a self-contained automatic weekly database updater | Testing in progress |
 
 ## Script operation
 
@@ -147,16 +147,16 @@ The installed updater and its private support files are located at:
 /etc/systemd/system/dvswitch-fcc-first-names-update.timer
 ```
 
-Version 1.1.2 component SHA256 values:
+Version 1.1.3 component SHA256 values:
 
 | Component | SHA256 |
 | --- | --- |
-| `mod-dashboard-fcc-first-names.sh` | `5f5d77761f0026acd5af676ef4cccc2126a6da03be683f23fc96411473263224` |
+| `mod-dashboard-fcc-first-names.sh` | `c2ad47bde15d4f17af66d116701edc94adce7e0465a72a9c7deb0920f907e42a` |
 | Installed updater | `cccb47f9f0dec56556f239372fc722dd83623ab8b65f679da1c1eaa685a738bc` |
 | Installed builder | `d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2` |
 | Installed transaction helper | `13d743d6065f88888725a1aefe98c8d4ad957974ec5cd991a52ff20ac44a6532` |
 | systemd service | `78c0b1da92560f27aae8db1faa3630498055c3e48663f709f9217463c7eb0267` |
-| systemd timer | `5d929156ef445c6e3d0c7ee32609f8c2e9cf29042c4cd13b161cae7215f76974` |
+| systemd timer | `28e8ec01752c230132848f5891a504194b1dadd6035580b355ad49dee5d05cf3` |
 | Dashboard lookup helper | `df8606e288b996c2189372d8b10a9c8e5b2ab3f935cd732589ed12a6df9fd257` |
 
 Every update downloads the FCC weekly Amateur Radio Service archive into a private workspace below `/var/lib/mmdvm`, never `/tmp` or `/var/tmp`. The complete archive is integrity-checked, its exact FCC file set and declared record counts are verified, and the replacement database is built and validated before the installed database is touched. The updater reports record count, byte size, and SHA256. An identical database creates no backup and is not replaced. A changed database receives a protected timestamped backup and atomic replacement. Download, ZIP, extraction, build, validation, checksum, ownership, permission, or installation failure returns a nonzero status and preserves the last known-good database. The archive and entire workspace are removed after success or failure.
@@ -173,4 +173,3 @@ sudo journalctl -u dvswitch-fcc-first-names-update.service -n 100 --no-pager
 Repository-authored code is licensed under the MIT License. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.
 
 <img width="1600" height="900" alt="Screenshot 2026-09-02 195516" src="https://github.com/user-attachments/assets/1b9a319b-c6e2-49b7-a001-5e3519560408" />
-
