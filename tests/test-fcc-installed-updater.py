@@ -5,7 +5,9 @@
 from __future__ import annotations
 
 import hashlib
+import grp
 import os
+import pwd
 import shutil
 import subprocess
 import tempfile
@@ -80,6 +82,8 @@ with tempfile.TemporaryDirectory() as directory:
 
     updater = sbin / "dvswitch-fcc-first-names-update"
     updater_text = (ROOT / "lib/dvswitch_fcc_first_names_update.sh").read_text(encoding="utf-8")
+    test_user = pwd.getpwuid(os.getuid()).pw_name
+    test_group = grp.getgrgid(os.getgid()).gr_name
     replacements = {
         'readonly LIBRARY_DIR="/usr/local/lib/dvswitch-mods"': f'readonly LIBRARY_DIR="{library}"',
         'readonly UPDATER_TARGET="/usr/local/sbin/dvswitch-fcc-first-names-update"': f'readonly UPDATER_TARGET="{updater}"',
@@ -98,11 +102,16 @@ with tempfile.TemporaryDirectory() as directory:
         '    "8bbfdd234c051354b29d94e496348ca315ecd858c67d8f335b245b0a5b7c1c13"': f'    "{digest(lh)}"',
         '    "48df64a5612d02c66d5f7da748b0b840de2f25fa60a4456b22fcd925e7e1f0fd"': f'    "{digest(localtx)}"',
         '    . /etc/os-release': '    ID=debian; VERSION_ID=12',
-        'require_owner_mode "$DATABASE_TARGET" root www-data 644': 'require_owner_mode "$DATABASE_TARGET" root root 644',
+        '    [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Run this updater with sudo."': '    : # Root requirement bypassed only in isolated regression copy.',
+        '    [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Run this utility with sudo."': '    : # Root requirement bypassed only in isolated regression copy.',
+        'require_owner_mode "$LH_TARGET" root root 644': f'require_owner_mode "$LH_TARGET" {test_user} {test_group} 644',
+        'require_owner_mode "$LOCALTX_TARGET" root root 644': f'require_owner_mode "$LOCALTX_TARGET" {test_user} {test_group} 644',
+        'require_owner_mode "$HELPER_TARGET" root root 644': f'require_owner_mode "$HELPER_TARGET" {test_user} {test_group} 644',
+        'require_owner_mode "$DATABASE_TARGET" root www-data 644': f'require_owner_mode "$DATABASE_TARGET" {test_user} {test_group} 644',
     }
     for old, new in replacements.items():
         require(old in updater_text, f"updater test substitution is stale: {old}")
-        updater_text = updater_text.replace(old, new) if old.startswith("require_owner_mode") else updater_text.replace(old, new, 1)
+        updater_text = updater_text.replace(old, new) if old.startswith('require_owner_mode "$DATABASE_TARGET"') else updater_text.replace(old, new, 1)
     updater.write_text(updater_text, encoding="utf-8")
     updater.chmod(0o755)
 
