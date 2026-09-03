@@ -176,8 +176,8 @@ service = SERVICE.read_text(encoding="utf-8")
 require("ExecStart=/usr/local/sbin/dvswitch-fcc-first-names-update" in service, "service depends on the repository checkout")
 require("ReadWritePaths=/var/lib/mmdvm /var/backups/dvswitch-mods /run/lock" in service, "service write access is not narrowly limited")
 timer = TIMER.read_text(encoding="utf-8")
-require("OnCalendar=Mon *-*-* 04:15:00" in timer, "weekly timer schedule changed unexpectedly")
-require("Persistent=true" in timer and "RandomizedDelaySec=2h" in timer, "timer resilience settings are missing")
+require("OnCalendar=Mon *-*-* 00:00:00" in timer, "weekly timer schedule changed unexpectedly")
+require("Persistent=true" in timer and "RandomizedDelaySec=96h" in timer and "FixedRandomDelay=true" in timer, "timer resilience settings are missing")
 
 readme = README.read_text(encoding="utf-8")
 for component in (INSTALLER, UPDATER, ROOT / "lib/build_fcc_first_names.py", ROOT / "lib/transaction.sh", SERVICE, TIMER, ROOT / "lib/dvswitch_mods_fcc_first_names.php"):
