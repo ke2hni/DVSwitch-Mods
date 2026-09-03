@@ -117,7 +117,7 @@ with tempfile.TemporaryDirectory() as directory:
     environment["FCC_TEST_ARCHIVE"] = str(archive)
 
     original = digest(database)
-    result = subprocess.run([str(updater)], env=environment, text=True, capture_output=True)
+    result = subprocess.run(["bash", str(updater)], env=environment, text=True, capture_output=True)
     require(result.returncode == 0, f"identical update failed: {result.stderr}")
     require("byte-for-byte identical" in result.stdout, "identical result was not reported")
     require(digest(database) == original, "identical update changed the database")
@@ -125,7 +125,7 @@ with tempfile.TemporaryDirectory() as directory:
     require(not list(state.glob(".dvswitch-fcc-firstnames.*")), "identical update left a workspace")
 
     make_archive(archive, "Laurie")
-    result = subprocess.run([str(updater)], env=environment, text=True, capture_output=True)
+    result = subprocess.run(["bash", str(updater)], env=environment, text=True, capture_output=True)
     require(result.returncode == 0, f"changed update failed: {result.stderr}")
     require("installed atomically" in result.stdout, "changed installation was not reported")
     changed = digest(database)
@@ -134,13 +134,13 @@ with tempfile.TemporaryDirectory() as directory:
     require(not list(state.glob(".dvswitch-fcc-firstnames.*")), "changed update left a workspace")
 
     archive.write_bytes(b"truncated zip")
-    result = subprocess.run([str(updater)], env=environment, text=True, capture_output=True)
+    result = subprocess.run(["bash", str(updater)], env=environment, text=True, capture_output=True)
     require(result.returncode != 0, "broken FCC archive was accepted")
     require(digest(database) == changed, "failed update changed the installed database")
     require(len(list((root / "backups").glob("install-*"))) == 1, "failed build created a backup")
     require(not list(state.glob(".dvswitch-fcc-firstnames.*")), "failed update left a workspace")
 
-    result = subprocess.run([str(updater), "--remove-updater"], env=environment, text=True, capture_output=True)
+    result = subprocess.run(["bash", str(updater), "--remove-updater"], env=environment, text=True, capture_output=True)
     require(result.returncode == 0, f"permanent removal utility failed: {result.stderr}")
     require(database.is_file() and lh.is_file() and localtx.is_file() and helper.is_file(), "updater removal deleted the working Name modification")
     require(all(not path.exists() for path in (updater, builder, transaction, service, timer)), "updater removal left installed components")
