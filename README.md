@@ -113,3 +113,6 @@ The paused INI compatibility project and obsolete development files are intentio
 ## License
 
 Repository-authored code is licensed under the MIT License. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.
+
+<img width="1600" height="900" alt="Screenshot 2026-09-02 195516" src="https://github.com/user-attachments/assets/1b9a319b-c6e2-49b7-a001-5e3519560408" />
+
