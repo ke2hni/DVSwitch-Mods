@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.1.1"
+readonly SCRIPT_VERSION="1.1.2"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PATCHER="$SCRIPT_DIR/lib/patch_dashboard_first_names.py"
 readonly BUILDER="$SCRIPT_DIR/lib/build_fcc_first_names.py"
@@ -25,6 +25,7 @@ readonly TRANSACTION_TARGET="$INSTALLED_LIBRARY_DIR/transaction.sh"
 readonly SERVICE_TARGET="/etc/systemd/system/dvswitch-fcc-first-names-update.service"
 readonly TIMER_TARGET="/etc/systemd/system/dvswitch-fcc-first-names-update.timer"
 readonly TIMER_UNIT="dvswitch-fcc-first-names-update.timer"
+readonly PREVIOUS_TIMER_SHA256="5624772150bd1d71f231417b23cd0e48eccd624591523e7f1c0ef9ffae1dea99"
 readonly WORK_ROOT="/var/lib/mmdvm"
 readonly FCC_URL="https://data.fcc.gov/download/pub/uls/complete/l_amat.zip"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"
@@ -96,19 +97,25 @@ updater_state() {
     else die "FCC updater installation is incomplete ($present present, $missing missing)."; fi
 }
 
-verify_updater_components() {
-    [[ "$(updater_state)" == present ]] || return 1
+updater_release_state() {
+    [[ "$(updater_state)" == present ]] || { printf 'absent'; return; }
     cmp -s "$UPDATER_SOURCE" "$UPDATER_TARGET" || die "Installed FCC updater does not match this release."
     cmp -s "$BUILDER" "$BUILDER_TARGET" || die "Installed FCC builder does not match this release."
     cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die "Installed FCC transaction helper does not match this release."
     cmp -s "$SERVICE_SOURCE" "$SERVICE_TARGET" || die "Installed FCC systemd service does not match this release."
-    cmp -s "$TIMER_SOURCE" "$TIMER_TARGET" || die "Installed FCC systemd timer does not match this release."
     [[ "$(stat -c '%U:%G:%a' "$UPDATER_TARGET")" == root:root:755 ]] || die "Incorrect updater ownership or mode."
     for target in "$BUILDER_TARGET" "$TRANSACTION_TARGET" "$SERVICE_TARGET" "$TIMER_TARGET"; do
         [[ "$(stat -c '%U:%G:%a' "$target")" == root:root:644 ]] || die "Incorrect ownership or mode: $target"
     done
     systemctl is-enabled --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not enabled."
     systemctl is-active --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not active."
+    if cmp -s "$TIMER_SOURCE" "$TIMER_TARGET"; then printf 'current'
+    elif [[ "$(file_hash "$TIMER_TARGET")" == "$PREVIOUS_TIMER_SHA256" ]]; then printf 'upgradeable'
+    else die "Installed FCC systemd timer has an unsupported checksum: $(file_hash "$TIMER_TARGET")"; fi
+}
+
+verify_updater_components() {
+    [[ "$(updater_release_state)" == current ]] || die "Installed FCC updater requires --install to upgrade it to this release."
 }
 
 report_updater_checksums() {
@@ -117,15 +124,20 @@ report_updater_checksums() {
         "$(file_hash "$SERVICE_TARGET")" "$(file_hash "$TIMER_TARGET")"
 }
 
+stage_updater_component() {
+    local source=$1 target=$2 owner=$3 group=$4 mode=$5
+    if [[ -f "$target" && ! -L "$target" ]] && cmp -s "$source" "$target" && [[ "$(stat -c '%U:%G:%a' "$target")" == "$owner:$group:${mode#0}" ]]; then return; fi
+    backup_target "$target"
+    install_one "$source" "$target" "$owner" "$group" "$mode"
+}
+
 stage_updater_components() {
     install -d -o root -g root -m 0755 "$INSTALLED_LIBRARY_DIR" "$(dirname "$UPDATER_TARGET")" "$(dirname "$SERVICE_TARGET")"
-    backup_target "$UPDATER_TARGET"; backup_target "$BUILDER_TARGET"; backup_target "$TRANSACTION_TARGET"
-    backup_target "$SERVICE_TARGET"; backup_target "$TIMER_TARGET"
-    install_one "$UPDATER_SOURCE" "$UPDATER_TARGET" root root 0755
-    install_one "$BUILDER" "$BUILDER_TARGET" root root 0644
-    install_one "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" root root 0644
-    install_one "$SERVICE_SOURCE" "$SERVICE_TARGET" root root 0644
-    install_one "$TIMER_SOURCE" "$TIMER_TARGET" root root 0644
+    stage_updater_component "$UPDATER_SOURCE" "$UPDATER_TARGET" root root 0755
+    stage_updater_component "$BUILDER" "$BUILDER_TARGET" root root 0644
+    stage_updater_component "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" root root 0644
+    stage_updater_component "$SERVICE_SOURCE" "$SERVICE_TARGET" root root 0644
+    stage_updater_component "$TIMER_SOURCE" "$TIMER_TARGET" root root 0644
 }
 
 prepare_dashboard() {
@@ -182,9 +194,13 @@ run_check() {
         database_checksum=$(file_hash "$DATABASE_TARGET")
         printf 'FCC database: %s validated records, %s bytes.\nFCC database SHA256: %s\n' "$database_count" "$(stat -c %s "$DATABASE_TARGET")" "$database_checksum"
     else printf 'FCC database: not installed; --install will download and build it.\n'; fi
-    if [[ "$(updater_state)" == present ]]; then
-        verify_updater_components; report_updater_checksums
+    local release_state
+    release_state=$(updater_release_state)
+    if [[ "$release_state" == current ]]; then
+        report_updater_checksums
         printf 'FCC weekly updater: installed, enabled, and active.\n'
+    elif [[ "$release_state" == upgradeable ]]; then
+        printf 'FCC weekly updater: supported previous timer detected; --install will upgrade it.\n'
     else
         printf 'FCC weekly updater: not installed; --install will add it.\n'
     fi
@@ -193,8 +209,7 @@ run_check() {
 
 run_install() {
     preflight; prepare_dashboard
-    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_state)" == present ]]; then
-        verify_updater_components
+    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_release_state)" == current ]]; then
         printf 'PASS: FCC first-name dashboard modification is already installed. No files changed.\n'; return
     fi
     local database_ready=0
@@ -235,7 +250,7 @@ run_update() {
 run_remove_updater() {
     preflight
     if [[ "$(updater_state)" == absent ]]; then printf 'PASS: FCC weekly updater is already removed. No files changed.\n'; return; fi
-    verify_updater_components
+    updater_release_state >/dev/null
     "$UPDATER_TARGET" --remove-updater
 }
 
@@ -285,7 +300,7 @@ run_restore() {
     dvsm_restore_backup_set "$directory"
     php -l "$LH_TARGET" >/dev/null; php -l "$LOCALTX_TARGET" >/dev/null
     systemctl daemon-reload
-    if [[ "$(updater_state)" == present ]]; then systemctl enable --now "$TIMER_UNIT"; verify_updater_components; fi
+    if [[ "$(updater_state)" == present ]]; then systemctl enable --now "$TIMER_UNIT"; updater_release_state >/dev/null; fi
     systemctl reload apache2.service; dashboard_health
     printf 'PASS: FCC first-name dashboard files restored from %s.\n' "$name"
 }

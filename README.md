@@ -35,7 +35,7 @@ Modifications add optional behavior and are separate from repairs.
 | `mod-p25-nxdn-friendly-names.sh` | 1.1.5 | Displays P25 and NXDN reflector names with sponsor and numeric fallbacks; recognizes the completed DMR v7 dashboard checksum | Completed and tested |
 | `mod-dstar-tx-ref.sh` | 1.0.5 | Adds D-Star Tx TG/Ref and reflector/module display; recognizes the completed DMR v7 dashboard checksum | Completed and tested |
 | `mod-dmr-friendly-names.sh` | 1.5.0 | Displays dynamic `DMR BM Master` and `DMR TGIF Master` headings plus BrandMeister, TGIF, and STFU talkgroup names; retains the last DMR network outside DMR mode; removes saved foreign-mode pollution behind TGIF placeholder 9; blocks stale cross-mode talkgroups; wraps long names; and preserves DMR status across an empty UTC-day log | Completed and tested |
-| `mod-dashboard-fcc-first-names.sh` | 1.1.1 | Adds FCC first names to Gateway and Local Activity plus a self-contained automatic weekly database updater | Testing in progress |
+| `mod-dashboard-fcc-first-names.sh` | 1.1.2 | Adds FCC first names to Gateway and Local Activity plus a self-contained automatic weekly database updater | Testing in progress |
 
 ## Script operation
 
@@ -147,11 +147,11 @@ The installed updater and its private support files are located at:
 /etc/systemd/system/dvswitch-fcc-first-names-update.timer
 ```
 
-Version 1.1.1 component SHA256 values:
+Version 1.1.2 component SHA256 values:
 
 | Component | SHA256 |
 | --- | --- |
-| `mod-dashboard-fcc-first-names.sh` | `2494604c09b89de7a76385406c541c36f30b00e3508bf498689de82160dab265` |
+| `mod-dashboard-fcc-first-names.sh` | `5f5d77761f0026acd5af676ef4cccc2126a6da03be683f23fc96411473263224` |
 | Installed updater | `cccb47f9f0dec56556f239372fc722dd83623ab8b65f679da1c1eaa685a738bc` |
 | Installed builder | `d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2` |
 | Installed transaction helper | `13d743d6065f88888725a1aefe98c8d4ad957974ec5cd991a52ff20ac44a6532` |

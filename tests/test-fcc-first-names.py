@@ -151,6 +151,9 @@ require("--uninstall" in installer and "uninstall_backup_file" in installer, "in
 require('"$WORK_DIR/original/lh.php"' in installer and '"$WORK_DIR/original/localtx.php"' in installer, "uninstaller does not preserve patcher-recognized dashboard basenames")
 require('systemctl enable --now "$TIMER_UNIT"' in installer, "installer does not enable the weekly timer")
 require('verify_updater_components' in installer, "installer does not validate permanent updater files")
+require('readonly PREVIOUS_TIMER_SHA256="5624772150bd1d71f231417b23cd0e48eccd624591523e7f1c0ef9ffae1dea99"' in installer, "known v1.1.0 timer upgrade checksum is missing")
+require('supported previous timer detected; --install will upgrade it' in installer, "supported timer upgrade is not reported")
+require('stage_updater_component' in installer and 'cmp -s "$source" "$target"' in installer, "unchanged updater components are not skipped during upgrade")
 
 updater = UPDATER.read_text(encoding="utf-8")
 builder_checksum = hashlib.sha256((ROOT / "lib/build_fcc_first_names.py").read_bytes()).hexdigest()
