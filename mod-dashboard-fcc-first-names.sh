@@ -256,8 +256,9 @@ run_uninstall() {
     original_lh=$(uninstall_backup_file "$directory" "$LH_TARGET")
     original_local=$(uninstall_backup_file "$directory" "$LOCALTX_TARGET")
     [[ -n "$WORK_DIR" ]] || WORK_DIR=$(mktemp -d "$WORK_ROOT/.dvswitch-fcc-firstnames.XXXXXX")
-    cp -- "$original_lh" "$WORK_DIR/original-lh.php"; cp -- "$original_local" "$WORK_DIR/original-localtx.php"
-    python3 "$PATCHER" --lh "$WORK_DIR/original-lh.php" --localtx "$WORK_DIR/original-localtx.php"
+    install -d -m 0700 "$WORK_DIR/original"
+    cp -- "$original_lh" "$WORK_DIR/original/lh.php"; cp -- "$original_local" "$WORK_DIR/original/localtx.php"
+    python3 "$PATCHER" --lh "$WORK_DIR/original/lh.php" --localtx "$WORK_DIR/original/localtx.php"
     . "$TRANSACTION_LIBRARY"
     dvsm_transaction_begin "$BACKUP_ROOT"
     for target in "$LH_TARGET" "$LOCALTX_TARGET" "$HELPER_TARGET" "$DATABASE_TARGET"; do backup_target "$target"; done

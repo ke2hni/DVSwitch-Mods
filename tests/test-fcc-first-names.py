@@ -148,6 +148,7 @@ require('readonly WORK_ROOT="/var/lib/mmdvm"' in installer, "installer work root
 require("/var/tmp/dvswitch-fcc-firstnames" not in installer and "/tmp/dvswitch-fcc-firstnames" not in installer, "installer still uses a size-limited temporary filesystem")
 require("--remove-updater" in installer, "installer lacks the updater removal utility")
 require("--uninstall" in installer and "uninstall_backup_file" in installer, "installer lacks protected full uninstallation")
+require('"$WORK_DIR/original/lh.php"' in installer and '"$WORK_DIR/original/localtx.php"' in installer, "uninstaller does not preserve patcher-recognized dashboard basenames")
 require('systemctl enable --now "$TIMER_UNIT"' in installer, "installer does not enable the weekly timer")
 require('verify_updater_components' in installer, "installer does not validate permanent updater files")
 
