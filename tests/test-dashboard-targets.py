@@ -23,7 +23,7 @@ patcher = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
 spec.loader.exec_module(patcher)
 
-lh = '''<?php
+lh = r'''<?php
 // DVSwitch-Mods: FCC first-name activity columns v2
 include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_fcc_first_names.php';
 \t\tif (strlen($listElem[4]) == 1) { $listElem[4] = str_pad($listElem[4], 8, " ", STR_PAD_LEFT); }
@@ -32,13 +32,13 @@ include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_fcc_first_names.
 \t\t} else {
 \t\t\techo "<td align=\"left\">&nbsp;<span style=\"color:#b5651d;font-weight:bold;\">".str_replace(" ","&nbsp;", $listElem[4])."</span></td>";
 \t\t}
-'''
-localtx = '''<?php
+'''.replace("\\t", "\t")
+localtx = r'''<?php
 // DVSwitch-Mods: FCC first-name activity columns v2
 include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_fcc_first_names.php';
 \t\t\tif (strlen($listElem[4]) == 1) { $listElem[4] = str_pad($listElem[4], 8, " ", STR_PAD_LEFT); }
 \t\t\techo"<td align=\"left\">&nbsp;<span style=\"color:#b5651d;font-weight:bold;\">".str_replace(" ","&nbsp;", $listElem[4])."</span></td>";
-'''
+'''.replace("\\t", "\t")
 patcher.SUPPORTED["lh.php"].add(patcher.digest(lh))
 patcher.SUPPORTED["localtx.php"].add(patcher.digest(localtx))
 for name, original in (("lh.php", lh), ("localtx.php", localtx)):
