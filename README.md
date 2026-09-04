@@ -35,8 +35,8 @@ Modifications add optional behavior and are separate from repairs.
 | `mod-p25-nxdn-friendly-names.sh` | 1.1.5 | Displays P25 and NXDN reflector names with sponsor and numeric fallbacks; recognizes the completed DMR v7 dashboard checksum | Completed and tested |
 | `mod-dstar-tx-ref.sh` | 1.0.5 | Adds D-Star Tx TG/Ref and reflector/module display; recognizes the completed DMR v7 dashboard checksum | Completed and tested |
 | `mod-dmr-friendly-names.sh` | 1.5.0 | Displays dynamic `DMR BM Master` and `DMR TGIF Master` headings plus BrandMeister, TGIF, and STFU talkgroup names; retains the last DMR network outside DMR mode; removes saved foreign-mode pollution behind TGIF placeholder 9; blocks stale cross-mode talkgroups; wraps long names; and preserves DMR status across an empty UTC-day log | Completed and tested |
-| `mod-dashboard-fcc-first-names.sh` | 1.2.1 | Adds FCC first names, resolves displayed seven-digit DMR IDs to callsigns, installs a self-contained weekly database updater, and validates the cleaned Target display | Testing |
-| `mod-dashboard-targets.sh` | 1.1.4 | Replaces raw activity targets with row-specific friendly talkgroup, reflector, Group Call, General Call, and GPS/Data labels plus a compact legend | Testing |
+| `mod-dashboard-fcc-first-names.sh` | 1.2.1 | Adds FCC first names, resolves displayed seven-digit DMR IDs to callsigns, installs a self-contained weekly database updater, and validates the cleaned Target display | Completed and tested |
+| `mod-dashboard-targets.sh` | 1.1.4 | Replaces raw activity targets with row-specific friendly talkgroup, reflector, Group Call, General Call, and GPS/Data labels plus a compact legend | Completed and tested |
 
 ## Script operation
 
