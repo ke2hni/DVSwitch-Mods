@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -72,7 +73,7 @@ with tempfile.TemporaryDirectory() as directory:
         ("D-Star", "CQCQCQ", "1.0", "Direct"),
         ("P25", "private 123", "", "private 123"),
     ]
-    php_cases = repr(cases).replace("'", '"').replace("(", "[").replace(")", "]")
+    php_cases = json.dumps(cases)
     program = f'''<?php
 $dvsModsTargetDataDirectory = {str(directory)!r};
 require {str(HELPER)!r};
