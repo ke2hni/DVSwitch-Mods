@@ -13,13 +13,15 @@ The scripts have been validated on fresh default ASL3/DVSwitch installations:
 
 Each script rejects unsupported operating systems, installed-file versions, or ambiguous file structures before installation. `repair-p25-audio-announcement.sh` additionally requires ARM64, Internet access during its pinned source build, and the exact supported stock P25Gateway binary.
 
+`repair-mmdvm-spacing.sh` currently completes both P25 and YSF repairs on the supported arm64 and armhf layouts. On the supported amd64 and i386 layouts it applies the proven fixed-width YSF repair and explicitly reports the tight-layout P25 repair as pending. It never reports that pending P25 state as repaired, and it rejects unknown ELF architectures or ambiguous command patterns.
+
 ## Repairs
 
 Repairs correct confirmed defects in installed DVSwitch software.
 
 | Script | Version | Purpose | Status |
 | --- | ---: | --- | --- |
-| `repair-mmdvm-spacing.sh` | 1.0.0 | Corrects malformed P25 and five-digit YSF remote-command spacing in `MMDVM_Bridge` | Completed and tested |
+| `repair-mmdvm-spacing.sh` | 1.1.0 | Detects amd64, i386, armhf, and arm64 `MMDVM_Bridge` binaries; corrects the proven fixed-width P25/YSF layouts while retaining strict rejection of unknown binaries | Testing |
 | `repair-dvswitch-txt-updater.sh` | 1.0.0 | Repairs and validates DVSwitch TXT database downloads with atomic replacement | Completed and tested |
 | `repair-p25-audio-announcement.sh` | 1.0.0 | Repairs immediate P25 remote voice announcements and adds an 800 ms silent lead-in | Completed and tested |
 | `repair-p25-dashboard.sh` | 1.1.0 | Recognizes P25Gateway remote-command and static-startup link messages | Completed and tested |
