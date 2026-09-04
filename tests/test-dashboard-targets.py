@@ -38,6 +38,8 @@ localtx = r'''<?php
 include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_fcc_first_names.php';
 \t\t\tif (strlen($listElem[4]) == 1) { $listElem[4] = str_pad($listElem[4], 8, " ", STR_PAD_LEFT); }
 \t\t\techo"<td align=\"left\">&nbsp;<span style=\"color:#b5651d;font-weight:bold;\">".str_replace(" ","&nbsp;", $listElem[4])."</span></td>";
+</div>
+<br>
 '''.replace("\\t", "\t")
 patcher.SUPPORTED["lh.php"].add(patcher.digest(lh))
 patcher.SUPPORTED["localtx.php"].add(patcher.digest(localtx))
@@ -45,7 +47,10 @@ for name, original in (("lh.php", lh), ("localtx.php", localtx)):
     changed = patcher.patch_text(original, name)
     require(changed.count(patcher.MARKER) == 1, name + " marker missing")
     require(changed.count("dvsModsTargetDisplay(") == 1, name + " helper call missing")
+    require(changed.count(patcher.LEGEND) == (1 if name == "localtx.php" else 0), name + " legend count incorrect")
     require(patcher.patch_text(changed, name) == changed, name + " patch not idempotent")
+    legacy = changed.replace(patcher.MARKER, patcher.LEGACY_MARKER, 1).replace(patcher.LEGEND, "", 1)
+    require(patcher.patch_text(legacy, name) == changed, name + " v1 upgrade failed")
     try:
         patcher.patch_text(changed + "<!-- altered -->\n", name)
     except patcher.PatchError:
@@ -70,7 +75,7 @@ with tempfile.TemporaryDirectory() as directory:
         ("YSF", "*****BE6w0 at N5YX", "15.1", "GPS/Data"),
         ("YSF", "ALL at N8IQT", "GPS", "GPS/Data"),
         ("D-Star", "CQCQCQ via REF058 C", "7.0", "REF058 C"),
-        ("D-Star", "CQCQCQ", "1.0", "Direct"),
+        ("D-Star", "CQCQCQ", "1.0", "General Call"),
         ("P25", "private 123", "", "private 123"),
     ]
     php_cases = json.dumps(cases)
@@ -87,7 +92,7 @@ echo "PASS: Target display helper cases\\n";
     php = shutil.which("php")
     if php is None:
         helper_text = HELPER.read_text()
-        for token in ("dvsModsTargetDisplay", "dvsModsTargetJsonName", "dvsModsTargetDmrNames", "GPS/Data", "Group Call", "Direct"):
+        for token in ("dvsModsTargetDisplay", "dvsModsTargetJsonName", "dvsModsTargetDmrNames", "GPS/Data", "Group Call", "General Call"):
             require(token in helper_text, "helper structure missing " + token)
         print("SKIP: PHP helper runtime cases (php unavailable)")
     else:

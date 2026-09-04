@@ -1,7 +1,7 @@
 <?php
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Jeff Milne, KE2HNI
-// DVSwitch-Mods: activity Target display helper v1
+// DVSwitch-Mods: activity Target display helper v2
 
 function dvsModsTargetCleanLabel($value) {
     $value = preg_replace('/\s+/u', ' ', str_replace('_', ' ', trim((string)$value)));
@@ -65,7 +65,7 @@ function dvsModsTargetDisplay($mode, $rawTarget, $activityType = '') {
 
     if ($mode === 'D-Star') {
         if (preg_match('/^CQCQCQ(?:\s+via\s+([A-Z0-9]+)\s+([A-Z]))?$/iD', $target, $matches)) {
-            return $cache[$key] = isset($matches[1]) ? strtoupper($matches[1].' '.$matches[2]) : 'Direct';
+            return $cache[$key] = isset($matches[1]) ? strtoupper($matches[1].' '.$matches[2]) : 'General Call';
         }
         return $cache[$key] = ($target !== '' ? $target : 'Unknown');
     }
