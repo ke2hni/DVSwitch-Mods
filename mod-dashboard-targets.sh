@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-readonly SCRIPT_VERSION="1.1.1"
+readonly SCRIPT_VERSION="1.1.2"
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly LH_TARGET="/usr/share/dvswitch/include/lh.php"
 readonly LOCALTX_TARGET="/usr/share/dvswitch/include/localtx.php"
@@ -90,16 +90,21 @@ run_install() {
     fi
     . "$TRANSACTION_LIBRARY"
     dvsm_transaction_begin "$BACKUP_ROOT"
-    dvsm_backup_file "$LH_TARGET"
-    dvsm_backup_file "$LOCALTX_TARGET"
-    if [[ -f "$HELPER_TARGET" ]]; then dvsm_backup_file "$HELPER_TARGET"; else dvsm_record_absent_file "$HELPER_TARGET"; fi
     INSTALL_ACTIVE=1
-    dvsm_install_candidate "$WORK_DIR/lh.php" "$LH_TARGET"
-    dvsm_install_candidate "$WORK_DIR/localtx.php" "$LOCALTX_TARGET"
-    if [[ -f "$HELPER_TARGET" ]]; then
-        dvsm_install_candidate "$HELPER_SOURCE" "$HELPER_TARGET"
-    else
+    if ! cmp -s "$WORK_DIR/lh.php" "$LH_TARGET"; then
+        dvsm_backup_file "$LH_TARGET"
+        dvsm_install_candidate "$WORK_DIR/lh.php" "$LH_TARGET"
+    fi
+    if ! cmp -s "$WORK_DIR/localtx.php" "$LOCALTX_TARGET"; then
+        dvsm_backup_file "$LOCALTX_TARGET"
+        dvsm_install_candidate "$WORK_DIR/localtx.php" "$LOCALTX_TARGET"
+    fi
+    if [[ ! -f "$HELPER_TARGET" ]]; then
+        dvsm_record_absent_file "$HELPER_TARGET"
         dvsm_install_new_candidate "$HELPER_SOURCE" "$HELPER_TARGET" root root 0644
+    elif ! cmp -s "$HELPER_SOURCE" "$HELPER_TARGET"; then
+        dvsm_backup_file "$HELPER_TARGET"
+        dvsm_install_candidate "$HELPER_SOURCE" "$HELPER_TARGET"
     fi
     cmp -s "$WORK_DIR/lh.php" "$LH_TARGET"
     cmp -s "$WORK_DIR/localtx.php" "$LOCALTX_TARGET"
@@ -116,10 +121,15 @@ run_restore() {
     [[ "$name" =~ ^install-[0-9]{8}-[0-9]{6}(-[0-9]+)?$ ]] || die "Invalid backup name: $name"
     local directory="$BACKUP_ROOT/$name"
     require_regular_file "$directory/MANIFEST"
-    [[ $(wc -l < "$directory/MANIFEST") -eq 3 ]] || die "Backup manifest does not contain exactly three Target-modification entries."
-    grep -Fq $'1\t'"$LH_TARGET"$'\t' "$directory/MANIFEST" || die "Backup does not contain lh.php."
-    grep -Fq $'1\t'"$LOCALTX_TARGET"$'\t' "$directory/MANIFEST" || die "Backup does not contain localtx.php."
-    grep -Eq $'^[01]\t'"$HELPER_TARGET"$'\t' "$directory/MANIFEST" || die "Backup does not record the helper."
+    awk -F '\t' -v lh="$LH_TARGET" -v localtx="$LOCALTX_TARGET" -v helper="$HELPER_TARGET" '
+        NF != 3 || ($1 != "0" && $1 != "1") || ($2 != lh && $2 != localtx && $2 != helper) { bad=1 }
+        { seen[$2]++ }
+        END {
+            if (NR < 1 || NR > 3) bad=1
+            for (target in seen) if (seen[target] != 1) bad=1
+            exit bad
+        }
+    ' "$directory/MANIFEST" || die "Backup manifest is not a supported Target-modification backup."
     . "$TRANSACTION_LIBRARY"
     dvsm_restore_backup_set "$directory"
     php -l "$LH_TARGET" >/dev/null

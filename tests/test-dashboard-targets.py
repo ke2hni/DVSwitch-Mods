@@ -11,6 +11,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 PATCHER_PATH = ROOT / "lib/patch_dashboard_targets.py"
 HELPER = ROOT / "lib/dvswitch_mods_target_display.php"
+INSTALLER = ROOT / "mod-dashboard-targets.sh"
 
 
 def require(condition: bool, message: str) -> None:
@@ -104,3 +105,9 @@ echo "PASS: Target display helper cases\\n";
         print(result.stdout.strip())
 
 print("PASS: Target dashboard patcher tests")
+
+installer = INSTALLER.read_text()
+require('if ! cmp -s "$WORK_DIR/lh.php" "$LH_TARGET"; then' in installer, "installer rewrites unchanged lh.php")
+require('if ! cmp -s "$WORK_DIR/localtx.php" "$LOCALTX_TARGET"; then' in installer, "installer rewrites unchanged localtx.php")
+require('elif ! cmp -s "$HELPER_SOURCE" "$HELPER_TARGET"; then' in installer, "installer rewrites unchanged helper")
+print("PASS: Target installer changed-components-only structure")
