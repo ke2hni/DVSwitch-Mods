@@ -53,6 +53,8 @@ for name, original in (("lh.php", lh), ("localtx.php", localtx)):
     if name == "localtx.php":
         old_legend = changed.replace(patcher.LEGEND, patcher.LEGACY_LEGEND, 1)
         require(patcher.patch_text(old_legend, name) == changed, name + " v1.1.0 legend upgrade failed")
+        previous_legend = changed.replace(patcher.LEGEND, patcher.PREVIOUS_LEGEND, 1)
+        require(patcher.patch_text(previous_legend, name) == changed, name + " v1.1.2 legend upgrade failed")
     legacy = changed.replace(patcher.MARKER, patcher.LEGACY_MARKER, 1).replace(patcher.LEGEND, "", 1)
     require(patcher.patch_text(legacy, name) == changed, name + " v1 upgrade failed")
     try:
