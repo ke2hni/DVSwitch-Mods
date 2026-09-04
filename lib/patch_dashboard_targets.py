@@ -13,8 +13,15 @@ from pathlib import Path
 LEGACY_MARKER = "// DVSwitch-Mods: cleaned activity Target display v1"
 MARKER = "// DVSwitch-Mods: cleaned activity Target display v2"
 INCLUDE = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_target_display.php';"
-LEGEND = '''<div style="width:640px;margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;">
+LEGACY_LEGEND = '''<div style="width:640px;margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;">
   <b>Legend:</b> <b>---</b> = no FCC first name available; <b>Group Call</b> = YSF call to ALL (room not recorded); <b>General Call</b> = D-Star CQCQCQ (reflector not recorded); <b>GPS/Data</b> = YSF data; <b>Name (TG #)</b> = destination and talkgroup.
+</div>
+'''
+LEGEND = '''<div style="width:640px;margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
+  <b>Legend:</b> <b>---</b> = no FCC first name available<br>
+  <b>Talkgroups:</b> <b>Name (TG #)</b> = destination and talkgroup number<br>
+  <b>YSF:</b> <b>Group Call</b> = call to ALL (room not recorded); <b>GPS/Data</b> = data transmission<br>
+  <b>D-Star:</b> <b>General Call</b> = CQCQCQ (reflector not recorded)
 </div>
 '''
 SUPPORTED = {
@@ -69,17 +76,20 @@ def patch_text(text: str, name: str) -> str:
         if marker_count + legacy_count != 1 or text.count(INCLUDE) != 1 or text.count(new) != 1:
             raise PatchError(f"incomplete modified {name}")
         legend_count = text.count(LEGEND)
+        legacy_legend_count = text.count(LEGACY_LEGEND)
         expected_legend = 1 if marker_count == 1 and name == "localtx.php" else 0
-        if legend_count != expected_legend:
+        if legend_count + legacy_legend_count != expected_legend:
             raise PatchError(f"incomplete or duplicate legend in {name}")
         active_marker = MARKER if marker_count == 1 else LEGACY_MARKER
         recovered = text.replace(active_marker + "\n", "", 1).replace(INCLUDE + "\n", "", 1).replace(new, old, 1)
         if legend_count:
             recovered = recovered.replace(LEGEND, "", 1)
+        if legacy_legend_count:
+            recovered = recovered.replace(LEGACY_LEGEND, "", 1)
         if digest(recovered) not in SUPPORTED[name]:
             raise PatchError(f"unsupported modified {name} hash: {digest(text)}")
         if marker_count == 1:
-            return text
+            return text.replace(LEGACY_LEGEND, LEGEND, 1) if legacy_legend_count else text
         text = text.replace(LEGACY_MARKER, MARKER, 1)
         if name == "localtx.php":
             anchor = "</div>\n<br>"
@@ -87,7 +97,7 @@ def patch_text(text: str, name: str) -> str:
                 raise PatchError("unsupported localtx legend anchor")
             text = text.replace(anchor, "</div>\n" + LEGEND + "<br>", 1)
         return text
-    if MARKER in text or LEGACY_MARKER in text or INCLUDE in text or "dvsModsTargetDisplay(" in text or LEGEND in text:
+    if MARKER in text or LEGACY_MARKER in text or INCLUDE in text or "dvsModsTargetDisplay(" in text or LEGEND in text or LEGACY_LEGEND in text:
         raise PatchError(f"partial or duplicate modification in {name}")
     if digest(text) not in SUPPORTED[name]:
         raise PatchError(f"unsupported unmodified {name} hash: {digest(text)}")

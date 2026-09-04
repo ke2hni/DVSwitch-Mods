@@ -49,6 +49,9 @@ for name, original in (("lh.php", lh), ("localtx.php", localtx)):
     require(changed.count("dvsModsTargetDisplay(") == 1, name + " helper call missing")
     require(changed.count(patcher.LEGEND) == (1 if name == "localtx.php" else 0), name + " legend count incorrect")
     require(patcher.patch_text(changed, name) == changed, name + " patch not idempotent")
+    if name == "localtx.php":
+        old_legend = changed.replace(patcher.LEGEND, patcher.LEGACY_LEGEND, 1)
+        require(patcher.patch_text(old_legend, name) == changed, name + " v1.1.0 legend upgrade failed")
     legacy = changed.replace(patcher.MARKER, patcher.LEGACY_MARKER, 1).replace(patcher.LEGEND, "", 1)
     require(patcher.patch_text(legacy, name) == changed, name + " v1 upgrade failed")
     try:
