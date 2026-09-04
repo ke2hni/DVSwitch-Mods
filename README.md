@@ -35,7 +35,7 @@ Modifications add optional behavior and are separate from repairs.
 | `mod-p25-nxdn-friendly-names.sh` | 1.1.5 | Displays P25 and NXDN reflector names with sponsor and numeric fallbacks; recognizes the completed DMR v7 dashboard checksum | Completed and tested |
 | `mod-dstar-tx-ref.sh` | 1.0.5 | Adds D-Star Tx TG/Ref and reflector/module display; recognizes the completed DMR v7 dashboard checksum | Completed and tested |
 | `mod-dmr-friendly-names.sh` | 1.5.0 | Displays dynamic `DMR BM Master` and `DMR TGIF Master` headings plus BrandMeister, TGIF, and STFU talkgroup names; retains the last DMR network outside DMR mode; removes saved foreign-mode pollution behind TGIF placeholder 9; blocks stale cross-mode talkgroups; wraps long names; and preserves DMR status across an empty UTC-day log | Completed and tested |
-| `mod-dashboard-fcc-first-names.sh` | 1.2.0 | Adds FCC first names, resolves displayed seven-digit DMR IDs to callsigns, and installs a self-contained weekly database updater | Ready for test-node validation |
+| `mod-dashboard-fcc-first-names.sh` | 1.2.0 | Adds FCC first names, resolves displayed seven-digit DMR IDs to callsigns, and installs a self-contained weekly database updater | Completed and tested |
 
 ## Script operation
 
@@ -150,7 +150,7 @@ The installed updater and its private support files are located at:
 /etc/systemd/system/dvswitch-fcc-first-names-update.timer
 ```
 
-Version 1.2.0 candidate component SHA256 values:
+Version 1.2.0 component SHA256 values:
 
 | Component | SHA256 |
 | --- | --- |
