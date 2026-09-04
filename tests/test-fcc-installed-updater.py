@@ -57,6 +57,8 @@ with tempfile.TemporaryDirectory(prefix=".fcc-updater-test-", dir=ROOT.parent) a
     builder = library / "build_fcc_first_names.py"
     builder_text = (ROOT / "lib/build_fcc_first_names.py").read_text(encoding="utf-8").replace("MIN_PRODUCTION_RECORDS = 700_000", "MIN_PRODUCTION_RECORDS = 2")
     builder.write_text(builder_text, encoding="utf-8")
+    patcher = library / "patch_dashboard_first_names.py"
+    patcher.write_text("#!/usr/bin/env python3\n# Isolated updater test: validation succeeds without changing fixtures.\n", encoding="utf-8")
     transaction = library / "transaction.sh"
     shutil.copyfile(ROOT / "lib/transaction.sh", transaction)
 
@@ -78,7 +80,7 @@ with tempfile.TemporaryDirectory(prefix=".fcc-updater-test-", dir=ROOT.parent) a
     timer = units / "dvswitch-fcc-first-names-update.timer"
     service.write_text("test service\n", encoding="utf-8")
     timer.write_text("test timer\n", encoding="utf-8")
-    service.chmod(0o644); timer.chmod(0o644); builder.chmod(0o644); transaction.chmod(0o644)
+    service.chmod(0o644); timer.chmod(0o644); builder.chmod(0o644); patcher.chmod(0o644); transaction.chmod(0o644)
 
     updater = sbin / "dvswitch-fcc-first-names-update"
     updater_text = (ROOT / "lib/dvswitch_fcc_first_names_update.sh").read_text(encoding="utf-8")
@@ -97,10 +99,9 @@ with tempfile.TemporaryDirectory(prefix=".fcc-updater-test-", dir=ROOT.parent) a
         'readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"': f'readonly BACKUP_ROOT="{root / "backups"}"',
         'readonly LOCK_FILE="/run/lock/dvswitch-fcc-first-names-update.lock"': f'readonly LOCK_FILE="{root / "update.lock"}"',
         'readonly BUILDER_SHA256="d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2"': f'readonly BUILDER_SHA256="{digest(builder)}"',
+        'readonly PATCHER_SHA256="aff53f3636f25a0ba45c9240958b6654fa95468ab81db28802ff727986c564fd"': f'readonly PATCHER_SHA256="{digest(patcher)}"',
         'readonly TRANSACTION_SHA256="13d743d6065f88888725a1aefe98c8d4ad957974ec5cd991a52ff20ac44a6532"': f'readonly TRANSACTION_SHA256="{digest(transaction)}"',
-        'readonly HELPER_SHA256="df8606e288b996c2189372d8b10a9c8e5b2ab3f935cd732589ed12a6df9fd257"': f'readonly HELPER_SHA256="{digest(helper)}"',
-        '    "8bbfdd234c051354b29d94e496348ca315ecd858c67d8f335b245b0a5b7c1c13"': f'    "{digest(lh)}"',
-        '    "48df64a5612d02c66d5f7da748b0b840de2f25fa60a4456b22fcd925e7e1f0fd"': f'    "{digest(localtx)}"',
+        'readonly HELPER_SHA256="7481c7099b9f7c4f58691052b71535bbe602774e8c0c6f5856341af22c1d09d9"': f'readonly HELPER_SHA256="{digest(helper)}"',
         '    . /etc/os-release': '    ID=debian; VERSION_ID=12',
         '    [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Run this updater with sudo."': '    : # Root requirement bypassed only in isolated regression copy.',
         '    [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Run this utility with sudo."': '    : # Root requirement bypassed only in isolated regression copy.',
@@ -152,6 +153,6 @@ with tempfile.TemporaryDirectory(prefix=".fcc-updater-test-", dir=ROOT.parent) a
     result = subprocess.run(["bash", str(updater), "--remove-updater"], env=environment, text=True, capture_output=True)
     require(result.returncode == 0, f"permanent removal utility failed: {result.stderr}")
     require(database.is_file() and lh.is_file() and localtx.is_file() and helper.is_file(), "updater removal deleted the working Name modification")
-    require(all(not path.exists() for path in (updater, builder, transaction, service, timer)), "updater removal left installed components")
+    require(all(not path.exists() for path in (updater, builder, patcher, transaction, service, timer)), "updater removal left installed components")
 
 print("PASS: installed FCC updater safety tests")

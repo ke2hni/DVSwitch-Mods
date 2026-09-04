@@ -5,9 +5,10 @@
 set -Eeuo pipefail
 umask 077
 
-readonly UPDATER_VERSION="1.1.0"
+readonly UPDATER_VERSION="1.2.0"
 readonly LIBRARY_DIR="/usr/local/lib/dvswitch-mods"
 readonly BUILDER="$LIBRARY_DIR/build_fcc_first_names.py"
+readonly PATCHER="$LIBRARY_DIR/patch_dashboard_first_names.py"
 readonly TRANSACTION_LIBRARY="$LIBRARY_DIR/transaction.sh"
 readonly UPDATER_TARGET="/usr/local/sbin/dvswitch-fcc-first-names-update"
 readonly SERVICE_TARGET="/etc/systemd/system/dvswitch-fcc-first-names-update.service"
@@ -22,16 +23,9 @@ readonly FCC_URL="https://data.fcc.gov/download/pub/uls/complete/l_amat.zip"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"
 readonly LOCK_FILE="/run/lock/dvswitch-fcc-first-names-update.lock"
 readonly BUILDER_SHA256="d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2"
+readonly PATCHER_SHA256="aff53f3636f25a0ba45c9240958b6654fa95468ab81db28802ff727986c564fd"
 readonly TRANSACTION_SHA256="13d743d6065f88888725a1aefe98c8d4ad957974ec5cd991a52ff20ac44a6532"
-readonly HELPER_SHA256="df8606e288b996c2189372d8b10a9c8e5b2ab3f935cd732589ed12a6df9fd257"
-readonly -a LH_SHA256=(
-    "8bbfdd234c051354b29d94e496348ca315ecd858c67d8f335b245b0a5b7c1c13"
-    "38a5da31b0f480ce9f278f82906274ab6cfa99409788e04ae04c654706a16473"
-)
-readonly -a LOCALTX_SHA256=(
-    "48df64a5612d02c66d5f7da748b0b840de2f25fa60a4456b22fcd925e7e1f0fd"
-    "7f59334d3cd7a97307a391541867703f704d3147561e7a87b294caf9c9ee223e"
-)
+readonly HELPER_SHA256="7481c7099b9f7c4f58691052b71535bbe602774e8c0c6f5856341af22c1d09d9"
 
 WORK_DIR=""
 INSTALL_ACTIVE=0
@@ -77,9 +71,12 @@ verify_installed_modification() {
     require_owner_mode "$LOCALTX_TARGET" root root 644
     require_owner_mode "$HELPER_TARGET" root root 644
     require_owner_mode "$DATABASE_TARGET" root www-data 644
+    cp -- "$LH_TARGET" "$WORK_DIR/lh.php"
+    cp -- "$LOCALTX_TARGET" "$WORK_DIR/localtx.php"
+    python3 "$PATCHER" --lh "$WORK_DIR/lh.php" --localtx "$WORK_DIR/localtx.php"
+    cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" || die "Installed lh.php is not the current supported modification."
+    cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" || die "Installed localtx.php is not the current supported modification."
     local actual
-    actual=$(file_hash "$LH_TARGET"); hash_is_supported "$actual" "${LH_SHA256[@]}" || die "Unsupported installed lh.php checksum: $actual"
-    actual=$(file_hash "$LOCALTX_TARGET"); hash_is_supported "$actual" "${LOCALTX_SHA256[@]}" || die "Unsupported installed localtx.php checksum: $actual"
     actual=$(file_hash "$HELPER_TARGET"); [[ "$actual" == "$HELPER_SHA256" ]] || die "Unsupported installed FCC helper checksum: $actual"
     python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null
 }
@@ -89,12 +86,15 @@ preflight() {
     . /etc/os-release
     [[ ${ID:-} == debian ]] || die "Unsupported OS: ${ID:-unknown}"
     case "${VERSION_ID:-}" in 12|13) ;; *) die "Unsupported Debian version: ${VERSION_ID:-unknown}" ;; esac
-    for command in awk cmp cp curl date flock install mktemp mv rm sha256sum stat systemctl; do require_command "$command"; done
-    require_file "$BUILDER"; require_file "$TRANSACTION_LIBRARY"
+    for command in awk cmp cp curl date flock install mktemp mv python3 rm sha256sum stat systemctl; do require_command "$command"; done
+    require_file "$BUILDER"; require_file "$PATCHER"; require_file "$TRANSACTION_LIBRARY"
     [[ "$(file_hash "$BUILDER")" == "$BUILDER_SHA256" ]] || die "Installed FCC builder checksum is unsupported."
+    [[ "$(file_hash "$PATCHER")" == "$PATCHER_SHA256" ]] || die "Installed FCC dashboard patcher checksum is unsupported."
     [[ "$(file_hash "$TRANSACTION_LIBRARY")" == "$TRANSACTION_SHA256" ]] || die "Installed transaction helper checksum is unsupported."
     exec 9>"$LOCK_FILE"
     flock -n 9 || die "Another FCC first-name update is already running."
+    [[ -d "$WORK_ROOT" && ! -L "$WORK_ROOT" ]] || die "Required work root is unavailable: $WORK_ROOT"
+    WORK_DIR=$(mktemp -d "$WORK_ROOT/.dvswitch-fcc-firstnames.XXXXXX")
     verify_installed_modification
 }
 
@@ -103,23 +103,21 @@ run_remove_updater() {
     for command in cp date install mktemp mv rm stat systemctl; do require_command "$command"; done
     require_file "$TRANSACTION_LIBRARY"
     local target
-    for target in "$UPDATER_TARGET" "$BUILDER" "$TRANSACTION_LIBRARY" "$SERVICE_TARGET" "$TIMER_TARGET"; do require_file "$target"; done
+    for target in "$UPDATER_TARGET" "$BUILDER" "$PATCHER" "$TRANSACTION_LIBRARY" "$SERVICE_TARGET" "$TIMER_TARGET"; do require_file "$target"; done
     . "$TRANSACTION_LIBRARY"
     dvsm_transaction_begin "$BACKUP_ROOT"
-    for target in "$UPDATER_TARGET" "$BUILDER" "$TRANSACTION_LIBRARY" "$SERVICE_TARGET" "$TIMER_TARGET"; do dvsm_backup_file "$target"; done
+    for target in "$UPDATER_TARGET" "$BUILDER" "$PATCHER" "$TRANSACTION_LIBRARY" "$SERVICE_TARGET" "$TIMER_TARGET"; do dvsm_backup_file "$target"; done
     INSTALL_ACTIVE=1
     systemctl disable --now "$TIMER_UNIT"
-    rm -f -- "$SERVICE_TARGET" "$TIMER_TARGET" "$BUILDER" "$TRANSACTION_LIBRARY" "$UPDATER_TARGET"
+    rm -f -- "$SERVICE_TARGET" "$TIMER_TARGET" "$BUILDER" "$PATCHER" "$TRANSACTION_LIBRARY" "$UPDATER_TARGET"
     systemctl daemon-reload
-    for target in "$UPDATER_TARGET" "$BUILDER" "$TRANSACTION_LIBRARY" "$SERVICE_TARGET" "$TIMER_TARGET"; do [[ ! -e "$target" && ! -L "$target" ]]; done
+    for target in "$UPDATER_TARGET" "$BUILDER" "$PATCHER" "$TRANSACTION_LIBRARY" "$SERVICE_TARGET" "$TIMER_TARGET"; do [[ ! -e "$target" && ! -L "$target" ]]; done
     INSTALL_ACTIVE=0
     printf 'PASS: FCC weekly updater removed; the installed Name modification and database were preserved.\nBackup: %s\n' "$DVSM_TRANSACTION_DIR"
 }
 
 run_update() {
     preflight
-    [[ -d "$WORK_ROOT" && ! -L "$WORK_ROOT" ]] || die "Required work root is unavailable: $WORK_ROOT"
-    WORK_DIR=$(mktemp -d "$WORK_ROOT/.dvswitch-fcc-firstnames.XXXXXX")
     local archive="$WORK_DIR/l_amat.zip" candidate="$WORK_DIR/fcc-first-names.dat"
     printf 'FCC archive: downloading weekly Amateur Radio Service file...\n'
     curl --fail --location --silent --show-error --connect-timeout 30 --max-time 900 --retry 2 --output "$archive" "$FCC_URL"

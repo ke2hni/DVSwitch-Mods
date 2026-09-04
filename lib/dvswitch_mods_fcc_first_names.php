@@ -3,6 +3,30 @@
 // Copyright (c) 2026 Jeff Milne, KE2HNI
 // DVSwitch-Mods: fixed-record FCC first-name lookup v1
 
+function dvsModsDmrIdCallsign($rawCallsign) {
+    static $cache = array();
+    $value = trim((string)$rawCallsign);
+    if (!preg_match('/^[0-9]{7}$/D', $value)) { return $value; }
+    if (array_key_exists($value, $cache)) { return $cache[$value]; }
+
+    global $dmrIDline;
+    $database = isset($dmrIDline) && is_string($dmrIDline) ? $dmrIDline : false;
+    if ($database === false) {
+        $path = defined('DMRIDDATPATH') ? DMRIDDATPATH.'/DMRIds.dat' : '/var/lib/mmdvm/DMRIds.dat';
+        $database = @file_get_contents($path);
+    }
+    if (!is_string($database) || $database === '') { return $cache[$value] = $value; }
+
+    $pattern = '/(?:\A|\R)'.preg_quote($value, '/').'[ \t]+([A-Z0-9]{3,10})(?:[ \t]+[^\r\n]*)?(?=\R|\z)/i';
+    $count = preg_match_all($pattern, $database, $matches);
+    if ($count !== 1) { return $cache[$value] = $value; }
+    $callsign = strtoupper($matches[1][0]);
+    if (!preg_match('/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{3,10}$/D', $callsign)) {
+        return $cache[$value] = $value;
+    }
+    return $cache[$value] = $callsign;
+}
+
 function dvsModsFccFirstName($rawCallsign) {
     static $cache = array();
     $callsign = strtoupper(trim((string)$rawCallsign));

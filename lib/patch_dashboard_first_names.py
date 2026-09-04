@@ -10,7 +10,8 @@ import argparse
 import hashlib
 from pathlib import Path
 
-MARKER = "// DVSwitch-Mods: FCC first-name activity columns v1"
+LEGACY_MARKER = "// DVSwitch-Mods: FCC first-name activity columns v1"
+MARKER = "// DVSwitch-Mods: FCC first-name activity columns v2"
 INCLUDE = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_fcc_first_names.php';"
 SUPPORTED = {
     "lh.php": {
@@ -88,6 +89,30 @@ def patch_lh(text: str) -> str:
     return text[:start] + replacement + text[end:]
 
 
+def add_dmr_id_resolution(text: str, name: str) -> str:
+    token = "if ((is_numeric($listElem[2]) || strpos($listElem[2], \"openSPOT\") !== FALSE)"
+    if name == "localtx.php":
+        token = "if (is_numeric($listElem[2]) || strpos($listElem[2], \"openSPOT\") !== FALSE)"
+    if text.count(token) != 1:
+        raise PatchError(f"unsupported or ambiguous {name} callsign-rendering anchor: {text.count(token)} matches")
+    insertion = text.rfind("\n", 0, text.index(token)) + 1
+    indent = text[insertion:text.index(token)]
+    line = indent + "$listElem[2] = dvsModsDmrIdCallsign($listElem[2]);\n"
+    return text[:insertion] + line + text[insertion:]
+
+
+def validate_current(text: str, name: str) -> None:
+    token = "$listElem[2] = dvsModsDmrIdCallsign($listElem[2]);"
+    if text.count(token) != 1:
+        raise PatchError(f"incomplete modified {name}")
+    recovered = text.replace(MARKER, LEGACY_MARKER, 1)
+    line_start = recovered.rfind("\n", 0, recovered.index(token)) + 1
+    line_end = recovered.index("\n", recovered.index(token)) + 1
+    recovered = recovered[:line_start] + recovered[line_end:]
+    if digest(recovered) not in SUPPORTED_MODIFIED_V2[name]:
+        raise PatchError(f"unsupported modified {name} hash: {digest(text)}")
+
+
 def patch_localtx(text: str) -> str:
     if not text.startswith("<?php\n"):
         raise PatchError("unsupported localtx marker anchor")
@@ -111,26 +136,27 @@ def patch_localtx(text: str) -> str:
 
 
 def patch_text(text: str, name: str) -> str:
-    if text.count(MARKER) == 1:
-        if text.count(INCLUDE) != 1 or text.count("dvsModsFccFirstName($listElem[2])") != 1 or text.count("<th>Name</th>") != 1:
-            raise PatchError(f"incomplete modified {name}")
+    if text.count(LEGACY_MARKER) == 1:
         value = digest(text)
-        if value in SUPPORTED_MODIFIED_V2[name]:
-            return text
         if value in SUPPORTED_MODIFIED_V1[name]:
             if text.count("white-space:nowrap;width:140px;") != 1:
                 raise PatchError(f"invalid v1 time width in {name}")
-            return text.replace("white-space:nowrap;width:140px;", "white-space:nowrap;width:115px;", 1)
-        if text.count("white-space:nowrap;width:115px;") == 1:
-            recovered = text.replace("white-space:nowrap;width:115px;", "white-space:nowrap;width:140px;", 1)
-            if digest(recovered) in SUPPORTED_MODIFIED_V1[name]:
-                return text
-        raise PatchError(f"unsupported modified {name} hash: {value}")
-    if MARKER in text:
+            text = text.replace("white-space:nowrap;width:140px;", "white-space:nowrap;width:115px;", 1)
+        elif value not in SUPPORTED_MODIFIED_V2[name]:
+            raise PatchError(f"unsupported legacy modified {name} hash: {value}")
+        text = text.replace(LEGACY_MARKER, MARKER, 1)
+        return add_dmr_id_resolution(text, name)
+    if text.count(MARKER) == 1:
+        if text.count(INCLUDE) != 1 or text.count("dvsModsFccFirstName($listElem[2])") != 1 or text.count("dvsModsDmrIdCallsign($listElem[2])") != 1 or text.count("<th>Name</th>") != 1:
+            raise PatchError(f"incomplete modified {name}")
+        validate_current(text, name)
+        return text
+    if MARKER in text or LEGACY_MARKER in text:
         raise PatchError(f"duplicate markers in {name}")
     if digest(text) not in SUPPORTED[name]:
         raise PatchError(f"unsupported unmodified {name} hash: {digest(text)}")
     result = patch_lh(text) if name == "lh.php" else patch_localtx(text)
+    result = add_dmr_id_resolution(result, name)
     if result.count(MARKER) != 1:
         raise PatchError(f"failed to install marker in {name}")
     return result

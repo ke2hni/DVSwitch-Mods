@@ -91,6 +91,7 @@ include_once dirname(dirname(__FILE__)).'/include/functions.php';''' + "    \n" 
 <?php
     if (DISPLAYNAME == "YES" && file_exists(DMRIDDATPATH."/DMRIds.dat") && ! empty(DMRIDDATPATH."/DMRIds.dat")) { echo "<th>Name</th>"; }
 ?>
+                if ((is_numeric($listElem[2]) || strpos($listElem[2], "openSPOT") !== FALSE) && (strlen($listElem[2])==7)) {
                 // Display NAME by DV8AWC
 old stock lookup
                 if (strlen($listElem[4]) == 1)
@@ -102,28 +103,39 @@ include_once dirname(dirname(__FILE__)).'/include/functions.php';''' + "    \n" 
       <th>Callsign</th>
       <th>Target</th>
                     }
+                        if (is_numeric($listElem[2]) || strpos($listElem[2], "openSPOT") !== FALSE) {
                         if (strlen($listElem[4]) == 1)
 '''
 patcher.SUPPORTED["lh.php"].add(patcher.digest(lh))
 patcher.SUPPORTED["localtx.php"].add(patcher.digest(localtx))
 patched_lh = patcher.patch_text(lh, "lh.php")
 patched_local = patcher.patch_text(localtx, "localtx.php")
-v1_lh = patched_lh.replace("width:115px", "width:140px", 1)
-v1_local = patched_local.replace("width:115px", "width:140px", 1)
+def remove_resolver(value):
+    token = "$listElem[2] = dvsModsDmrIdCallsign($listElem[2]);"
+    start = value.rfind("\n", 0, value.index(token)) + 1
+    end = value.index("\n", value.index(token)) + 1
+    return value[:start] + value[end:]
+
+
+legacy_lh = remove_resolver(patched_lh.replace(patcher.MARKER, patcher.LEGACY_MARKER, 1))
+legacy_local = remove_resolver(patched_local.replace(patcher.MARKER, patcher.LEGACY_MARKER, 1))
+v1_lh = legacy_lh.replace("width:115px", "width:140px", 1)
+v1_local = legacy_local.replace("width:115px", "width:140px", 1)
 patcher.SUPPORTED_MODIFIED_V1["lh.php"].add(patcher.digest(v1_lh))
 patcher.SUPPORTED_MODIFIED_V1["localtx.php"].add(patcher.digest(v1_local))
-patcher.SUPPORTED_MODIFIED_V2["lh.php"].add(patcher.digest(patched_lh))
-patcher.SUPPORTED_MODIFIED_V2["localtx.php"].add(patcher.digest(patched_local))
+patcher.SUPPORTED_MODIFIED_V2["lh.php"].add(patcher.digest(legacy_lh))
+patcher.SUPPORTED_MODIFIED_V2["localtx.php"].add(patcher.digest(legacy_local))
 for value in (patched_lh, patched_local):
     require(value.count(patcher.MARKER) == 1, "marker missing")
     require(value.count(patcher.INCLUDE) == 1, "helper include missing")
     require(value.count("<th>Name</th>") == 1, "Name heading missing")
     require(value.count("dvsModsFccFirstName($listElem[2])") == 1, "lookup call missing")
+    require(value.count("dvsModsDmrIdCallsign($listElem[2])") == 1, "DMR ID resolver call missing")
     require(value.count("echo '<td align=\"left\" style=\"font-weight:bold;color:#464646;\">&nbsp;<b>'.htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, \"UTF-8\").'</b></td>';" ) == 1, "safe PHP name-cell output is missing")
 require(patcher.patch_text(patched_lh, "lh.php") == patched_lh, "lh patch is not idempotent")
 require(patcher.patch_text(patched_local, "localtx.php") == patched_local, "localtx patch is not idempotent")
-require(patcher.patch_text(v1_lh, "lh.php") == patched_lh, "lh v1 width was not upgraded")
-require(patcher.patch_text(v1_local, "localtx.php") == patched_local, "localtx v1 width was not upgraded")
+require(patcher.patch_text(v1_lh, "lh.php") == patched_lh, "lh legacy version was not upgraded")
+require(patcher.patch_text(v1_local, "localtx.php") == patched_local, "localtx legacy version was not upgraded")
 try:
     patcher.patch_text(patched_lh + "<!-- altered -->\n", "lh.php")
 except patcher.PatchError:
@@ -153,7 +165,8 @@ require('systemctl enable --now "$TIMER_UNIT"' in installer, "installer does not
 require('verify_updater_components' in installer, "installer does not validate permanent updater files")
 require('readonly PREVIOUS_TIMER_SHA256_V110="5624772150bd1d71f231417b23cd0e48eccd624591523e7f1c0ef9ffae1dea99"' in installer, "known v1.1.0 timer upgrade checksum is missing")
 require('readonly PREVIOUS_TIMER_SHA256_V112="5d929156ef445c6e3d0c7ee32609f8c2e9cf29042c4cd13b161cae7215f76974"' in installer, "known v1.1.2 timer upgrade checksum is missing")
-require('supported previous timer detected; --install will upgrade it' in installer, "supported timer upgrade is not reported")
+require('supported previous release detected; --install will upgrade it' in installer, "supported release upgrade is not reported")
+require('"$PREVIOUS_UPDATER_SHA256_V113"' in installer and 'rm -f -- "$PATCHER_TARGET"' in installer, "historical restore does not remove the later patcher component")
 require('stage_updater_component' in installer and 'cmp -s "$source" "$target"' in installer, "unchanged updater components are not skipped during upgrade")
 require('[[ "$target" != "$TIMER_TARGET" ]] || TIMER_CHANGED=1' in installer, "timer changes are not tracked")
 require('if [[ $TIMER_CHANGED -eq 1 ]]' in installer and 'systemctl restart "$TIMER_UNIT"' in installer, "changed timer is not restarted")

@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.1.3"
+readonly SCRIPT_VERSION="1.2.0"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PATCHER="$SCRIPT_DIR/lib/patch_dashboard_first_names.py"
 readonly BUILDER="$SCRIPT_DIR/lib/build_fcc_first_names.py"
@@ -21,12 +21,18 @@ readonly DATABASE_TARGET="/var/lib/mmdvm/dvswitch-mods-fcc-first-names.dat"
 readonly UPDATER_TARGET="/usr/local/sbin/dvswitch-fcc-first-names-update"
 readonly INSTALLED_LIBRARY_DIR="/usr/local/lib/dvswitch-mods"
 readonly BUILDER_TARGET="$INSTALLED_LIBRARY_DIR/build_fcc_first_names.py"
+readonly PATCHER_TARGET="$INSTALLED_LIBRARY_DIR/patch_dashboard_first_names.py"
 readonly TRANSACTION_TARGET="$INSTALLED_LIBRARY_DIR/transaction.sh"
 readonly SERVICE_TARGET="/etc/systemd/system/dvswitch-fcc-first-names-update.service"
 readonly TIMER_TARGET="/etc/systemd/system/dvswitch-fcc-first-names-update.timer"
 readonly TIMER_UNIT="dvswitch-fcc-first-names-update.timer"
 readonly PREVIOUS_TIMER_SHA256_V110="5624772150bd1d71f231417b23cd0e48eccd624591523e7f1c0ef9ffae1dea99"
 readonly PREVIOUS_TIMER_SHA256_V112="5d929156ef445c6e3d0c7ee32609f8c2e9cf29042c4cd13b161cae7215f76974"
+readonly PREVIOUS_UPDATER_SHA256_V113="cccb47f9f0dec56556f239372fc722dd83623ab8b65f679da1c1eaa685a738bc"
+readonly BUILDER_SHA256_V113="d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2"
+readonly TRANSACTION_SHA256_V113="13d743d6065f88888725a1aefe98c8d4ad957974ec5cd991a52ff20ac44a6532"
+readonly SERVICE_SHA256_V113="78c0b1da92560f27aae8db1faa3630498055c3e48663f709f9217463c7eb0267"
+readonly TIMER_SHA256_V113="28e8ec01752c230132848f5891a504194b1dadd6035580b355ad49dee5d05cf3"
 readonly WORK_ROOT="/var/lib/mmdvm"
 readonly FCC_URL="https://data.fcc.gov/download/pub/uls/complete/l_amat.zip"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"
@@ -84,7 +90,7 @@ preflight() {
 }
 
 updater_targets() {
-    printf '%s\n' "$UPDATER_TARGET" "$BUILDER_TARGET" "$TRANSACTION_TARGET" "$SERVICE_TARGET" "$TIMER_TARGET"
+    printf '%s\n' "$UPDATER_TARGET" "$BUILDER_TARGET" "$PATCHER_TARGET" "$TRANSACTION_TARGET" "$SERVICE_TARGET" "$TIMER_TARGET"
 }
 
 updater_state() {
@@ -95,12 +101,35 @@ updater_state() {
         else die "Refusing unsupported updater target state: $target"; fi
     done < <(updater_targets)
     if [[ $present -eq 0 ]]; then printf 'absent'
+    elif [[ $present -eq 5 && $missing -eq 1 && ! -e "$PATCHER_TARGET" && ! -L "$PATCHER_TARGET" ]]; then printf 'legacy'
     elif [[ $missing -eq 0 ]]; then printf 'present'
     else die "FCC updater installation is incomplete ($present present, $missing missing)."; fi
 }
 
 updater_release_state() {
-    [[ "$(updater_state)" == present ]] || { printf 'absent'; return; }
+    local state
+    state=$(updater_state)
+    [[ "$state" != absent ]] || { printf 'absent'; return; }
+    if [[ "$state" == legacy ]]; then
+        [[ "$(file_hash "$UPDATER_TARGET")" == "$PREVIOUS_UPDATER_SHA256_V113" ]] || die "Installed legacy FCC updater has an unsupported checksum."
+        [[ "$(file_hash "$BUILDER_TARGET")" == "$BUILDER_SHA256_V113" ]] || die "Installed legacy FCC builder has an unsupported checksum."
+        [[ "$(file_hash "$TRANSACTION_TARGET")" == "$TRANSACTION_SHA256_V113" ]] || die "Installed legacy FCC transaction helper has an unsupported checksum."
+        [[ "$(file_hash "$SERVICE_TARGET")" == "$SERVICE_SHA256_V113" ]] || die "Installed legacy FCC service has an unsupported checksum."
+        local legacy_timer_hash
+        legacy_timer_hash=$(file_hash "$TIMER_TARGET")
+        case "$legacy_timer_hash" in
+            "$PREVIOUS_TIMER_SHA256_V110"|"$PREVIOUS_TIMER_SHA256_V112"|"$TIMER_SHA256_V113") ;;
+            *) die "Installed legacy FCC timer has an unsupported checksum." ;;
+        esac
+        [[ "$(stat -c '%U:%G:%a' "$UPDATER_TARGET")" == root:root:755 ]] || die "Incorrect legacy updater ownership or mode."
+        for target in "$BUILDER_TARGET" "$TRANSACTION_TARGET" "$SERVICE_TARGET" "$TIMER_TARGET"; do
+            [[ "$(stat -c '%U:%G:%a' "$target")" == root:root:644 ]] || die "Incorrect ownership or mode: $target"
+        done
+        systemctl is-enabled --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not enabled."
+        systemctl is-active --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not active."
+        printf 'upgradeable'
+        return
+    fi
     cmp -s "$UPDATER_SOURCE" "$UPDATER_TARGET" || die "Installed FCC updater does not match this release."
     cmp -s "$BUILDER" "$BUILDER_TARGET" || die "Installed FCC builder does not match this release."
     cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die "Installed FCC transaction helper does not match this release."
@@ -128,8 +157,8 @@ verify_updater_components() {
 }
 
 report_updater_checksums() {
-    printf 'Updater SHA256: %s\nBuilder SHA256: %s\nService SHA256: %s\nTimer SHA256: %s\n' \
-        "$(file_hash "$UPDATER_TARGET")" "$(file_hash "$BUILDER_TARGET")" \
+    printf 'Updater SHA256: %s\nBuilder SHA256: %s\nPatcher SHA256: %s\nService SHA256: %s\nTimer SHA256: %s\n' \
+        "$(file_hash "$UPDATER_TARGET")" "$(file_hash "$BUILDER_TARGET")" "$(file_hash "$PATCHER_TARGET")" \
         "$(file_hash "$SERVICE_TARGET")" "$(file_hash "$TIMER_TARGET")"
 }
 
@@ -145,6 +174,7 @@ stage_updater_components() {
     install -d -o root -g root -m 0755 "$INSTALLED_LIBRARY_DIR" "$(dirname "$UPDATER_TARGET")" "$(dirname "$SERVICE_TARGET")"
     stage_updater_component "$UPDATER_SOURCE" "$UPDATER_TARGET" root root 0755
     stage_updater_component "$BUILDER" "$BUILDER_TARGET" root root 0644
+    stage_updater_component "$PATCHER" "$PATCHER_TARGET" root root 0644
     stage_updater_component "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" root root 0644
     stage_updater_component "$SERVICE_SOURCE" "$SERVICE_TARGET" root root 0644
     stage_updater_component "$TIMER_SOURCE" "$TIMER_TARGET" root root 0644
@@ -191,6 +221,13 @@ install_one() {
     else install -d -o "$owner" -g "$group" -m 0755 "$(dirname "$target")"; dvsm_install_new_candidate "$candidate" "$target" "$owner" "$group" "$mode"; fi
 }
 
+stage_install_component() {
+    local source=$1 target=$2 owner=$3 group=$4 mode=$5
+    if [[ -f "$target" && ! -L "$target" ]] && cmp -s "$source" "$target" && [[ "$(stat -c '%U:%G:%a' "$target")" == "$owner:$group:${mode#0}" ]]; then return; fi
+    backup_target "$target"
+    install_one "$source" "$target" "$owner" "$group" "$mode"
+}
+
 run_check() {
     preflight; prepare_dashboard
     if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php"; then
@@ -210,7 +247,7 @@ run_check() {
         report_updater_checksums
         printf 'FCC weekly updater: installed, enabled, and active.\n'
     elif [[ "$release_state" == upgradeable ]]; then
-        printf 'FCC weekly updater: supported previous timer detected; --install will upgrade it.\n'
+        printf 'FCC weekly updater: supported previous release detected; --install will upgrade it.\n'
     else
         printf 'FCC weekly updater: not installed; --install will add it.\n'
     fi
@@ -223,24 +260,19 @@ run_install() {
         printf 'PASS: FCC first-name dashboard modification is already installed. No files changed.\n'; return
     fi
     local database_ready=0
-    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" && ! -L "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$DATABASE_TARGET" && ! -L "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null; then
+    if [[ -f "$DATABASE_TARGET" && ! -L "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null; then
         database_ready=1
     else
         build_database
     fi
     . "$TRANSACTION_LIBRARY"
     dvsm_transaction_begin "$BACKUP_ROOT"
-    if [[ $database_ready -eq 0 ]]; then
-        backup_target "$LH_TARGET"; backup_target "$LOCALTX_TARGET"; backup_target "$HELPER_TARGET"; backup_target "$DATABASE_TARGET"
-    fi
     INSTALL_ACTIVE=1
     stage_updater_components
-    if [[ $database_ready -eq 0 ]]; then
-        install_one "$WORK_DIR/lh.php" "$LH_TARGET" root root 0644
-        install_one "$WORK_DIR/localtx.php" "$LOCALTX_TARGET" root root 0644
-        install_one "$HELPER_SOURCE" "$HELPER_TARGET" root root 0644
-        install_one "$WORK_DIR/fcc-first-names.dat" "$DATABASE_TARGET" root www-data 0644
-    fi
+    stage_install_component "$WORK_DIR/lh.php" "$LH_TARGET" root root 0644
+    stage_install_component "$WORK_DIR/localtx.php" "$LOCALTX_TARGET" root root 0644
+    stage_install_component "$HELPER_SOURCE" "$HELPER_TARGET" root root 0644
+    if [[ $database_ready -eq 0 ]]; then stage_install_component "$WORK_DIR/fcc-first-names.dat" "$DATABASE_TARGET" root www-data 0644; fi
     php -l "$LH_TARGET" >/dev/null; php -l "$LOCALTX_TARGET" >/dev/null; php -l "$HELPER_TARGET" >/dev/null
     python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null
     systemctl daemon-reload
@@ -313,9 +345,14 @@ run_restore() {
     . "$TRANSACTION_LIBRARY"
     systemctl disable --now "$TIMER_UNIT" >/dev/null 2>&1 || true
     dvsm_restore_backup_set "$directory"
+    if [[ -f "$UPDATER_TARGET" && ! -L "$UPDATER_TARGET" && "$(file_hash "$UPDATER_TARGET")" == "$PREVIOUS_UPDATER_SHA256_V113" ]] && ! awk -F '\t' -v wanted="$PATCHER_TARGET" '$2 == wanted { found=1 } END { exit(found ? 0 : 1) }' "$directory/MANIFEST"; then
+        rm -f -- "$PATCHER_TARGET"
+    fi
     php -l "$LH_TARGET" >/dev/null; php -l "$LOCALTX_TARGET" >/dev/null
     systemctl daemon-reload
-    if [[ "$(updater_state)" == present ]]; then systemctl enable --now "$TIMER_UNIT"; updater_release_state >/dev/null; fi
+    local restored_updater_state
+    restored_updater_state=$(updater_state)
+    if [[ "$restored_updater_state" != absent ]]; then systemctl enable --now "$TIMER_UNIT"; updater_release_state >/dev/null; fi
     systemctl reload apache2.service; dashboard_health
     printf 'PASS: FCC first-name dashboard files restored from %s.\n' "$name"
 }
