@@ -15,10 +15,12 @@ INCLUDE = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_targe
 SUPPORTED = {
     "lh.php": {
         "fc656bfec498ed3e9fd8738238207e25a7cd3911b0ea7fba7001e52095e807da",
+        "2a9b4510fcf5adf0b5bd479ac9027a8dbeba2835f7068656b38dd36d7c280953",
         "4ba94a4dfe796c8c23ed0f8df7c585c019ed464e85e0057e529884ffd77a4af8",
     },
     "localtx.php": {
         "2cbd0c26fa58fe0887f6b95e70cb222f6b5aaaf2e23f79dd0545aad64ba5f336",
+        "376b4d5ba19b19ae17173487e2e51e3ba6554e38700aae47bf1142357fd9c435",
         "23ba44628248f6000222adb4e4bde67d38aef9f10f136c3c62b820c4fee53ee4",
     },
 }
