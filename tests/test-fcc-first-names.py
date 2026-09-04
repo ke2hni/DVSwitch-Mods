@@ -169,7 +169,9 @@ require('supported previous release detected; --install will upgrade it' in inst
 require('"$PREVIOUS_UPDATER_SHA256_V113"' in installer and 'rm -f -- "$PATCHER_TARGET"' in installer, "historical restore does not remove the later patcher component")
 require('stage_updater_component' in installer and 'cmp -s "$source" "$target"' in installer, "unchanged updater components are not skipped during upgrade")
 require('[[ "$target" != "$TIMER_TARGET" ]] || TIMER_CHANGED=1' in installer, "timer changes are not tracked")
+require('SYSTEMD_CHANGED=0' in installer and 'if [[ $SYSTEMD_CHANGED -eq 1 ]]; then systemctl daemon-reload; fi' in installer, "unchanged systemd units still trigger daemon-reload")
 require('if [[ $TIMER_CHANGED -eq 1 ]]' in installer and 'systemctl restart "$TIMER_UNIT"' in installer, "changed timer is not restarted")
+require('elif ! systemctl is-enabled --quiet "$TIMER_UNIT" || ! systemctl is-active --quiet "$TIMER_UNIT"' in installer, "unchanged healthy timer is not left untouched")
 
 updater = UPDATER.read_text(encoding="utf-8")
 builder_checksum = hashlib.sha256((ROOT / "lib/build_fcc_first_names.py").read_bytes()).hexdigest()

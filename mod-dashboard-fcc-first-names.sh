@@ -41,6 +41,7 @@ readonly DASHBOARD_URL="https://127.0.0.1/dvswitch/"
 WORK_DIR=""
 INSTALL_ACTIVE=0
 TIMER_CHANGED=0
+SYSTEMD_CHANGED=0
 
 die() { printf 'ERROR: %s\n' "$1" >&2; exit 1; }
 usage() { printf 'FCC first-name dashboard modification %s\nUsage: sudo %s {--check|--install|--update|--remove-updater|--restore BACKUP-NAME|--uninstall BACKUP-NAME}\n' "$SCRIPT_VERSION" "$(basename "$0")"; }
@@ -56,8 +57,14 @@ on_error() {
     printf 'ERROR: failed near line %s (status %s).\n' "$line" "$status" >&2
     if [[ $INSTALL_ACTIVE -eq 1 ]]; then
         dvsm_transaction_rollback >&2 || printf 'ERROR: automatic rollback failed; use the protected backup.\n' >&2
-        systemctl daemon-reload >/dev/null 2>&1 || true
-        if [[ -f "$TIMER_TARGET" && ! -L "$TIMER_TARGET" ]]; then systemctl enable --now "$TIMER_UNIT" >/dev/null 2>&1 || true
+        if [[ $SYSTEMD_CHANGED -eq 1 ]]; then systemctl daemon-reload >/dev/null 2>&1 || true; fi
+        if [[ -f "$TIMER_TARGET" && ! -L "$TIMER_TARGET" ]]; then
+            if [[ $SYSTEMD_CHANGED -eq 1 ]]; then
+                systemctl enable "$TIMER_UNIT" >/dev/null 2>&1 || true
+                systemctl restart "$TIMER_UNIT" >/dev/null 2>&1 || true
+            elif ! systemctl is-enabled --quiet "$TIMER_UNIT" || ! systemctl is-active --quiet "$TIMER_UNIT"; then
+                systemctl enable --now "$TIMER_UNIT" >/dev/null 2>&1 || true
+            fi
         else systemctl disable --now "$TIMER_UNIT" >/dev/null 2>&1 || true; fi
         systemctl reload apache2.service >/dev/null 2>&1 || true
     fi
@@ -168,6 +175,7 @@ stage_updater_component() {
     backup_target "$target"
     install_one "$source" "$target" "$owner" "$group" "$mode"
     [[ "$target" != "$TIMER_TARGET" ]] || TIMER_CHANGED=1
+    if [[ "$target" == "$SERVICE_TARGET" || "$target" == "$TIMER_TARGET" ]]; then SYSTEMD_CHANGED=1; fi
 }
 
 stage_updater_components() {
@@ -275,11 +283,11 @@ run_install() {
     if [[ $database_ready -eq 0 ]]; then stage_install_component "$WORK_DIR/fcc-first-names.dat" "$DATABASE_TARGET" root www-data 0644; fi
     php -l "$LH_TARGET" >/dev/null; php -l "$LOCALTX_TARGET" >/dev/null; php -l "$HELPER_TARGET" >/dev/null
     python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null
-    systemctl daemon-reload
+    if [[ $SYSTEMD_CHANGED -eq 1 ]]; then systemctl daemon-reload; fi
     if [[ $TIMER_CHANGED -eq 1 ]]; then
         systemctl enable "$TIMER_UNIT"
         systemctl restart "$TIMER_UNIT"
-    else
+    elif ! systemctl is-enabled --quiet "$TIMER_UNIT" || ! systemctl is-active --quiet "$TIMER_UNIT"; then
         systemctl enable --now "$TIMER_UNIT"
     fi
     verify_updater_components

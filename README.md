@@ -154,7 +154,7 @@ Version 1.2.0 candidate component SHA256 values:
 
 | Component | SHA256 |
 | --- | --- |
-| `mod-dashboard-fcc-first-names.sh` | `8a4b6439a09d271c7e745dd3db47e6ce3b9546ccb88945ccbaf1a52f4f43d84a` |
+| `mod-dashboard-fcc-first-names.sh` | `72f514c457076994f67467fc798e5a41939f023c8fce22e4b4dcaa44e245c163` |
 | Installed updater | `ff766bf6ed68e81b52e48bd7f6efd1df230ce986ae4e6573dcf98599eb6ed4f5` |
 | Installed builder | `d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2` |
 | Installed dashboard patcher | `aff53f3636f25a0ba45c9240958b6654fa95468ab81db28802ff727986c564fd` |
