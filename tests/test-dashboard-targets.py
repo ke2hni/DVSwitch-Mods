@@ -79,7 +79,7 @@ require {str(HELPER)!r};
 $cases = {php_cases};
 foreach ($cases as $case) {{
     $actual = dvsModsTargetDisplay($case[0], $case[1], $case[2]);
-    if ($actual !== $case[3]) {{ fwrite(STDERR, "FAIL: ".$case[0]." / ".$case[1]." => ".$actual." expected ".$case[3]."\\n"); exit(1); }}
+    if ($actual !== $case[3]) {{ file_put_contents("php://stderr", "FAIL: ".$case[0]." / ".$case[1]." => ".$actual." expected ".$case[3]."\\n"); exit(1); }}
 }}
 echo "PASS: Target display helper cases\\n";
 ?>'''
