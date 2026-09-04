@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.2.0"
+readonly SCRIPT_VERSION="1.2.1"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PATCHER="$SCRIPT_DIR/lib/patch_dashboard_first_names.py"
 readonly BUILDER="$SCRIPT_DIR/lib/build_fcc_first_names.py"
@@ -29,6 +29,8 @@ readonly TIMER_UNIT="dvswitch-fcc-first-names-update.timer"
 readonly PREVIOUS_TIMER_SHA256_V110="5624772150bd1d71f231417b23cd0e48eccd624591523e7f1c0ef9ffae1dea99"
 readonly PREVIOUS_TIMER_SHA256_V112="5d929156ef445c6e3d0c7ee32609f8c2e9cf29042c4cd13b161cae7215f76974"
 readonly PREVIOUS_UPDATER_SHA256_V113="cccb47f9f0dec56556f239372fc722dd83623ab8b65f679da1c1eaa685a738bc"
+readonly PREVIOUS_UPDATER_SHA256_V120="ff766bf6ed68e81b52e48bd7f6efd1df230ce986ae4e6573dcf98599eb6ed4f5"
+readonly PREVIOUS_PATCHER_SHA256_V120="aff53f3636f25a0ba45c9240958b6654fa95468ab81db28802ff727986c564fd"
 readonly BUILDER_SHA256_V113="d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2"
 readonly TRANSACTION_SHA256_V113="13d743d6065f88888725a1aefe98c8d4ad957974ec5cd991a52ff20ac44a6532"
 readonly SERVICE_SHA256_V113="78c0b1da92560f27aae8db1faa3630498055c3e48663f709f9217463c7eb0267"
@@ -137,12 +139,27 @@ updater_release_state() {
         printf 'upgradeable'
         return
     fi
+    if [[ "$(file_hash "$UPDATER_TARGET")" == "$PREVIOUS_UPDATER_SHA256_V120" && "$(file_hash "$PATCHER_TARGET")" == "$PREVIOUS_PATCHER_SHA256_V120" ]]; then
+        cmp -s "$BUILDER" "$BUILDER_TARGET" || die "Installed FCC builder does not match the supported previous release."
+        cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die "Installed FCC transaction helper does not match the supported previous release."
+        cmp -s "$SERVICE_SOURCE" "$SERVICE_TARGET" || die "Installed FCC systemd service does not match the supported previous release."
+        cmp -s "$TIMER_SOURCE" "$TIMER_TARGET" || die "Installed FCC timer does not match the supported previous release."
+        [[ "$(stat -c '%U:%G:%a' "$UPDATER_TARGET")" == root:root:755 ]] || die "Incorrect updater ownership or mode."
+        for target in "$BUILDER_TARGET" "$PATCHER_TARGET" "$TRANSACTION_TARGET" "$SERVICE_TARGET" "$TIMER_TARGET"; do
+            [[ "$(stat -c '%U:%G:%a' "$target")" == root:root:644 ]] || die "Incorrect ownership or mode: $target"
+        done
+        systemctl is-enabled --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not enabled."
+        systemctl is-active --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not active."
+        printf 'upgradeable'
+        return
+    fi
     cmp -s "$UPDATER_SOURCE" "$UPDATER_TARGET" || die "Installed FCC updater does not match this release."
+    cmp -s "$PATCHER" "$PATCHER_TARGET" || die "Installed FCC dashboard patcher does not match this release."
     cmp -s "$BUILDER" "$BUILDER_TARGET" || die "Installed FCC builder does not match this release."
     cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die "Installed FCC transaction helper does not match this release."
     cmp -s "$SERVICE_SOURCE" "$SERVICE_TARGET" || die "Installed FCC systemd service does not match this release."
     [[ "$(stat -c '%U:%G:%a' "$UPDATER_TARGET")" == root:root:755 ]] || die "Incorrect updater ownership or mode."
-    for target in "$BUILDER_TARGET" "$TRANSACTION_TARGET" "$SERVICE_TARGET" "$TIMER_TARGET"; do
+    for target in "$BUILDER_TARGET" "$PATCHER_TARGET" "$TRANSACTION_TARGET" "$SERVICE_TARGET" "$TIMER_TARGET"; do
         [[ "$(stat -c '%U:%G:%a' "$target")" == root:root:644 ]] || die "Incorrect ownership or mode: $target"
     done
     systemctl is-enabled --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not enabled."

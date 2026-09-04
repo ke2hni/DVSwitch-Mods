@@ -136,6 +136,13 @@ require(patcher.patch_text(patched_lh, "lh.php") == patched_lh, "lh patch is not
 require(patcher.patch_text(patched_local, "localtx.php") == patched_local, "localtx patch is not idempotent")
 require(patcher.patch_text(v1_lh, "lh.php") == patched_lh, "lh legacy version was not upgraded")
 require(patcher.patch_text(v1_local, "localtx.php") == patched_local, "localtx legacy version was not upgraded")
+for name in ("lh.php", "localtx.php"):
+    original_target, modified_target = patcher.target_blocks(name)
+    targeted = patcher.TARGET_MARKER + "\n" + patcher.TARGET_INCLUDE + "\n" + modified_target
+    expected = original_target
+    if name == "localtx.php":
+        targeted += patcher.TARGET_LEGEND
+    require(patcher.without_target_modification(targeted, name) == expected, f"{name} Target compatibility reversal failed")
 try:
     patcher.patch_text(patched_lh + "<!-- altered -->\n", "lh.php")
 except patcher.PatchError:

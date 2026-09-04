@@ -35,7 +35,8 @@ Modifications add optional behavior and are separate from repairs.
 | `mod-p25-nxdn-friendly-names.sh` | 1.1.5 | Displays P25 and NXDN reflector names with sponsor and numeric fallbacks; recognizes the completed DMR v7 dashboard checksum | Completed and tested |
 | `mod-dstar-tx-ref.sh` | 1.0.5 | Adds D-Star Tx TG/Ref and reflector/module display; recognizes the completed DMR v7 dashboard checksum | Completed and tested |
 | `mod-dmr-friendly-names.sh` | 1.5.0 | Displays dynamic `DMR BM Master` and `DMR TGIF Master` headings plus BrandMeister, TGIF, and STFU talkgroup names; retains the last DMR network outside DMR mode; removes saved foreign-mode pollution behind TGIF placeholder 9; blocks stale cross-mode talkgroups; wraps long names; and preserves DMR status across an empty UTC-day log | Completed and tested |
-| `mod-dashboard-fcc-first-names.sh` | 1.2.0 | Adds FCC first names, resolves displayed seven-digit DMR IDs to callsigns, and installs a self-contained weekly database updater | Completed and tested |
+| `mod-dashboard-fcc-first-names.sh` | 1.2.1 | Adds FCC first names, resolves displayed seven-digit DMR IDs to callsigns, installs a self-contained weekly database updater, and validates the cleaned Target display | Testing |
+| `mod-dashboard-targets.sh` | 1.1.3 | Replaces raw activity targets with row-specific friendly talkgroup, reflector, Group Call, General Call, and GPS/Data labels plus a compact legend | Testing |
 
 ## Script operation
 
@@ -50,6 +51,8 @@ sudo ./SCRIPT_NAME.sh --restore BACKUP_NAME
 `mod-dashboard-fcc-first-names.sh` installs a self-contained systemd updater that remains available if the cloned repository is deleted. Each activation is randomized between Monday 00:00 and Friday 00:00 local time using a 96-hour delay window, and a missed update runs after startup. The timer never downloads unless the exact supported FCC Name dashboard modification, helper, database, ownership, and permissions are installed.
 
 Gateway and Local Activity entries containing an exact seven-digit DMR ID are resolved through DVSwitch's maintained `/var/lib/mmdvm/DMRIds.dat`. A unique valid match replaces the displayed number with its callsign, after which the existing FCC lookup supplies the first name. Missing, malformed, or ambiguous mappings retain the original value and display `---` rather than guessing.
+
+`mod-dashboard-targets.sh` formats every history row only from the destination captured for that reception. It never assigns the node's current room, reflector, network, or talkgroup to older rows. P25, NXDN, and unambiguous DMR destinations display as `Friendly Name (TG number)`; D-Star reflector routes display the reflector and module; YSF voice and data display as `Group Call` and `GPS/Data`; and D-Star `CQCQCQ` without a recorded reflector displays as `General Call`. Unknown or ambiguous targets retain their original value.
 
 Manual updating remains available through either command:
 
@@ -99,6 +102,7 @@ Use the exact backup name printed by a successful installation, such as `install
 | `mod-dmr-friendly-names.sh` | `mod-dstar-tx-ref.sh` and valid BrandMeister/TGIF lists |
 | `repair-ysf-dashboard-null.sh` | `mod-dmr-friendly-names.sh` and a valid YSF host list |
 | `mod-dashboard-fcc-first-names.sh` | Independent of the nine-stage chain; Internet access is required for the initial database build and weekly/manual updates |
+| `mod-dashboard-targets.sh` | `mod-dashboard-fcc-first-names.sh` v1.2.1; valid P25/NXDN JSON and BrandMeister/TGIF lists provide friendly names |
 
 The dashboard scripts intentionally validate the completed state produced by their prerequisites. They are not interchangeable or safely reorderable. Their compatibility checks also recognize the fully completed dashboard chain, including the DMR v4 transition protection, v5 log-status repair, v6 TGIF placeholder cleanup, and v7 BM/TGIF network heading, so every script can be rechecked safely after all nine stages are installed.
 
@@ -116,6 +120,7 @@ When every repair and modification is wanted, use this order:
 8. `mod-dmr-friendly-names.sh`
 9. `repair-ysf-dashboard-null.sh`
 10. `mod-dashboard-fcc-first-names.sh` (optional and independent after the dashboard baseline is established)
+11. `mod-dashboard-targets.sh` (optional; install after the FCC activity-column modification)
 
 The three independent repairs may be performed separately when their corresponding defects apply. Follow the dependency table before selecting anything from the dashboard or database chain.
 
@@ -150,18 +155,26 @@ The installed updater and its private support files are located at:
 /etc/systemd/system/dvswitch-fcc-first-names-update.timer
 ```
 
-Version 1.2.0 component SHA256 values:
+Version 1.2.1 FCC component SHA256 values:
 
 | Component | SHA256 |
 | --- | --- |
-| `mod-dashboard-fcc-first-names.sh` | `72f514c457076994f67467fc798e5a41939f023c8fce22e4b4dcaa44e245c163` |
-| Installed updater | `ff766bf6ed68e81b52e48bd7f6efd1df230ce986ae4e6573dcf98599eb6ed4f5` |
+| `mod-dashboard-fcc-first-names.sh` | `bd07ae57da57975cf8905766cdea940a5d4b6dad3feac923959ab83db9d5a4c3` |
+| Installed updater | `ff2c45c1e0258a13ed1b819dae6cbc9a99e0be2b7d8d7fb73aa13faeaba426dd` |
 | Installed builder | `d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2` |
-| Installed dashboard patcher | `aff53f3636f25a0ba45c9240958b6654fa95468ab81db28802ff727986c564fd` |
+| Installed dashboard patcher | `80ba8c7e998a596ef43a138ab678457b1a5afce61cb1a2396099fac735ef9a4d` |
 | Installed transaction helper | `13d743d6065f88888725a1aefe98c8d4ad957974ec5cd991a52ff20ac44a6532` |
 | systemd service | `78c0b1da92560f27aae8db1faa3630498055c3e48663f709f9217463c7eb0267` |
 | systemd timer | `28e8ec01752c230132848f5891a504194b1dadd6035580b355ad49dee5d05cf3` |
 | Dashboard lookup helper | `7481c7099b9f7c4f58691052b71535bbe602774e8c0c6f5856341af22c1d09d9` |
+
+Version 1.1.3 Target-display component SHA256 values:
+
+| Component | SHA256 |
+| --- | --- |
+| `mod-dashboard-targets.sh` | `1bc2c13d23cc705aef061a2b2f3daf1013aec1ed1af55aad9b86a3163b4b27dc` |
+| Dashboard patcher | `cdea0c764a4d87851f42e092b9049a98a79f350419796d85950d6e96ec4d8cc6` |
+| Dashboard helper | `de7bafe302c5a992a7e63f5d68d12f12968614e23ce07fa4457e481be0843cbb` |
 
 Every update downloads the FCC weekly Amateur Radio Service archive into a private workspace below `/var/lib/mmdvm`, never `/tmp` or `/var/tmp`. The complete archive is integrity-checked, its exact FCC file set and declared record counts are verified, and the replacement database is built and validated before the installed database is touched. The updater reports record count, byte size, and SHA256. An identical database creates no backup and is not replaced. A changed database receives a protected timestamped backup and atomic replacement. Download, ZIP, extraction, build, validation, checksum, ownership, permission, or installation failure returns a nonzero status and preserves the last known-good database. The archive and entire workspace are removed after success or failure.
 

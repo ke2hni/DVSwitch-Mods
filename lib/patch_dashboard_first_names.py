@@ -13,6 +13,15 @@ from pathlib import Path
 LEGACY_MARKER = "// DVSwitch-Mods: FCC first-name activity columns v1"
 MARKER = "// DVSwitch-Mods: FCC first-name activity columns v2"
 INCLUDE = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_fcc_first_names.php';"
+TARGET_MARKER = "// DVSwitch-Mods: cleaned activity Target display v2"
+TARGET_INCLUDE = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_target_display.php';"
+TARGET_LEGEND = '''<div style="width:640px;margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
+  <b>Legend:</b> <b>---</b> = no FCC first name available; callsign may be non-U.S./international or absent from FCC data<br>
+  <b>Talkgroups:</b> <b>Name (TG #)</b> = destination and talkgroup number<br>
+  <b>YSF:</b> <b>Group Call</b> = call to ALL (room not recorded); <b>GPS/Data</b> = data transmission<br>
+  <b>D-Star:</b> <b>General Call</b> = CQCQCQ (reflector not recorded)
+</div>
+'''
 SUPPORTED = {
     "lh.php": {
         "f8e6c9801c2613796f070921cee442943ed2dfdd4ec2466a266a6df369a8dc70",
@@ -47,6 +56,51 @@ SUPPORTED_MODIFIED_V2 = {
 
 class PatchError(RuntimeError):
     pass
+
+
+def target_blocks(name: str) -> tuple[str, str]:
+    if name == "lh.php":
+        original = r'''\t\tif (strlen($listElem[4]) == 1) { $listElem[4] = str_pad($listElem[4], 8, " ", STR_PAD_LEFT); }
+\t\tif ( substr($listElem[4], 0, 6) === 'CQCQCQ' ) {
+\t\t\techo "<td align=\"left\">&nbsp;<span style=\"color:#b5651d;font-weight:bold;\">$listElem[4]</span></td>";
+\t\t} else {
+\t\t\techo "<td align=\"left\">&nbsp;<span style=\"color:#b5651d;font-weight:bold;\">".str_replace(" ","&nbsp;", $listElem[4])."</span></td>";
+\t\t}
+'''.replace("\\t", "\t")
+        modified = '''\t\t$dvsModsTarget = dvsModsTargetDisplay($listElem[1], $listElem[4], $listElem[6]);
+\t\techo '<td align="left">&nbsp;<span style="color:#b5651d;font-weight:bold;white-space:normal;">'.htmlspecialchars($dvsModsTarget, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").'</span></td>';
+'''
+    else:
+        original = r'''\t\t\tif (strlen($listElem[4]) == 1) { $listElem[4] = str_pad($listElem[4], 8, " ", STR_PAD_LEFT); }
+\t\t\techo"<td align=\"left\">&nbsp;<span style=\"color:#b5651d;font-weight:bold;\">".str_replace(" ","&nbsp;", $listElem[4])."</span></td>";
+'''.replace("\\t", "\t")
+        modified = '''\t\t\t$dvsModsTarget = dvsModsTargetDisplay($listElem[1], $listElem[4], $listElem[6]);
+\t\t\techo '<td align="left">&nbsp;<span style="color:#b5651d;font-weight:bold;white-space:normal;">'.htmlspecialchars($dvsModsTarget, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").'</span></td>';
+'''
+    return original, modified
+
+
+def without_target_modification(text: str, name: str) -> str:
+    counts = (
+        text.count(TARGET_MARKER),
+        text.count(TARGET_INCLUDE),
+        text.count("dvsModsTargetDisplay("),
+        text.count(TARGET_LEGEND),
+    )
+    if counts == (0, 0, 0, 0):
+        return text
+    expected = (1, 1, 1, 1 if name == "localtx.php" else 0)
+    if counts != expected:
+        raise PatchError(f"incomplete or unsupported Target modification in {name}: {counts}")
+    original, modified = target_blocks(name)
+    if text.count(modified) != 1:
+        raise PatchError(f"unsupported Target rendering block in {name}")
+    recovered = text.replace(TARGET_MARKER + "\n", "", 1)
+    recovered = recovered.replace(TARGET_INCLUDE + "\n", "", 1)
+    recovered = recovered.replace(modified, original, 1)
+    if name == "localtx.php":
+        recovered = recovered.replace(TARGET_LEGEND, "", 1)
+    return recovered
 
 
 def digest(text: str) -> str:
@@ -102,6 +156,8 @@ def add_dmr_id_resolution(text: str, name: str) -> str:
 
 
 def validate_current(text: str, name: str) -> None:
+    original_text = text
+    text = without_target_modification(text, name)
     token = "$listElem[2] = dvsModsDmrIdCallsign($listElem[2]);"
     if text.count(token) != 1:
         raise PatchError(f"incomplete modified {name}")
@@ -110,7 +166,7 @@ def validate_current(text: str, name: str) -> None:
     line_end = recovered.index("\n", recovered.index(token)) + 1
     recovered = recovered[:line_start] + recovered[line_end:]
     if digest(recovered) not in SUPPORTED_MODIFIED_V2[name]:
-        raise PatchError(f"unsupported modified {name} hash: {digest(text)}")
+        raise PatchError(f"unsupported modified {name} hash: {digest(original_text)}")
 
 
 def patch_localtx(text: str) -> str:

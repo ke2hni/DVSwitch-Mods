@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly UPDATER_VERSION="1.2.0"
+readonly UPDATER_VERSION="1.2.1"
 readonly LIBRARY_DIR="/usr/local/lib/dvswitch-mods"
 readonly BUILDER="$LIBRARY_DIR/build_fcc_first_names.py"
 readonly PATCHER="$LIBRARY_DIR/patch_dashboard_first_names.py"
@@ -23,7 +23,7 @@ readonly FCC_URL="https://data.fcc.gov/download/pub/uls/complete/l_amat.zip"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"
 readonly LOCK_FILE="/run/lock/dvswitch-fcc-first-names-update.lock"
 readonly BUILDER_SHA256="d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2"
-readonly PATCHER_SHA256="aff53f3636f25a0ba45c9240958b6654fa95468ab81db28802ff727986c564fd"
+readonly PATCHER_SHA256="80ba8c7e998a596ef43a138ab678457b1a5afce61cb1a2396099fac735ef9a4d"
 readonly TRANSACTION_SHA256="13d743d6065f88888725a1aefe98c8d4ad957974ec5cd991a52ff20ac44a6532"
 readonly HELPER_SHA256="7481c7099b9f7c4f58691052b71535bbe602774e8c0c6f5856341af22c1d09d9"
 

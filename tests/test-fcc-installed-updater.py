@@ -99,7 +99,7 @@ with tempfile.TemporaryDirectory(prefix=".fcc-updater-test-", dir=ROOT.parent) a
         'readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"': f'readonly BACKUP_ROOT="{root / "backups"}"',
         'readonly LOCK_FILE="/run/lock/dvswitch-fcc-first-names-update.lock"': f'readonly LOCK_FILE="{root / "update.lock"}"',
         'readonly BUILDER_SHA256="d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2"': f'readonly BUILDER_SHA256="{digest(builder)}"',
-        'readonly PATCHER_SHA256="aff53f3636f25a0ba45c9240958b6654fa95468ab81db28802ff727986c564fd"': f'readonly PATCHER_SHA256="{digest(patcher)}"',
+        'readonly PATCHER_SHA256="80ba8c7e998a596ef43a138ab678457b1a5afce61cb1a2396099fac735ef9a4d"': f'readonly PATCHER_SHA256="{digest(patcher)}"',
         'readonly TRANSACTION_SHA256="13d743d6065f88888725a1aefe98c8d4ad957974ec5cd991a52ff20ac44a6532"': f'readonly TRANSACTION_SHA256="{digest(transaction)}"',
         'readonly HELPER_SHA256="7481c7099b9f7c4f58691052b71535bbe602774e8c0c6f5856341af22c1d09d9"': f'readonly HELPER_SHA256="{digest(helper)}"',
         '    . /etc/os-release': '    ID=debian; VERSION_ID=12',
