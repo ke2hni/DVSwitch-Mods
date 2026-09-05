@@ -38,7 +38,7 @@ patch_candidate() {
     local candidate=$1 current_hash
     current_hash=$(sha256sum "$TARGET" | awk '{print $1}')
     if ! grep -Fq "$MOD_MARKER" "$TARGET" && ! grep -Fq "$LEGACY_MOD_MARKER" "$TARGET" && [[ "$current_hash" != "$STAGE2_HASH" ]]; then
-        die "Unsupported dvswitch.sh. Expected the completed Stage 2 updater ($STAGE2_HASH), found $current_hash."
+        die "Required TXT updater repair is not installed. Run repair-dvswitch-txt-updater.sh --install first. Expected repaired dvswitch.sh SHA256 $STAGE2_HASH, found $current_hash."
     fi
 
     DVSWITCH_CANDIDATE="$candidate" python3 - <<'PY_PATCH'
@@ -270,7 +270,7 @@ run_check() {
         printf 'After:  '
         sha256sum "$WORK_DIR/dvswitch.sh"
     fi
-    printf 'PASS: supported completed Stage 2 updater. No files changed.\n'
+    printf 'PASS: required DVSwitch TXT updater repair is installed. No files changed.\n'
 }
 
 run_install() {
