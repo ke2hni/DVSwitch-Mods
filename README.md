@@ -35,7 +35,7 @@ Repairs correct confirmed defects in installed DVSwitch software.
 | `repair-dvswitch-txt-updater.sh` | 1.0.0 | Repairs and validates DVSwitch TXT database downloads with atomic replacement | Completed and tested |
 | `repair-p25-audio-announcement.sh` | 1.0.0 | Repairs immediate P25 remote voice announcements and adds an 800 ms silent lead-in | Completed and tested |
 | `repair-p25-dashboard.sh` | 1.1.0 | Recognizes P25Gateway remote-command and static-startup link messages | Completed and tested |
-| `repair-ysf-dashboard-null.sh` | 1.0.4 | Corrects case-sensitive YSF room matching, prevents a literal `null` fallback, and recognizes the completed DMR v7 dashboard checksum | Completed and tested |
+| `repair-ysf-dashboard-null.sh` | 1.0.5 | Corrects case-sensitive YSF room matching, prevents a literal `null` fallback, and recognizes both sides of the completed DMR v7 dashboard checksum transition | Completed and tested |
 
 ## Optional modifications
 

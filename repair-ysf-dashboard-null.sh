@@ -9,7 +9,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.0.4"
+readonly SCRIPT_VERSION="1.0.5"
 readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly HOSTS_FILE="/var/lib/mmdvm/YSFHosts.txt"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/ysf-dashboard-null"
@@ -17,6 +17,7 @@ readonly SUPPORTED_HASH="3f2d81aad9fed503b38271fee033821d27aafea969ca6348fc0afc1
 readonly DMR_V4_YSF_STATUS_HASH="628c5b2debc3b658a132b2e3b10c1e656ff59f9e5412af4a15afc5bb7b292aee"
 readonly DMR_V5_YSF_STATUS_HASH="02f4e7c6c5208d4f44bb559711cc006e0d8da7f4ad7ba5005ea47a4062330cf8"
 readonly DMR_V6_YSF_STATUS_HASH="9c7f1749a37830d5adf51912c880d4c9faf6a79157bba249156f03f86e81b09d"
+readonly DMR_V7_STATUS_HASH="70cc3f29e06d1b5b1bc6cee6a605c9936f72b939f70fad7597dc73cbe8aefc87"
 readonly DMR_V7_YSF_STATUS_HASH="4a7c3ca33091eba398ec0517d5ee69fb383c5889621e60fda8745c737a3655c5"
 readonly REPAIR_MARKER="// DVSwitch-Mods: YSF dashboard null repair v1"
 readonly DASHBOARD_URL="https://127.0.0.1/dvswitch/"
@@ -68,7 +69,8 @@ PY_HOSTS
 patch_candidate() {
     STATUS_CANDIDATE="$WORK_DIR/status.php" DVS_SUPPORTED_HASH="$SUPPORTED_HASH" \
     DVS_DMR_V4_YSF_STATUS_HASH="$DMR_V4_YSF_STATUS_HASH" DVS_DMR_V5_YSF_STATUS_HASH="$DMR_V5_YSF_STATUS_HASH" \
-    DVS_DMR_V6_YSF_STATUS_HASH="$DMR_V6_YSF_STATUS_HASH" DVS_DMR_V7_YSF_STATUS_HASH="$DMR_V7_YSF_STATUS_HASH" \
+    DVS_DMR_V6_YSF_STATUS_HASH="$DMR_V6_YSF_STATUS_HASH" DVS_DMR_V7_STATUS_HASH="$DMR_V7_STATUS_HASH" \
+    DVS_DMR_V7_YSF_STATUS_HASH="$DMR_V7_YSF_STATUS_HASH" \
     DVS_REPAIR_MARKER="$REPAIR_MARKER" python3 - <<'PY_PATCH'
 from pathlib import Path
 import hashlib
@@ -92,7 +94,7 @@ dmr_v2_output = '''                        echo "<tr><td  style=\\"background: #
 dmr_v3_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;text-align:center;\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
 
 def supported_base(value):
-    if digest(value) == supported_hash:
+    if digest(value) in (supported_hash, os.environ["DVS_DMR_V7_STATUS_HASH"]):
         return True
     counts = (value.count(dmr_v2_marker), value.count(dmr_v3_marker), value.count(dmr_v2_output), value.count(dmr_v3_output))
     if counts != (0, 1, 0, 1):
@@ -212,13 +214,14 @@ verify_installed() {
     [[ $(grep -Fc "$REPAIR_MARKER" "$TARGET") -eq 1 ]] || return 1
     [[ $(grep -Fc 'strcasecmp($ysfRoomTxtLine[0], $ysfLinkedTo)' "$TARGET") -eq 1 ]] || return 1
     [[ $(grep -Fc '$ysfLinkedToTxt = $ysfLinkedTo;' "$TARGET") -eq 1 ]] || return 1
-    local dmr_v2_count dmr_v3_count dmr_v4_count dmr_v5_count dmr_v6_count
+    local dmr_v2_count dmr_v3_count dmr_v4_count dmr_v5_count dmr_v6_count dmr_v7_count
     dmr_v2_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v2' "$TARGET" || true)
     dmr_v3_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v3' "$TARGET" || true)
     dmr_v4_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v4' "$TARGET" || true)
     dmr_v5_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v5' "$TARGET" || true)
     dmr_v6_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v6' "$TARGET" || true)
-    [[ $((dmr_v2_count + dmr_v3_count + dmr_v4_count + dmr_v5_count + dmr_v6_count)) -eq 1 ]] || return 1
+    dmr_v7_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v7' "$TARGET" || true)
+    [[ $((dmr_v2_count + dmr_v3_count + dmr_v4_count + dmr_v5_count + dmr_v6_count + dmr_v7_count)) -eq 1 ]] || return 1
     [[ $(grep -Fc '>Tx TG/Ref</th>' "$TARGET") -eq 2 ]] || return 1
     [[ $(grep -Fc 'formatReflectorLink(' "$TARGET") -eq 2 ]] || return 1
     dashboard_health
