@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Jeff Milne, KE2HNI
 
-"""Apply a hash-specific, fixed-size AMD64 MMDVM_Bridge repair.
+"""Apply hash-specific, fixed-size AMD64/i386 MMDVM_Bridge repairs.
 
 No upstream executable is distributed.  The corrected format strings are
 placed in verified file padding, the existing executable PT_LOAD segment is
@@ -50,6 +50,25 @@ LOAD_FILESZ_OFFSET = 0xD0
 LOAD_MEMSZ_OFFSET = 0xD8
 ORIGINAL_SEGMENT_END = 0xAA430
 
+I386_ORIGINAL_SHA256 = "40d2a2b98d928441b5f5c118fee164147d509f6272d855f25f84f586ee08e1c5"
+I386_PATCHED_SHA256 = "440afcbd69c7a0ebe5414a957dda5a8299ba90ec0d10df09a70e7bcade136103"
+I386_FILE_SIZE = 4_491_752
+I386_BUILD_ID = bytes.fromhex("23f9406751544d3b674357ba6b5d48f66c7b7969")
+I386_PADDING_START = 0xBB651
+I386_PADDING_END = 0xBBA98
+I386_NEW_SEGMENT_END = 0xBB6A0
+I386_P25_ADDRESS = 0xBB660
+I386_YSF_ADDRESS = 0xBB680
+I386_GOT_BASE = 0xBD000
+I386_P25_ORIGINAL_ADDRESS = 0x99DD1
+I386_YSF_ORIGINAL_ADDRESS = 0xA04CB
+I386_P25_REFERENCES = (0x5F41A, 0x48EA0)
+I386_YSF_REFERENCE = 0x7B59F
+# ELF32 program header index 2: p_filesz and p_memsz.
+I386_LOAD_FILESZ_OFFSET = 0x84
+I386_LOAD_MEMSZ_OFFSET = 0x88
+I386_ORIGINAL_SEGMENT_END = 0xBB651
+
 
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
@@ -77,6 +96,83 @@ def expected_padding() -> bytes:
     padding[p25:p25 + len(P25_RELOCATED)] = P25_RELOCATED
     padding[ysf:ysf + len(YSF_RELOCATED)] = YSF_RELOCATED
     return bytes(padding)
+
+
+def i386_lea_bytes(target: int) -> bytes:
+    return b"\x8d\x83" + struct.pack("<i", target - I386_GOT_BASE)
+
+
+def i386_expected_padding() -> bytes:
+    padding = bytearray(I386_PADDING_END - I386_PADDING_START)
+    p25 = I386_P25_ADDRESS - I386_PADDING_START
+    ysf = I386_YSF_ADDRESS - I386_PADDING_START
+    padding[p25:p25 + len(P25_RELOCATED)] = P25_RELOCATED
+    padding[ysf:ysf + len(YSF_RELOCATED)] = YSF_RELOCATED
+    return bytes(padding)
+
+
+def validate_i386_common(data: bytes) -> None:
+    require(len(data) == I386_FILE_SIZE, f"unsupported i386 file size: {len(data)}")
+    require(data[:6] == b"\x7fELF\x01\x01", "not a little-endian ELF32 executable")
+    require(struct.unpack_from("<H", data, 0x10)[0] == 3, "unsupported i386 ELF type")
+    require(struct.unpack_from("<H", data, 0x12)[0] == 3, "unsupported ELF machine (expected i386)")
+    require(data.count(I386_BUILD_ID) == 1, "missing or ambiguous expected i386 GNU build ID")
+    count(data, P25_ORIGINAL, "original i386 P25 format string", 1)
+    count(data, YSF_ORIGINAL, "original i386 YSF format string", 1)
+
+
+def validate_i386_original(data: bytes) -> None:
+    validate_i386_common(data)
+    require(struct.unpack_from("<I", data, I386_LOAD_FILESZ_OFFSET)[0] == I386_ORIGINAL_SEGMENT_END,
+            "unexpected original i386 executable-segment file size")
+    require(struct.unpack_from("<I", data, I386_LOAD_MEMSZ_OFFSET)[0] == I386_ORIGINAL_SEGMENT_END,
+            "unexpected original i386 executable-segment memory size")
+    require(data[I386_PADDING_START:I386_PADDING_END] == bytes(I386_PADDING_END - I386_PADDING_START),
+            "i386 relocation padding is not entirely zero-filled")
+    for offset in I386_P25_REFERENCES:
+        require(data[offset:offset + 6] == i386_lea_bytes(I386_P25_ORIGINAL_ADDRESS),
+                f"unexpected original i386 P25 reference at 0x{offset:x}")
+    require(data[I386_YSF_REFERENCE:I386_YSF_REFERENCE + 6] == i386_lea_bytes(I386_YSF_ORIGINAL_ADDRESS),
+            "unexpected original i386 YSF reference")
+
+
+def validate_i386_patched(data: bytes) -> None:
+    validate_i386_common(data)
+    require(struct.unpack_from("<I", data, I386_LOAD_FILESZ_OFFSET)[0] == I386_NEW_SEGMENT_END,
+            "unexpected patched i386 executable-segment file size")
+    require(struct.unpack_from("<I", data, I386_LOAD_MEMSZ_OFFSET)[0] == I386_NEW_SEGMENT_END,
+            "unexpected patched i386 executable-segment memory size")
+    require(data[I386_PADDING_START:I386_PADDING_END] == i386_expected_padding(),
+            "relocated i386 strings or unused padding are invalid")
+    for offset in I386_P25_REFERENCES:
+        require(data[offset:offset + 6] == i386_lea_bytes(I386_P25_ADDRESS),
+                f"unexpected patched i386 P25 reference at 0x{offset:x}")
+    require(data[I386_YSF_REFERENCE:I386_YSF_REFERENCE + 6] == i386_lea_bytes(I386_YSF_ADDRESS),
+            "unexpected patched i386 YSF reference")
+
+
+def patch_i386(data: bytes) -> bytes:
+    digest = sha256(data)
+    if digest == I386_PATCHED_SHA256:
+        validate_i386_patched(data)
+        return data
+    require(digest == I386_ORIGINAL_SHA256, f"unsupported i386 MMDVM_Bridge SHA256: {digest}")
+    validate_i386_original(data)
+    candidate = bytearray(data)
+    struct.pack_into("<I", candidate, I386_LOAD_FILESZ_OFFSET, I386_NEW_SEGMENT_END)
+    struct.pack_into("<I", candidate, I386_LOAD_MEMSZ_OFFSET, I386_NEW_SEGMENT_END)
+    candidate[I386_PADDING_START:I386_PADDING_END] = i386_expected_padding()
+    for offset in I386_P25_REFERENCES:
+        candidate[offset:offset + 6] = i386_lea_bytes(I386_P25_ADDRESS)
+    candidate[I386_YSF_REFERENCE:I386_YSF_REFERENCE + 6] = i386_lea_bytes(I386_YSF_ADDRESS)
+    result = bytes(candidate)
+    require(len(result) == len(data), "i386 binary size changed")
+    validate_i386_patched(result)
+    actual = sha256(result)
+    require(I386_PATCHED_SHA256 != "TO_BE_FILLED",
+            f"internal i386 patched SHA256 is not configured; calculated {actual}")
+    require(actual == I386_PATCHED_SHA256, f"internal i386 patched SHA256 mismatch: {actual}")
+    return result
 
 
 def validate_common(data: bytes) -> None:
@@ -125,11 +221,13 @@ def validate_patched(data: bytes) -> None:
 
 def patch_binary(data: bytes) -> bytes:
     digest = sha256(data)
+    if digest in (I386_ORIGINAL_SHA256, I386_PATCHED_SHA256):
+        return patch_i386(data)
     if digest == PATCHED_SHA256:
         validate_patched(data)
         return data
     if digest != ORIGINAL_SHA256:
-        raise PatchError(f"unsupported AMD64 MMDVM_Bridge SHA256: {digest}")
+        raise PatchError(f"unsupported AMD64/i386 MMDVM_Bridge SHA256: {digest}")
 
     validate_original(data)
     candidate = bytearray(data)
@@ -159,7 +257,7 @@ def patch_file(path: Path) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Patch a temporary AMD64 MMDVM_Bridge copy")
+    parser = argparse.ArgumentParser(description="Patch a temporary AMD64/i386 MMDVM_Bridge copy")
     parser.add_argument("--binary", required=True, type=Path)
     args = parser.parse_args()
     if not args.binary.is_file() or args.binary.is_symlink():

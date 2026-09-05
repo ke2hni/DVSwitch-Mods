@@ -8,7 +8,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="0.1.0"
+readonly SCRIPT_VERSION="0.2.0"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PATCHER="$SCRIPT_DIR/lib/patch_mmdvm_binary_x86.py"
 readonly TRANSACTION_LIBRARY="$SCRIPT_DIR/lib/transaction.sh"
@@ -20,7 +20,7 @@ WORK_DIR=""
 INSTALL_ACTIVE=0
 
 die() { printf 'ERROR: %s\n' "$1" >&2; exit 1; }
-usage() { printf 'MMDVM x86 spacing repair %s (Testing; AMD64 build -94 only)\nUsage: sudo %s {--check|--dry-run|--install|--restore BACKUP-NAME}\n' "$SCRIPT_VERSION" "$(basename "$0")"; }
+usage() { printf 'MMDVM x86 spacing repair %s (Testing; exact AMD64/i386 builds only)\nUsage: sudo %s {--check|--dry-run|--install|--restore BACKUP-NAME}\n' "$SCRIPT_VERSION" "$(basename "$0")"; }
 cleanup() { [[ -z "$WORK_DIR" || ! -d "$WORK_DIR" ]] || rm -rf -- "$WORK_DIR"; }
 on_error() { local line=$1 status=$2; trap - ERR; set +e; printf 'ERROR: failed near line %s (status %s).\n' "$line" "$status" >&2; if [[ $INSTALL_ACTIVE -eq 1 ]]; then dvsm_transaction_rollback >&2 || printf 'ERROR: automatic rollback failed; use the protected backup.\n' >&2; systemctl try-restart "$SERVICE" >/dev/null 2>&1 || true; fi; cleanup; exit "$status"; }
 trap 'on_error $LINENO $?' ERR
@@ -29,12 +29,12 @@ trap cleanup EXIT
 require_root() { [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Run this repair with sudo."; }
 require_command() { command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"; }
 check_regular_file() { [[ -f "$1" ]] || die "Required file not found: $1"; [[ ! -L "$1" ]] || die "Refusing symbolic-link target: $1"; }
-preflight() { require_root; [[ $(uname -m) == x86_64 ]] || die "This testing release supports only an AMD64 host."; for command in bash cmp cp date file grep install mktemp mv python3 sha256sum stat systemctl uname; do require_command "$command"; done; check_regular_file "$PATCHER"; check_regular_file "$TRANSACTION_LIBRARY"; check_regular_file "$TARGET"; file -b "$TARGET" | grep -q 'ELF 64-bit.*x86-64' || die "MMDVM_Bridge is not the supported AMD64 ELF executable."; systemctl cat "$SERVICE" >/dev/null; python3 "$PATCHER" --help >/dev/null; }
+preflight() { require_root; [[ $(uname -m) =~ ^(x86_64|i[3-6]86)$ ]] || die "This testing release requires an x86 host."; for command in bash cmp cp date file grep install mktemp mv python3 sha256sum stat systemctl uname; do require_command "$command"; done; check_regular_file "$PATCHER"; check_regular_file "$TRANSACTION_LIBRARY"; check_regular_file "$TARGET"; file -b "$TARGET" | grep -Eq 'ELF (64-bit.*x86-64|32-bit.*Intel 80386)' || die "MMDVM_Bridge is not a supported x86 ELF executable."; systemctl cat "$SERVICE" >/dev/null; python3 "$PATCHER" --help >/dev/null; }
 prepare_candidate() { WORK_DIR=$(mktemp -d /tmp/dvswitch-mmdvm-spacing-x86.XXXXXX); cp -- "$TARGET" "$WORK_DIR/MMDVM_Bridge"; python3 "$PATCHER" --binary "$WORK_DIR/MMDVM_Bridge"; python3 "$PATCHER" --binary "$WORK_DIR/MMDVM_Bridge"; [[ $(stat -c '%s' "$TARGET") == "$(stat -c '%s' "$WORK_DIR/MMDVM_Bridge")" ]] || die "Candidate size changed."; }
-show_result() { if cmp -s "$TARGET" "$WORK_DIR/MMDVM_Bridge"; then printf 'ALREADY PATCHED FOR TESTING: %s\n' "$TARGET"; else printf 'AMD64 TEST CANDIDATE READY: %s\nBefore: ' "$TARGET"; sha256sum "$TARGET"; printf 'After:  '; sha256sum "$WORK_DIR/MMDVM_Bridge"; fi; }
-run_check() { preflight; prepare_candidate; show_result; printf 'PASS: recognized AMD64 build and verified candidate. No files changed.\n'; }
+show_result() { if cmp -s "$TARGET" "$WORK_DIR/MMDVM_Bridge"; then printf 'ALREADY PATCHED FOR TESTING: %s\n' "$TARGET"; else printf 'X86 TEST CANDIDATE READY: %s\nBefore: ' "$TARGET"; sha256sum "$TARGET"; printf 'After:  '; sha256sum "$WORK_DIR/MMDVM_Bridge"; fi; }
+run_check() { preflight; prepare_candidate; show_result; printf 'PASS: recognized AMD64/i386 build and verified candidate. No files changed.\n'; }
 run_dry_run() { run_check; }
-run_install() { preflight; prepare_candidate; show_result; if cmp -s "$TARGET" "$WORK_DIR/MMDVM_Bridge"; then printf 'PASS: AMD64 test candidate is already installed. No files changed.\n'; return; fi; . "$TRANSACTION_LIBRARY"; dvsm_transaction_begin "$BACKUP_ROOT"; dvsm_backup_file "$TARGET"; INSTALL_ACTIVE=1; dvsm_install_candidate "$WORK_DIR/MMDVM_Bridge" "$TARGET"; cmp -s "$WORK_DIR/MMDVM_Bridge" "$TARGET"; python3 "$PATCHER" --binary "$TARGET"; systemctl try-restart "$SERVICE"; systemctl is-active --quiet "$SERVICE"; INSTALL_ACTIVE=0; printf 'PASS: AMD64 test candidate installed atomically; live YSF and P25 tests are still required.\nBackup: %s\n' "$DVSM_TRANSACTION_DIR"; }
+run_install() { preflight; prepare_candidate; show_result; if cmp -s "$TARGET" "$WORK_DIR/MMDVM_Bridge"; then printf 'PASS: x86 test candidate is already installed. No files changed.\n'; return; fi; . "$TRANSACTION_LIBRARY"; dvsm_transaction_begin "$BACKUP_ROOT"; dvsm_backup_file "$TARGET"; INSTALL_ACTIVE=1; dvsm_install_candidate "$WORK_DIR/MMDVM_Bridge" "$TARGET"; cmp -s "$WORK_DIR/MMDVM_Bridge" "$TARGET"; python3 "$PATCHER" --binary "$TARGET"; systemctl try-restart "$SERVICE"; systemctl is-active --quiet "$SERVICE"; INSTALL_ACTIVE=0; printf 'PASS: x86 test candidate installed atomically; live YSF and P25 tests are still required.\nBackup: %s\n' "$DVSM_TRANSACTION_DIR"; }
 run_restore() { local name=$1; preflight; [[ "$name" =~ ^install-[0-9]{8}-[0-9]{6}(-[0-9]+)?$ ]] || die "Invalid backup name: $name"; . "$TRANSACTION_LIBRARY"; dvsm_restore_backup_set "$BACKUP_ROOT/$name"; file -b "$TARGET" | grep -q 'ELF 64-bit.*x86-64'; systemctl try-restart "$SERVICE"; systemctl is-active --quiet "$SERVICE"; printf 'PASS: MMDVM_Bridge restored from %s.\n' "$name"; }
 
 main() { case "${1:-}" in --check) [[ $# -eq 1 ]] || die "Unexpected arguments."; run_check;; --dry-run) [[ $# -eq 1 ]] || die "Unexpected arguments."; run_dry_run;; --install) [[ $# -eq 1 ]] || die "Unexpected arguments."; run_install;; --restore) [[ $# -eq 2 ]] || die "--restore requires one backup name."; run_restore "$2";; --help|-h) usage;; "") usage; exit 2;; *) die "Unknown option: $1";; esac; }

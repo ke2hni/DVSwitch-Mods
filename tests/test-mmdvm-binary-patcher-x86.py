@@ -53,6 +53,35 @@ def make_expected(original: bytes) -> bytes:
     return bytes(data)
 
 
+def make_i386_original() -> bytes:
+    data = bytearray(patcher.I386_FILE_SIZE)
+    data[:6] = b"\x7fELF\x01\x01"
+    struct.pack_into("<H", data, 0x10, 3)
+    struct.pack_into("<H", data, 0x12, 3)
+    struct.pack_into("<I", data, patcher.I386_LOAD_FILESZ_OFFSET, patcher.I386_ORIGINAL_SEGMENT_END)
+    struct.pack_into("<I", data, patcher.I386_LOAD_MEMSZ_OFFSET, patcher.I386_ORIGINAL_SEGMENT_END)
+    data[0x188:0x188 + len(patcher.I386_BUILD_ID)] = patcher.I386_BUILD_ID
+    data[patcher.I386_P25_ORIGINAL_ADDRESS:patcher.I386_P25_ORIGINAL_ADDRESS + len(patcher.P25_ORIGINAL)] = patcher.P25_ORIGINAL
+    data[patcher.I386_YSF_ORIGINAL_ADDRESS:patcher.I386_YSF_ORIGINAL_ADDRESS + len(patcher.YSF_ORIGINAL)] = patcher.YSF_ORIGINAL
+    for offset in patcher.I386_P25_REFERENCES:
+        data[offset:offset + 6] = patcher.i386_lea_bytes(patcher.I386_P25_ORIGINAL_ADDRESS)
+    data[patcher.I386_YSF_REFERENCE:patcher.I386_YSF_REFERENCE + 6] = \
+        patcher.i386_lea_bytes(patcher.I386_YSF_ORIGINAL_ADDRESS)
+    return bytes(data)
+
+
+def make_i386_expected(original: bytes) -> bytes:
+    data = bytearray(original)
+    struct.pack_into("<I", data, patcher.I386_LOAD_FILESZ_OFFSET, patcher.I386_NEW_SEGMENT_END)
+    struct.pack_into("<I", data, patcher.I386_LOAD_MEMSZ_OFFSET, patcher.I386_NEW_SEGMENT_END)
+    data[patcher.I386_PADDING_START:patcher.I386_PADDING_END] = patcher.i386_expected_padding()
+    for offset in patcher.I386_P25_REFERENCES:
+        data[offset:offset + 6] = patcher.i386_lea_bytes(patcher.I386_P25_ADDRESS)
+    data[patcher.I386_YSF_REFERENCE:patcher.I386_YSF_REFERENCE + 6] = \
+        patcher.i386_lea_bytes(patcher.I386_YSF_ADDRESS)
+    return bytes(data)
+
+
 def expect_rejected(data: bytes, phrase: str) -> None:
     try:
         patcher.patch_binary(data)
@@ -92,7 +121,27 @@ def main() -> None:
         patcher.ORIGINAL_SHA256 = saved_original
         patcher.PATCHED_SHA256 = saved_patched
 
-    print("PASS: hash-specific AMD64 MMDVM_Bridge binary patcher tests")
+    i386_original = make_i386_original()
+    i386_expected = make_i386_expected(i386_original)
+    saved_i386_original = patcher.I386_ORIGINAL_SHA256
+    saved_i386_patched = patcher.I386_PATCHED_SHA256
+    try:
+        patcher.I386_ORIGINAL_SHA256 = hashlib.sha256(i386_original).hexdigest()
+        patcher.I386_PATCHED_SHA256 = hashlib.sha256(i386_expected).hexdigest()
+        repaired = patcher.patch_binary(i386_original)
+        require(repaired == i386_expected, "i386 repair differs from expected candidate")
+        require(patcher.patch_binary(repaired) == repaired, "second i386 patch was not idempotent")
+        require(len(repaired) == len(i386_original), "i386 repair changed file size")
+
+        damaged = bytearray(i386_original)
+        damaged[patcher.I386_P25_REFERENCES[0]] ^= 1
+        patcher.I386_ORIGINAL_SHA256 = hashlib.sha256(damaged).hexdigest()
+        expect_rejected(bytes(damaged), "i386 P25 reference")
+    finally:
+        patcher.I386_ORIGINAL_SHA256 = saved_i386_original
+        patcher.I386_PATCHED_SHA256 = saved_i386_patched
+
+    print("PASS: hash-specific AMD64/i386 MMDVM_Bridge binary patcher tests")
 
 
 if __name__ == "__main__":
