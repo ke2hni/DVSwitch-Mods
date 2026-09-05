@@ -25,7 +25,7 @@ Repairs correct confirmed defects in installed DVSwitch software.
 | Script | Version | Purpose | Status |
 | --- | ---: | --- | --- |
 | `repair-mmdvm-spacing.sh` | 1.0.0 | Corrects malformed P25 and five-digit YSF remote-command spacing in `MMDVM_Bridge` | Completed and tested |
-| `repair-mmdvm-spacing-x86.sh` | 0.2.0 | Creates hash-specific fixed-size AMD64/i386 candidates using verified ELF padding and relocated command strings | Testing |
+| `repair-mmdvm-spacing-x86.sh` | 0.2.1 | Creates hash-specific fixed-size AMD64/i386 candidates using verified ELF padding and relocated command strings | Testing |
 | `repair-dvswitch-txt-updater.sh` | 1.0.0 | Repairs and validates DVSwitch TXT database downloads with atomic replacement | Completed and tested |
 | `repair-p25-audio-announcement.sh` | 1.0.0 | Repairs immediate P25 remote voice announcements and adds an 800 ms silent lead-in | Completed and tested |
 | `repair-p25-dashboard.sh` | 1.1.0 | Recognizes P25Gateway remote-command and static-startup link messages | Completed and tested |
