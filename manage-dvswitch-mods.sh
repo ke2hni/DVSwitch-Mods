@@ -64,7 +64,7 @@ select_component() {
                 *"ELF 64-bit"*"ARM aarch64"*) BACKUP_ROOT="/var/backups/dvswitch-mods/mmdvm-spacing" ;;
                 *"ELF 32-bit"*"ARM"*"EABI5"*"hard-float"*) BACKUP_ROOT="/var/backups/dvswitch-mods/mmdvm-spacing-armhf" ;;
                 *"ELF 64-bit"*"x86-64"*|*"ELF 32-bit"*"Intel 80386"*|*"ELF 32-bit"*"Intel i386"*) BACKUP_ROOT="/var/backups/dvswitch-mods/mmdvm-spacing-x86" ;;
-                *) die "Cannot select an MMDVM repair for the installed binary." ;;
+                *) printf 'ERROR: Cannot select an MMDVM repair for the installed binary.\n' >&2; return 1 ;;
             esac
             ;;
         dvswitch-txt-updater) CHILD_SCRIPT="$SCRIPT_DIR/repair-dvswitch-txt-updater.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/txt-updater" ;;
@@ -178,6 +178,76 @@ check_one() {
     "$CHILD_SCRIPT" --check
 }
 
+dependency_hint() {
+    case "$1" in
+        p25-nxdn-json) printf 'install dvswitch-txt-updater first' ;;
+        p25-nxdn-friendly-names) printf 'install p25-dashboard and p25-nxdn-json first' ;;
+        dstar-tx-ref) printf 'install p25-nxdn-friendly-names first' ;;
+        dmr-friendly-names) printf 'install dstar-tx-ref first' ;;
+        ysf-dashboard-null) printf 'install dmr-friendly-names first' ;;
+        dashboard-targets) printf 'install dashboard-fcc-first-names first' ;;
+        *) printf 'review the detailed error shown above' ;;
+    esac
+}
+
+print_named_list() {
+    local heading=$1
+    shift
+    printf '%s\n' "$heading"
+    if [[ $# -eq 0 ]]; then
+        printf '  - None\n'
+    else
+        printf '  - %s\n' "$@"
+    fi
+}
+
+check_all() {
+    local component output status index=0
+    local -a installed=() ready=() failed=() skipped=() expected=()
+    require_command grep
+    for component in "${COMPONENTS[@]}"; do
+        if should_skip_all_component "$component"; then
+            printf '\n=== SKIP: %s ===\nRequires an ARM64 host; this component does not apply here.\n' "$component"
+            skipped+=("$component — ARM64 hosts only")
+            continue
+        fi
+        expected+=("$component")
+        if ! select_component "$component"; then
+            failed+=("$component — installed MMDVM_Bridge architecture or build could not be selected")
+            continue
+        fi
+        printf '\n=== CHECK: %s ===\n' "$COMPONENT"
+        set +e
+        output=$("$CHILD_SCRIPT" --check 2>&1)
+        status=$?
+        set -e
+        printf '%s\n' "$output"
+        if [[ $status -ne 0 ]]; then
+            failed+=("$COMPONENT — $(dependency_hint "$COMPONENT")")
+        elif grep -Eq '(^| )(REPAIR|MODIFICATION|INSTALLATION|ARMHF TEST|X86) READY:' <<< "$output"; then
+            ready+=("$COMPONENT")
+        else
+            installed+=("$COMPONENT")
+        fi
+    done
+
+    printf '\n=== PLAIN-LANGUAGE SUMMARY ===\n'
+    print_named_list 'Passed — already installed or currently valid:' "${installed[@]}"
+    print_named_list 'Passed compatibility checks — ready to install:' "${ready[@]}"
+    print_named_list 'Failed or blocked:' "${failed[@]}"
+    print_named_list 'Skipped because they do not apply to this host:' "${skipped[@]}"
+    printf 'Required installation order for this host:\n'
+    for component in "${expected[@]}"; do
+        index=$((index + 1))
+        printf '  %d. %s\n' "$index" "$component"
+    done
+    if [[ ${#failed[@]} -gt 0 ]]; then
+        printf 'RESULT: One or more checks are blocked or failed. Install prerequisites in the order above, then run --check all again.\n'
+        return 1
+    fi
+    printf 'RESULT: Every applicable component is either already installed or ready to install.\n'
+}
+
 last_state_line() { tail -n 1 "$STATE_FILE"; }
 
 remove_last_state_line() {
@@ -209,15 +279,9 @@ uninstall_one() {
 }
 
 check_requested() {
-    local requested=$1 component
+    local requested=$1
     if [[ $requested == all ]]; then
-        for component in "${COMPONENTS[@]}"; do
-            if should_skip_all_component "$component"; then
-                printf '\n=== SKIP: %s requires an ARM64 host ===\n' "$component"
-                continue
-            fi
-            check_one "$component"
-        done
+        check_all
     else
         check_one "$requested"
     fi

@@ -137,6 +137,14 @@ sudo ./manage-dvswitch-mods.sh --uninstall all
 sudo ./manage-dvswitch-mods.sh --status
 ```
 
+`--check all` never stops at the first missing prerequisite. It checks every
+applicable component and ends with a plain-language summary separating items
+that are already installed, ready to install, failed or blocked, and skipped
+because they do not apply to the host. The summary also prints the required
+installation order and names the prerequisite script instead of relying on
+internal stage numbers. A blocked or failed summary returns a nonzero status
+but does not change any files.
+
 The repository manager invokes `--check` before installation and again after
 installation. It records the one protected backup created by each changed
 component below `/var/lib/dvswitch-mods/manager`. A component that was already
