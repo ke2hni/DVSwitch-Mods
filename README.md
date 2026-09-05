@@ -164,6 +164,18 @@ order automatically. A failed uninstall retains its state record and backup.
 During `--install all`, components run in the documented dependency order and
 the MMDVM manager selects only the installed architecture. The ARM64-only P25
 audio-announcement source repair is explicitly skipped on non-ARM64 hosts.
+After installing the P25/NXDN JSON updater, the manager checks for all required
+P25, NXDN, DMR, and YSF data files. It avoids an unnecessary download when
+every required regular nonempty file already exists. If any are missing, it
+runs the installed validated `dvswitch.sh update` operation, requires success,
+and verifies every required file before continuing. Before downloading, an
+explicit one-hour guard checks both the manager's protected update timestamp
+and the newest P25/NXDN JSON modification time. The attempt timestamp is saved
+before the updater starts, so even a failed manager-started download cannot be
+retried immediately. If any update attempt occurred
+less than 3,600 seconds earlier, the operation stops and reports the remaining
+wait in minutes. The same database step and rate-limit protection are performed
+when `p25-nxdn-json` is installed individually through the manager.
 Installation stops at the first failed compatibility, dependency, download,
 build, validation, service, or dashboard health check. Earlier successful
 manager-recorded installations remain safely reversible.

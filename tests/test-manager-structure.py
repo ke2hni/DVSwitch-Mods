@@ -65,6 +65,17 @@ def main() -> None:
             "reversible state recording or post-install validation is missing")
     require("Refusing symbolic-link" in master and "flock -n" in master,
             "state-file link or concurrency protection is missing")
+    require("ensure_databases" in master and '"$DVSWITCH_COMMAND" update' in master,
+            "required post-JSON database update is missing")
+    require("DATABASE_MIN_INTERVAL=3600" in master and "less than one hour ago" in master,
+            "one-hour database update guard is missing")
+    require("last-database-update" in master and "stat -c '%Y'" in master,
+            "database update timestamp protection is missing")
+    require(master.index('mv -fT -- "$temporary" "$DATABASE_UPDATE_STAMP"') <
+            master.index('"$DVSWITCH_COMMAND" update'),
+            "rate-limit attempt timestamp must be saved before downloading")
+    for name in ("NXDNHosts.json", "P25Hosts.json", "TGList_BM.txt", "TGList_TGIF.txt", "YSFHosts.txt"):
+        require(name in master, f"required managed database is missing: {name}")
     require("--uninstall BACKUP-NAME" in mmdvm,
             "MMDVM backup-driven uninstall interface is missing")
     require("Unsupported MMDVM_Bridge architecture" in mmdvm,

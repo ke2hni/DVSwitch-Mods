@@ -14,6 +14,22 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly STATE_DIR="/var/lib/dvswitch-mods/manager"
 readonly STATE_FILE="$STATE_DIR/active-installs.tsv"
 readonly LOCK_FILE="$STATE_DIR/manager.lock"
+readonly DVSWITCH_COMMAND="/opt/MMDVM_Bridge/dvswitch.sh"
+readonly DATABASE_UPDATE_STAMP="$STATE_DIR/last-database-update"
+readonly DATABASE_MIN_INTERVAL=3600
+readonly -a REQUIRED_DATABASES=(
+    /var/lib/mmdvm/NXDNHosts.txt
+    /var/lib/mmdvm/NXDNHosts.json
+    /var/lib/mmdvm/P25Hosts.txt
+    /var/lib/mmdvm/P25Hosts.json
+    /var/lib/mmdvm/TGList_BM.txt
+    /var/lib/mmdvm/YSFHosts.txt
+    /var/lib/mmdvm/TGList_TGIF.txt
+)
+readonly -a RATE_LIMIT_EVIDENCE=(
+    /var/lib/mmdvm/NXDNHosts.json
+    /var/lib/mmdvm/P25Hosts.json
+)
 
 readonly -a COMPONENTS=(
     mmdvm-spacing
@@ -172,6 +188,46 @@ install_one() {
     "$CHILD_SCRIPT" --check
 }
 
+databases_ready() {
+    local database
+    for database in "${REQUIRED_DATABASES[@]}"; do
+        [[ -f "$database" && ! -L "$database" && -s "$database" ]] || return 1
+    done
+}
+
+ensure_databases() {
+    local database modified newest=0 now age remaining temporary
+    if databases_ready; then
+        printf '\n=== DATABASE UPDATE ===\nAll required P25, NXDN, DMR, and YSF data files are already present; no download was requested.\n'
+        return
+    fi
+    for database in "${RATE_LIMIT_EVIDENCE[@]}" "$DATABASE_UPDATE_STAMP"; do
+        if [[ -f "$database" && ! -L "$database" ]]; then
+            modified=$(stat -c '%Y' "$database")
+            if ((modified > newest)); then newest=$modified; fi
+        fi
+    done
+    now=$(date +%s)
+    age=$((now - newest))
+    if ((newest > 0 && age < DATABASE_MIN_INTERVAL)); then
+        remaining=$((DATABASE_MIN_INTERVAL - age))
+        die "Required data is missing, but a database update ran less than one hour ago. Wait $(((remaining + 59) / 60)) minute(s) before trying again."
+    fi
+    require_regular "$DVSWITCH_COMMAND"
+    [[ -x "$DVSWITCH_COMMAND" ]] || die "DVSwitch updater is not executable: $DVSWITCH_COMMAND"
+    printf '\n=== DATABASE UPDATE ===\nRequired dashboard data is missing. Running the installed validated DVSwitch updater.\n'
+    temporary=$(mktemp --tmpdir="$STATE_DIR" .last-database-update.XXXXXX)
+    printf '%s\n' "$now" > "$temporary"
+    chown root:root "$temporary"
+    chmod 0600 "$temporary"
+    mv -fT -- "$temporary" "$DATABASE_UPDATE_STAMP"
+    "$DVSWITCH_COMMAND" update
+    for database in "${REQUIRED_DATABASES[@]}"; do
+        [[ -f "$database" && ! -L "$database" && -s "$database" ]] || die "Database update did not produce a valid regular nonempty file: $database"
+    done
+    printf 'PASS: all required P25, NXDN, DMR, and YSF data files are present.\n'
+}
+
 check_one() {
     select_component "$1"
     printf '\n=== CHECK: %s ===\n' "$COMPONENT"
@@ -296,9 +352,11 @@ install_requested() {
                 continue
             fi
             install_one "$component"
+            if [[ $component == p25-nxdn-json ]]; then ensure_databases; fi
         done
     else
         install_one "$requested"
+        if [[ $requested == p25-nxdn-json ]]; then ensure_databases; fi
     fi
 }
 
