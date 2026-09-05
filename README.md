@@ -16,6 +16,11 @@ and i386 package builds listed by its patcher. Both architectures have passed
 live YSF and P25 testing. This is not a replacement for the completed ARM
 repair.
 
+The separate `repair-mmdvm-spacing-armhf.sh` is a testing release for one
+exact 32-bit ARM hard-float build. Its offline candidate and safety tests have
+passed, but it must complete live P25 and YSF testing on an ARMHF DVSwitch node
+before it is marked completed.
+
 Each script rejects unsupported operating systems, installed-file versions, or ambiguous file structures before installation. `repair-p25-audio-announcement.sh` additionally requires ARM64, Internet access during its pinned source build, and the exact supported stock P25Gateway binary.
 
 ## Repairs
@@ -26,6 +31,7 @@ Repairs correct confirmed defects in installed DVSwitch software.
 | --- | ---: | --- | --- |
 | `repair-mmdvm-spacing.sh` | 1.0.0 | Corrects malformed P25 and five-digit YSF remote-command spacing in `MMDVM_Bridge` | Completed and tested |
 | `repair-mmdvm-spacing-x86.sh` | 1.0.0 | Corrects malformed P25 and five-digit YSF remote-command spacing in exact AMD64/i386 `MMDVM_Bridge` builds | Completed and tested |
+| `repair-mmdvm-spacing-armhf.sh` | 0.1.0-testing | Corrects malformed P25 and five-digit YSF remote-command spacing in one exact ARMHF `MMDVM_Bridge` build | Testing |
 | `repair-dvswitch-txt-updater.sh` | 1.0.0 | Repairs and validates DVSwitch TXT database downloads with atomic replacement | Completed and tested |
 | `repair-p25-audio-announcement.sh` | 1.0.0 | Repairs immediate P25 remote voice announcements and adds an 800 ms silent lead-in | Completed and tested |
 | `repair-p25-dashboard.sh` | 1.1.0 | Recognizes P25Gateway remote-command and static-startup link messages | Completed and tested |
@@ -100,6 +106,7 @@ Use the exact backup name printed by a successful installation, such as `install
 | --- | --- |
 | `repair-mmdvm-spacing.sh` | Independent |
 | `repair-mmdvm-spacing-x86.sh` | Independent; exact AMD64/i386 builds only |
+| `repair-mmdvm-spacing-armhf.sh` | Independent; exact ARMHF build only; live testing required |
 | `repair-dvswitch-txt-updater.sh` | Independent |
 | `repair-p25-audio-announcement.sh` | Independent; ARM64 and Internet access required |
 | `repair-p25-dashboard.sh` | Independent of the optional dashboard modifications |
@@ -129,7 +136,43 @@ When every repair and modification is wanted, use this order:
 10. `mod-dashboard-fcc-first-names.sh` (optional and independent after the dashboard baseline is established)
 11. `mod-dashboard-targets.sh` (optional; install after the FCC activity-column modification)
 
-The three independent repairs may be performed separately when their corresponding defects apply. Follow the dependency table before selecting anything from the dashboard or database chain.
+The independent repairs may be performed separately when their corresponding defects apply. Use only the architecture-specific MMDVM repair appropriate for that installation; do not run multiple MMDVM repair scripts on the same binary. Follow the dependency table before selecting anything from the dashboard or database chain.
+
+### If an MMDVM spacing repair rejects the installed binary
+
+Do not bypass the compatibility check, edit a hash in the patcher, or copy a
+patched executable from another system. Start a new ChatGPT session, attach a
+current ZIP of this repository and a copy of the rejected unmodified
+`/opt/MMDVM_Bridge/MMDVM_Bridge`, and use this request:
+
+> My DVSwitch MMDVM_Bridge spacing repair rejected this exact binary. Analyze
+> the attached unmodified binary and repository without changing my live
+> system. Determine its architecture, SHA256, size, GNU Build ID, ELF load
+> segments, exact P25 and YSF format strings, every code or literal reference
+> to those strings, and verified unused mapped or extendable padding. The
+> required results are `TalkGroup 10200` and `LinkYSF 44444`; do not treat
+> disconnect value 0 as the defect. Create or update a separate hash-specific
+> repair only if every offset and reference can be proved. Preserve file size,
+> owner, group, mode, atomic installation, protected backup, automatic
+> rollback, named restore, `--check`, `--install`, and idempotency. Do not
+> modify the completed repair scripts for other architectures. Mark a new
+> build Testing until live `strace` and gateway-log results prove both modes.
+> Give me one copy-and-paste command at a time, beginning with read-only checks.
+
+Also paste the complete output from this read-only collection command:
+
+```bash
+cd ~/DVSwitch-Mods && printf '=== REVISION ===\n' && git status --short --branch && git log -1 --oneline --decorate && printf '\n=== SYSTEM ===\n' && uname -a && dpkg --print-architecture && printf '\n=== BINARY ===\n' && sudo sha256sum /opt/MMDVM_Bridge/MMDVM_Bridge && sudo stat -c 'SIZE=%s OWNER=%U:%G MODE=%a' /opt/MMDVM_Bridge/MMDVM_Bridge && sudo file /opt/MMDVM_Bridge/MMDVM_Bridge && sudo readelf -n /opt/MMDVM_Bridge/MMDVM_Bridge | grep -A1 'Build ID' && sudo readelf -lW /opt/MMDVM_Bridge/MMDVM_Bridge && printf '\n=== PACKAGE ===\n' && dpkg-query -W -f='${binary:Package} ${Version} ${Architecture}\n' mmdvm-bridge 2>&1 && apt-cache policy mmdvm-bridge && printf '\n=== REPAIR CHECK ===\n' && sudo ./REPAIR_SCRIPT_NAME.sh --check; printf '\n=== SERVICES ===\n'; systemctl is-active mmdvm_bridge.service ysfgateway.service p25gateway.service
+```
+
+Replace `REPAIR_SCRIPT_NAME.sh` with the script that rejected the binary. If
+`readelf` is unavailable, report that exact error instead of installing tools.
+After a candidate is installed on a test node, ChatGPT must capture the exact
+MMDVM_Bridge UDP sends with `strace`: `TalkGroup 10200` to P25Gateway and
+`LinkYSF 44444` to YSFGateway. It must also capture only the new gateway-log
+lines proving the P25 reflector switch and YSF room connection, then verify
+service health, dashboard HTTP status, installed hash and metadata, backup
+count, and a final no-change `--check`.
 
 ## Repository contents
 
