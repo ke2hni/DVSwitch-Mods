@@ -22,16 +22,15 @@ class PatchError(RuntimeError):
 
 
 ORIGINAL_SHA256 = "afc4c7f30ac3376afb195b71facfab102fcda5c7b3d0b5e03e42cfad69e7b380"
-PATCHED_SHA256 = "f42851cbc8878c6c888b311fe0dd96ae5b21fa893c796a4742972e3e4c59fca1"
+PATCHED_SHA256 = "9c408f4395859bb1059f5e19e292551fe98f13e1e87c0e1eb4983a4cca3d124f"
 FILE_SIZE = 5_428_248
 BUILD_ID = bytes.fromhex("9751eacc365f9986a9f6a0c62eac7d0709f8c2ae")
 
 PADDING_START = 0xAA430
 PADDING_END = 0xAA540
-NEW_SEGMENT_END = 0xAA4A0
+NEW_SEGMENT_END = 0xAA470
 P25_ADDRESS = 0xAA430
 YSF_ADDRESS = 0xAA450
-YSF_SELECTOR_ADDRESS = 0xAA480
 YSF_REFERENCE_OFFSET = 0x73BB3
 YSF_ORIGINAL_ADDRESS = 0x98D99
 
@@ -71,32 +70,12 @@ def lea_bytes(instruction_offset: int, target: int) -> bytes:
     return b"\x48\x8d\x35" + struct.pack("<i", displacement)
 
 
-def call_bytes(instruction_offset: int, target: int) -> bytes:
-    displacement = target - (instruction_offset + 5)
-    return b"\xe8" + struct.pack("<i", displacement)
-
-
-def ysf_selector_bytes() -> bytes:
-    # Default to the original unspaced string. For a nonzero reflector ID in
-    # r12d, select the relocated spaced string. This preserves LinkYSF00000.
-    code = bytearray()
-    code += lea_bytes(YSF_SELECTOR_ADDRESS + len(code), YSF_ORIGINAL_ADDRESS)
-    code += b"\x45\x85\xe4"  # test r12d,r12d
-    code += b"\x74\x07"      # je to ret, retaining the original string
-    code += lea_bytes(YSF_SELECTOR_ADDRESS + len(code), YSF_ADDRESS)
-    code += b"\xc3"
-    return bytes(code)
-
-
 def expected_padding() -> bytes:
     padding = bytearray(PADDING_END - PADDING_START)
     p25 = P25_ADDRESS - PADDING_START
     ysf = YSF_ADDRESS - PADDING_START
-    selector = YSF_SELECTOR_ADDRESS - PADDING_START
     padding[p25:p25 + len(P25_RELOCATED)] = P25_RELOCATED
     padding[ysf:ysf + len(YSF_RELOCATED)] = YSF_RELOCATED
-    code = ysf_selector_bytes()
-    padding[selector:selector + len(code)] = code
     return bytes(padding)
 
 
@@ -139,9 +118,9 @@ def validate_patched(data: bytes) -> None:
     for offset, _old_target, new_target in REFERENCES:
         require(data[offset:offset + 7] == lea_bytes(offset, new_target),
                 f"unexpected patched reference instruction at 0x{offset:x}")
-    expected_call = call_bytes(YSF_REFERENCE_OFFSET, YSF_SELECTOR_ADDRESS) + b"\x90\x90"
-    require(data[YSF_REFERENCE_OFFSET:YSF_REFERENCE_OFFSET + 7] == expected_call,
-            "unexpected patched YSF selector call")
+    require(data[YSF_REFERENCE_OFFSET:YSF_REFERENCE_OFFSET + 7] ==
+            lea_bytes(YSF_REFERENCE_OFFSET, YSF_ADDRESS),
+            "unexpected patched YSF reference instruction")
 
 
 def patch_binary(data: bytes) -> bytes:
@@ -159,9 +138,8 @@ def patch_binary(data: bytes) -> bytes:
     candidate[PADDING_START:PADDING_END] = expected_padding()
     for offset, _old_target, new_target in REFERENCES:
         candidate[offset:offset + 7] = lea_bytes(offset, new_target)
-    candidate[YSF_REFERENCE_OFFSET:YSF_REFERENCE_OFFSET + 7] = (
-        call_bytes(YSF_REFERENCE_OFFSET, YSF_SELECTOR_ADDRESS) + b"\x90\x90"
-    )
+    candidate[YSF_REFERENCE_OFFSET:YSF_REFERENCE_OFFSET + 7] = \
+        lea_bytes(YSF_REFERENCE_OFFSET, YSF_ADDRESS)
 
     result = bytes(candidate)
     require(len(result) == len(data), "binary size changed")

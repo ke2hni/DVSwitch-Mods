@@ -49,7 +49,7 @@ def make_expected(original: bytes) -> bytes:
     for offset, _old_target, new_target in patcher.REFERENCES:
         data[offset:offset + 7] = patcher.lea_bytes(offset, new_target)
     data[patcher.YSF_REFERENCE_OFFSET:patcher.YSF_REFERENCE_OFFSET + 7] = \
-        patcher.call_bytes(patcher.YSF_REFERENCE_OFFSET, patcher.YSF_SELECTOR_ADDRESS) + b"\x90\x90"
+        patcher.lea_bytes(patcher.YSF_REFERENCE_OFFSET, patcher.YSF_ADDRESS)
     return bytes(data)
 
 
