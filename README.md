@@ -11,10 +11,10 @@ The scripts have been validated on fresh default ASL3/DVSwitch installations:
 - Raspberry Pi 4, Debian 12 Bookworm, ARM64
 - Raspberry Pi 5, Debian 13 Trixie, ARM64
 
-The separate `repair-mmdvm-spacing-x86.sh` remains in testing for the exact
-DVSwitch AMD64 and i386 package builds listed by its patcher. AMD64 has passed
-live YSF and P25 testing; i386 remains pending. This is not a replacement for
-the completed ARM repair.
+The separate `repair-mmdvm-spacing-x86.sh` supports the exact DVSwitch AMD64
+and i386 package builds listed by its patcher. Both architectures have passed
+live YSF and P25 testing. This is not a replacement for the completed ARM
+repair.
 
 Each script rejects unsupported operating systems, installed-file versions, or ambiguous file structures before installation. `repair-p25-audio-announcement.sh` additionally requires ARM64, Internet access during its pinned source build, and the exact supported stock P25Gateway binary.
 
@@ -25,7 +25,7 @@ Repairs correct confirmed defects in installed DVSwitch software.
 | Script | Version | Purpose | Status |
 | --- | ---: | --- | --- |
 | `repair-mmdvm-spacing.sh` | 1.0.0 | Corrects malformed P25 and five-digit YSF remote-command spacing in `MMDVM_Bridge` | Completed and tested |
-| `repair-mmdvm-spacing-x86.sh` | 0.2.1 | Creates hash-specific fixed-size AMD64/i386 candidates using verified ELF padding and relocated command strings | Testing |
+| `repair-mmdvm-spacing-x86.sh` | 1.0.0 | Corrects malformed P25 and five-digit YSF remote-command spacing in exact AMD64/i386 `MMDVM_Bridge` builds | Completed and tested |
 | `repair-dvswitch-txt-updater.sh` | 1.0.0 | Repairs and validates DVSwitch TXT database downloads with atomic replacement | Completed and tested |
 | `repair-p25-audio-announcement.sh` | 1.0.0 | Repairs immediate P25 remote voice announcements and adds an 800 ms silent lead-in | Completed and tested |
 | `repair-p25-dashboard.sh` | 1.1.0 | Recognizes P25Gateway remote-command and static-startup link messages | Completed and tested |
@@ -99,7 +99,7 @@ Use the exact backup name printed by a successful installation, such as `install
 | Script | Required prior state |
 | --- | --- |
 | `repair-mmdvm-spacing.sh` | Independent |
-| `repair-mmdvm-spacing-x86.sh` | Independent; exact AMD64/i386 builds only; i386 live YSF and P25 validation required |
+| `repair-mmdvm-spacing-x86.sh` | Independent; exact AMD64/i386 builds only |
 | `repair-dvswitch-txt-updater.sh` | Independent |
 | `repair-p25-audio-announcement.sh` | Independent; ARM64 and Internet access required |
 | `repair-p25-dashboard.sh` | Independent of the optional dashboard modifications |
