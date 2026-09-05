@@ -180,6 +180,14 @@ Installation stops at the first failed compatibility, dependency, download,
 build, validation, service, or dashboard health check. Earlier successful
 manager-recorded installations remain safely reversible.
 
+If `--install all` is run again after a stopped or interrupted installation,
+the manager skips components already present in its protected active-install
+record and resumes at the first unrecorded component. It does not rerun an
+earlier component installer against files already transformed by later
+dependent components. Individually requesting an already recorded component
+also makes no changes. Components that were installed outside the manager are
+still checked normally and are never silently claimed or added to its record.
+
 ## Dependencies
 
 | Script | Required prior state |

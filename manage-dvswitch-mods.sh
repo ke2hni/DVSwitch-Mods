@@ -101,7 +101,7 @@ select_component() {
 
 initialize_state() {
     require_root
-    for command in cat chmod chown comm file find flock install mktemp mv sed sort tail uname wc; do require_command "$command"; done
+    for command in awk cat chmod chown comm file find flock install mktemp mv sed sort tail uname wc; do require_command "$command"; done
     [[ ! -L "$STATE_DIR" ]] || die "Refusing symbolic-link state directory: $STATE_DIR"
     install -d -o root -g root -m 0700 "$STATE_DIR"
     if [[ ! -e "$STATE_FILE" ]]; then
@@ -186,6 +186,17 @@ install_one() {
     printf 'PASS: recorded reversible installation of %s using %s.\n' "$COMPONENT" "$backup"
     printf '\n=== POST-INSTALL CHECK: %s ===\n' "$COMPONENT"
     "$CHILD_SCRIPT" --check
+}
+
+component_is_recorded() {
+    local requested=$1 root backup
+    local -a matches=()
+    mapfile -t matches < <(awk -F '\t' -v wanted="$requested" '$1 == wanted { print $3 "\t" $4 }' "$STATE_FILE")
+    [[ ${#matches[@]} -gt 0 ]] || return 1
+    [[ ${#matches[@]} -eq 1 ]] || die "Manager state contains duplicate records for $requested."
+    IFS=$'\t' read -r root backup <<< "${matches[0]}"
+    [[ -d "$root/$backup" && ! -L "$root/$backup" ]] || die "Recorded backup is unavailable for $requested: $root/$backup"
+    return 0
 }
 
 databases_ready() {
@@ -351,10 +362,18 @@ install_requested() {
                 printf '\n=== SKIP: %s requires an ARM64 host ===\n' "$component"
                 continue
             fi
+            if component_is_recorded "$component"; then
+                printf '\n=== SKIP: %s ===\nThis installation is already recorded by the manager; continuing from the next unrecorded component.\n' "$component"
+                continue
+            fi
             install_one "$component"
             if [[ $component == p25-nxdn-json ]]; then ensure_databases; fi
         done
     else
+        if component_is_recorded "$requested"; then
+            printf 'NOTICE: %s is already recorded as installed by this manager. No files changed.\n' "$requested"
+            return
+        fi
         install_one "$requested"
         if [[ $requested == p25-nxdn-json ]]; then ensure_databases; fi
     fi

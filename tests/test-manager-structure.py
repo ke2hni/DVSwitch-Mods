@@ -55,6 +55,8 @@ def main() -> None:
             "reverse-order uninstall safety notice is missing")
     require("last_state_line" in master and "remove_last_state_line" in master,
             "recorded LIFO uninstall implementation is missing")
+    require("component_is_recorded" in master and "continuing from the next unrecorded component" in master,
+            "safe interrupted-install resume behavior is missing")
     require("check_all" in master and "PLAIN-LANGUAGE SUMMARY" in master,
             "complete check-all reporting is missing")
     require("Failed or blocked:" in master and "Required installation order" in master,
