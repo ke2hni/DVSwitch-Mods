@@ -100,6 +100,66 @@ Backups are stored below:
 
 Use the exact backup name printed by a successful installation, such as `install-YYYYMMDD-HHMMSS`.
 
+## Unified managers
+
+The repository includes two convenience managers. They use the individual
+repair and modification files; those files remain separate and authoritative.
+
+`manage-mmdvm-spacing.sh` examines the installed executable with `file` and
+selects exactly one compatible repair:
+
+- ARM64: `repair-mmdvm-spacing.sh`
+- ARMHF: `repair-mmdvm-spacing-armhf.sh`
+- AMD64 or i386: `repair-mmdvm-spacing-x86.sh`
+
+It never tries multiple patchers against the live executable. Identify, check,
+install, list the applicable backups, or uninstall the repair with:
+
+```bash
+./manage-mmdvm-spacing.sh --identify
+sudo ./manage-mmdvm-spacing.sh --check
+sudo ./manage-mmdvm-spacing.sh --install
+sudo ./manage-mmdvm-spacing.sh --list-backups
+sudo ./manage-mmdvm-spacing.sh --uninstall install-YYYYMMDD-HHMMSS
+```
+
+`manage-dvswitch-mods.sh` provides one interface for every public repair and
+modification. The component names are displayed by `--list`:
+
+```bash
+./manage-dvswitch-mods.sh --list
+sudo ./manage-dvswitch-mods.sh --check COMPONENT
+sudo ./manage-dvswitch-mods.sh --install COMPONENT
+sudo ./manage-dvswitch-mods.sh --uninstall COMPONENT
+sudo ./manage-dvswitch-mods.sh --check all
+sudo ./manage-dvswitch-mods.sh --install all
+sudo ./manage-dvswitch-mods.sh --uninstall all
+sudo ./manage-dvswitch-mods.sh --status
+```
+
+The repository manager invokes `--check` before installation and again after
+installation. It records the one protected backup created by each changed
+component below `/var/lib/dvswitch-mods/manager`. A component that was already
+installed creates no unnecessary backup and is not claimed by the manager.
+Consequently, the manager can uninstall only changes it installed and recorded
+itself. It never selects an older pre-existing backup by timestamp or guesses
+which backup represents an original installation.
+
+Manager uninstall means restoring the exact state saved immediately before
+that manager-controlled installation. For the FCC first-name component, its
+dedicated complete uninstaller is used. Because several dashboard components
+modify the same files, individual uninstalls must occur in strict reverse
+installation order. An unsafe request is rejected and identifies the later
+component that must be removed first. `--uninstall all` performs this reverse
+order automatically. A failed uninstall retains its state record and backup.
+
+During `--install all`, components run in the documented dependency order and
+the MMDVM manager selects only the installed architecture. The ARM64-only P25
+audio-announcement source repair is explicitly skipped on non-ARM64 hosts.
+Installation stops at the first failed compatibility, dependency, download,
+build, validation, service, or dashboard health check. Earlier successful
+manager-recorded installations remain safely reversible.
+
 ## Dependencies
 
 | Script | Required prior state |
@@ -177,6 +237,8 @@ count, and a final no-change `--check`.
 ## Repository contents
 
 - Top-level executable repair and modification scripts are the public commands.
+- `manage-mmdvm-spacing.sh` selects the one correct architecture-specific MMDVM repair.
+- `manage-dvswitch-mods.sh` checks, installs, records, and safely reverses individual or complete managed installations.
 - `lib/` contains shared transaction and narrowly scoped patching logic.
 - `systemd/` contains the FCC first-name weekly updater service and timer installed by `mod-dashboard-fcc-first-names.sh`.
 - `LICENSE` covers repository-authored code.
