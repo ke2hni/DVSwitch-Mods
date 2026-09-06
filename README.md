@@ -135,6 +135,7 @@ sudo ./manage-dvswitch-mods.sh --check all
 sudo ./manage-dvswitch-mods.sh --install all
 sudo ./manage-dvswitch-mods.sh --uninstall all
 sudo ./manage-dvswitch-mods.sh --status
+sudo ./manage-dvswitch-mods.sh --reset-after-reinstall
 ```
 
 `--check all` never stops at the first missing prerequisite. It checks every
@@ -187,6 +188,24 @@ earlier component installer against files already transformed by later
 dependent components. Individually requesting an already recorded component
 also makes no changes. Components that were installed outside the manager are
 still checked normally and are never silently claimed or added to its record.
+
+Before an individual or `all` installation changes anything, the manager
+checks every active record and confirms that its protected backup still
+exists. This prevents a fresh DVSwitch installation from being partly modified
+before stale pre-reinstall records are discovered. If DVSwitch was
+intentionally uninstalled and reinstalled, the manager stops before making any
+changes and prints this recovery command:
+
+```bash
+sudo ./manage-dvswitch-mods.sh --reset-after-reinstall
+```
+
+The reset is accepted only when at least one recorded backup is unavailable.
+It preserves the complete old record file as a root-only timestamped archive,
+clears the active records atomically, and does not alter live DVSwitch files or
+delete any remaining backups. Run `--install all` again afterward. If every
+recorded backup is still present, the reset is refused so valid uninstall
+history cannot be discarded accidentally.
 
 ## Dependencies
 

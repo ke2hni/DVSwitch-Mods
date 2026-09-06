@@ -57,6 +57,16 @@ def main() -> None:
             "recorded LIFO uninstall implementation is missing")
     require("component_is_recorded" in master and "continuing from the next unrecorded component" in master,
             "safe interrupted-install resume behavior is missing")
+    install_requested = master.index("install_requested()")
+    require("preflight_recorded_backups" in master and
+            master.index("preflight_recorded_backups", install_requested) <
+            master.index("install_one", install_requested),
+            "all recorded backups are not checked before installation")
+    require("--reset-after-reinstall" in master and "reset_after_reinstall" in master,
+            "fresh-reinstall stale-state recovery is missing")
+    require("active-installs.pre-reinstall-" in master and
+            "Refusing to reset valid uninstall records" in master,
+            "stale-state archival or valid-state refusal is missing")
     require("check_all" in master and "PLAIN-LANGUAGE SUMMARY" in master,
             "complete check-all reporting is missing")
     require("Failed or blocked:" in master and "Required installation order" in master,

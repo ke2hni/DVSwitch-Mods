@@ -9,7 +9,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.0.0"
+readonly SCRIPT_VERSION="1.1.0"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly STATE_DIR="/var/lib/dvswitch-mods/manager"
 readonly STATE_FILE="$STATE_DIR/active-installs.tsv"
@@ -59,6 +59,7 @@ usage() {
         "       sudo $(basename "$0") --check COMPONENT|all" \
         "       sudo $(basename "$0") --install COMPONENT|all" \
         "       sudo $(basename "$0") --uninstall COMPONENT|all" \
+        "       sudo $(basename "$0") --reset-after-reinstall" \
         "" \
         "Only installations performed and recorded by this manager can be" \
         "uninstalled through it. Uninstall operations run in strict reverse" \
@@ -115,6 +116,49 @@ initialize_state() {
     chown root:root "$LOCK_FILE"
     chmod 0600 "$LOCK_FILE"
     flock -n 9 || die "Another DVSwitch-Mods manager operation is running."
+}
+
+preflight_recorded_backups() {
+    local component script root backup action missing=0
+    [[ -s "$STATE_FILE" ]] || return 0
+    while IFS=$'\t' read -r component script root backup action; do
+        [[ -n "$component" ]] || continue
+        if [[ -z "$script" || -z "$root" || -z "$backup" || -z "$action" ]]; then
+            printf 'ERROR: Invalid manager record for %s.\n' "$component" >&2
+            missing=1
+        elif [[ ! -d "$root/$backup" || -L "$root/$backup" ]]; then
+            printf 'ERROR: Recorded backup is missing for %s: %s/%s\n' "$component" "$root" "$backup" >&2
+            missing=1
+        fi
+    done < "$STATE_FILE"
+    if ((missing)); then
+        printf '%s\n' \
+            'ERROR: Installation stopped before changing any files.' \
+            'The manager records do not match the available backups. This commonly happens after DVSwitch is uninstalled and reinstalled.' \
+            "If DVSwitch was intentionally reinstalled, run: sudo ./$(basename "$0") --reset-after-reinstall" \
+            'Then run the requested install command again. The reset archives the old records and does not delete any backups.' >&2
+        return 1
+    fi
+}
+
+reset_after_reinstall() {
+    local stamp archive temporary
+    [[ -s "$STATE_FILE" ]] || die "No active manager records exist; there is nothing to reset."
+    if preflight_recorded_backups >/dev/null 2>&1; then
+        die "Every recorded backup is available. Refusing to reset valid uninstall records."
+    fi
+    stamp=$(date +%Y%m%d-%H%M%S)
+    archive="$STATE_DIR/active-installs.pre-reinstall-$stamp.tsv"
+    [[ ! -e "$archive" ]] || die "State archive already exists: $archive"
+    install -o root -g root -m 0600 "$STATE_FILE" "$archive"
+    temporary=$(mktemp --tmpdir="$STATE_DIR" .active-installs.XXXXXX)
+    chown root:root "$temporary"
+    chmod 0600 "$temporary"
+    mv -fT -- "$temporary" "$STATE_FILE"
+    printf '%s\n' \
+        "PASS: stale manager records were archived at $archive" \
+        'No component backups or live DVSwitch files were deleted or changed.' \
+        'Run the requested install command again.'
 }
 
 list_components() {
@@ -356,6 +400,7 @@ check_requested() {
 
 install_requested() {
     local requested=$1 component
+    preflight_recorded_backups
     if [[ $requested == all ]]; then
         for component in "${COMPONENTS[@]}"; do
             if should_skip_all_component "$component"; then
@@ -400,6 +445,7 @@ main() {
         --check) [[ $# -eq 2 ]] || die "--check requires a component name or all."; require_root; check_requested "$2" ;;
         --install) [[ $# -eq 2 ]] || die "--install requires a component name or all."; initialize_state; install_requested "$2" ;;
         --uninstall) [[ $# -eq 2 ]] || die "--uninstall requires a component name or all."; initialize_state; uninstall_requested "$2" ;;
+        --reset-after-reinstall) [[ $# -eq 1 ]] || die "Unexpected arguments."; initialize_state; reset_after_reinstall ;;
         --help|-h) usage ;;
         "") usage; exit 2 ;;
         *) die "Unknown option: $1" ;;
