@@ -15,13 +15,17 @@ MARKER = "// DVSwitch-Mods: FCC first-name activity columns v2"
 INCLUDE = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_fcc_first_names.php';"
 TARGET_MARKER = "// DVSwitch-Mods: cleaned activity Target display v2"
 TARGET_INCLUDE = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_target_display.php';"
-TARGET_LEGEND = '''<div style="width:640px;margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
+TARGET_PREVIOUS_LEGEND = '''<div style="width:640px;margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
   <b>Legend:</b> <b>---</b> = no FCC first name available; callsign may be non-U.S./international or absent from FCC data<br>
   <b>Talkgroups:</b> <b>Name (TG #)</b> = destination and talkgroup number<br>
   <b>YSF:</b> <b>Group Call</b> = call to ALL (room not recorded); <b>GPS/Data</b> = data transmission<br>
   <b>D-Star:</b> <b>General Call</b> = CQCQCQ (reflector not recorded)
 </div>
 '''
+TARGET_LEGEND = TARGET_PREVIOUS_LEGEND.replace(
+    "no FCC first name available; callsign may be non-U.S./international or absent from FCC data",
+    "no usable worldwide DMR or FCC name data available",
+)
 SUPPORTED = {
     "lh.php": {
         "f8e6c9801c2613796f070921cee442943ed2dfdd4ec2466a266a6df369a8dc70",
@@ -85,7 +89,7 @@ def without_target_modification(text: str, name: str) -> str:
         text.count(TARGET_MARKER),
         text.count(TARGET_INCLUDE),
         text.count("dvsModsTargetDisplay("),
-        text.count(TARGET_LEGEND),
+        text.count(TARGET_LEGEND) + text.count(TARGET_PREVIOUS_LEGEND),
     )
     if counts == (0, 0, 0, 0):
         return text
@@ -99,7 +103,10 @@ def without_target_modification(text: str, name: str) -> str:
     recovered = recovered.replace(TARGET_INCLUDE + "\n", "", 1)
     recovered = recovered.replace(modified, original, 1)
     if name == "localtx.php":
-        recovered = recovered.replace(TARGET_LEGEND, "", 1)
+        if TARGET_LEGEND in recovered:
+            recovered = recovered.replace(TARGET_LEGEND, "", 1)
+        else:
+            recovered = recovered.replace(TARGET_PREVIOUS_LEGEND, "", 1)
     return recovered
 
 
@@ -206,7 +213,7 @@ def patch_text(text: str, name: str) -> str:
         if text.count(INCLUDE) != 1 or text.count("dvsModsFccFirstName($listElem[2])") != 1 or text.count("dvsModsDmrIdCallsign($listElem[2])") != 1 or text.count("<th>Name</th>") != 1:
             raise PatchError(f"incomplete modified {name}")
         validate_current(text, name)
-        return text
+        return text.replace(TARGET_PREVIOUS_LEGEND, TARGET_LEGEND, 1)
     if MARKER in text or LEGACY_MARKER in text:
         raise PatchError(f"duplicate markers in {name}")
     if digest(text) not in SUPPORTED[name]:

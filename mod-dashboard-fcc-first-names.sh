@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.2.1"
+readonly SCRIPT_VERSION="1.3.0"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PATCHER="$SCRIPT_DIR/lib/patch_dashboard_first_names.py"
 readonly BUILDER="$SCRIPT_DIR/lib/build_fcc_first_names.py"
@@ -31,6 +31,8 @@ readonly PREVIOUS_TIMER_SHA256_V112="5d929156ef445c6e3d0c7ee32609f8c2e9cf29042c4
 readonly PREVIOUS_UPDATER_SHA256_V113="cccb47f9f0dec56556f239372fc722dd83623ab8b65f679da1c1eaa685a738bc"
 readonly PREVIOUS_UPDATER_SHA256_V120="ff766bf6ed68e81b52e48bd7f6efd1df230ce986ae4e6573dcf98599eb6ed4f5"
 readonly PREVIOUS_PATCHER_SHA256_V120="aff53f3636f25a0ba45c9240958b6654fa95468ab81db28802ff727986c564fd"
+readonly PREVIOUS_UPDATER_SHA256_V121="ff2c45c1e0258a13ed1b819dae6cbc9a99e0be2b7d8d7fb73aa13faeaba426dd"
+readonly PREVIOUS_PATCHER_SHA256_V121="80ba8c7e998a596ef43a138ab678457b1a5afce61cb1a2396099fac735ef9a4d"
 readonly BUILDER_SHA256_V113="d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2"
 readonly TRANSACTION_SHA256_V113="13d743d6065f88888725a1aefe98c8d4ad957974ec5cd991a52ff20ac44a6532"
 readonly SERVICE_SHA256_V113="78c0b1da92560f27aae8db1faa3630498055c3e48663f709f9217463c7eb0267"
@@ -139,7 +141,8 @@ updater_release_state() {
         printf 'upgradeable'
         return
     fi
-    if [[ "$(file_hash "$UPDATER_TARGET")" == "$PREVIOUS_UPDATER_SHA256_V120" && "$(file_hash "$PATCHER_TARGET")" == "$PREVIOUS_PATCHER_SHA256_V120" ]]; then
+    if { [[ "$(file_hash "$UPDATER_TARGET")" == "$PREVIOUS_UPDATER_SHA256_V120" && "$(file_hash "$PATCHER_TARGET")" == "$PREVIOUS_PATCHER_SHA256_V120" ]] ||
+         [[ "$(file_hash "$UPDATER_TARGET")" == "$PREVIOUS_UPDATER_SHA256_V121" && "$(file_hash "$PATCHER_TARGET")" == "$PREVIOUS_PATCHER_SHA256_V121" ]]; }; then
         cmp -s "$BUILDER" "$BUILDER_TARGET" || die "Installed FCC builder does not match the supported previous release."
         cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die "Installed FCC transaction helper does not match the supported previous release."
         cmp -s "$SERVICE_SOURCE" "$SERVICE_TARGET" || die "Installed FCC systemd service does not match the supported previous release."
@@ -256,7 +259,7 @@ stage_install_component() {
 run_check() {
     preflight; prepare_dashboard
     if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php"; then
-        printf 'ALREADY MODIFIED: Gateway and Local Activity FCC first-name columns are installed.\n'
+        printf 'ALREADY MODIFIED: Gateway and Local Activity worldwide DMR/FCC Name columns are installed.\n'
     else
         printf 'MODIFICATION READY:\nBefore lh.php:      %s\nAfter lh.php:       %s\nBefore localtx.php: %s\nAfter localtx.php:  %s\n' "$(file_hash "$LH_TARGET")" "$(file_hash "$WORK_DIR/lh.php")" "$(file_hash "$LOCALTX_TARGET")" "$(file_hash "$WORK_DIR/localtx.php")"
     fi
@@ -282,7 +285,7 @@ run_check() {
 run_install() {
     preflight; prepare_dashboard
     if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_release_state)" == current ]]; then
-        printf 'PASS: FCC first-name dashboard modification is already installed. No files changed.\n'; return
+        printf 'PASS: worldwide DMR/FCC dashboard Name modification is already installed. No files changed.\n'; return
     fi
     local database_ready=0
     if [[ -f "$DATABASE_TARGET" && ! -L "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null; then
@@ -310,7 +313,7 @@ run_install() {
     verify_updater_components
     systemctl reload apache2.service; dashboard_health
     INSTALL_ACTIVE=0
-    printf 'PASS: FCC first-name dashboard modification installed atomically.\nBackup: %s\n' "$DVSM_TRANSACTION_DIR"
+    printf 'PASS: worldwide DMR/FCC dashboard Name modification installed atomically.\nBackup: %s\n' "$DVSM_TRANSACTION_DIR"
 }
 
 run_update() {

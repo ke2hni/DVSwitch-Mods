@@ -225,12 +225,15 @@ sudo ./mod-dmr-friendly-names.sh --install
 After this modification, install the YSF dashboard null repair described in
 the Repairs section.
 
-### 5. FCC first names
+### 5. Worldwide DMR/FCC names
 
-**What it adds:** A first-name column to Gateway and Local Activity. Seven-digit
-DMR IDs are resolved through DVSwitch's `DMRIds.dat` before the FCC lookup. It
-also installs a self-contained weekly FCC database updater and randomized
-systemd timer.
+**What it adds:** A Name column to Gateway and Local Activity. DVSwitch's
+worldwide `DMRIds.dat` supplies the complete meaningful name or description,
+including international operators and entries such as club names. Blank,
+placeholder, conflicting, or malformed DMR names fall back to the FCC first-name
+database; `---` is shown only when neither source supplies usable data. The mod also
+installs a self-contained weekly FCC database updater and randomized systemd
+timer.
 
 **Required first:** Independent of the P25/NXDN/DMR chain, but install it before
 the dashboard Target display modification. Internet access is required for the
@@ -276,7 +279,7 @@ The unified manager handles this order automatically:
 7. D-Star Tx TG/Ref display
 8. DMR friendly names
 9. YSF dashboard null repair
-10. FCC first names
+10. Worldwide DMR/FCC names
 11. Dashboard target display
 
 > [!NOTE]

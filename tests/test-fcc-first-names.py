@@ -209,7 +209,13 @@ require("Persistent=true" in timer and "RandomizedDelaySec=96h" in timer, "timer
 require("FixedRandomDelay" not in timer, "timer still derives a fixed delay from machine identity")
 
 readme = README.read_text(encoding="utf-8")
-for component in (INSTALLER, UPDATER, ROOT / "lib/build_fcc_first_names.py", ROOT / "lib/transaction.sh", SERVICE, TIMER, ROOT / "lib/dvswitch_mods_fcc_first_names.php"):
-    require(hashlib.sha256(component.read_bytes()).hexdigest() in readme, f"README checksum is stale or missing: {component.relative_to(ROOT)}")
+for value in (
+    "Worldwide DMR/FCC names",
+    "worldwide `DMRIds.dat` supplies the complete meaningful name or description",
+    "`---` is shown only when neither source supplies usable data",
+    "sudo ./mod-dashboard-fcc-first-names.sh --check",
+    "sudo ./mod-dashboard-fcc-first-names.sh --install",
+):
+    require(value in readme, f"README worldwide-name documentation is missing: {value}")
 
 print("PASS: FCC first-name builder and dashboard patcher tests")

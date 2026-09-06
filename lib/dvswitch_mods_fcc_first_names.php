@@ -1,7 +1,66 @@
 <?php
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Jeff Milne, KE2HNI
-// DVSwitch-Mods: fixed-record FCC first-name lookup v1
+// DVSwitch-Mods: worldwide DMR and FCC name lookup v2
+
+function dvsModsDmrDatabase() {
+    static $database = null;
+    if ($database !== null) { return $database; }
+
+    global $dmrIDline;
+    if (isset($dmrIDline) && is_string($dmrIDline) && $dmrIDline !== '') {
+        return $database = $dmrIDline;
+    }
+    $path = defined('DMRIDDATPATH') ? DMRIDDATPATH.'/DMRIds.dat' : '/var/lib/mmdvm/DMRIds.dat';
+    $contents = @file_get_contents($path);
+    return $database = is_string($contents) ? $contents : '';
+}
+
+function dvsModsUsableDmrName($rawName, $callsign) {
+    $name = preg_replace('/[ \t]+/', ' ', trim((string)$rawName));
+    if (!is_string($name) || $name === '' || strlen($name) > 120) { return false; }
+    $upper = strtoupper($name);
+    $placeholders = array('UNKNOWN', 'NONE', 'N/A', 'NA', 'NULL', 'NO NAME', 'NOT REGISTERED', '-', '--', '---');
+    if (in_array($upper, $placeholders, true) || $upper === strtoupper($callsign)) { return false; }
+    if (preg_match('/[\x00-\x1F\x7F]/', $name) || preg_match('/\p{L}/u', $name) !== 1) { return false; }
+    return $name;
+}
+
+function dvsModsDmrNameCache($callsign, $value = false, $store = false) {
+    static $cache = array();
+    if ($store) { $cache[$callsign] = $value; }
+    return array_key_exists($callsign, $cache) ? $cache[$callsign] : false;
+}
+
+function dvsModsDmrName($rawCallsign) {
+    static $cache = array();
+    $callsign = strtoupper(trim((string)$rawCallsign));
+    $dash = strpos($callsign, '-');
+    if ($dash !== false) { $callsign = substr($callsign, 0, $dash); }
+    $slash = strpos($callsign, '/');
+    if ($slash !== false) { $callsign = substr($callsign, 0, $slash); }
+    if (!preg_match('/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{3,10}$/D', $callsign)) { return false; }
+    if (array_key_exists($callsign, $cache)) { return $cache[$callsign]; }
+    $remembered = dvsModsDmrNameCache($callsign);
+    if ($remembered !== false) { return $cache[$callsign] = $remembered; }
+
+    $database = dvsModsDmrDatabase();
+    if ($database === '') { return $cache[$callsign] = false; }
+    $pattern = '/(?:\A|\R)[0-9]{7}[ \t]+'.preg_quote($callsign, '/').'[ \t]+([^\r\n]*)(?=\R|\z)/i';
+    $count = preg_match_all($pattern, $database, $matches);
+    if ($count < 1) { return $cache[$callsign] = false; }
+
+    $resolved = false;
+    foreach ($matches[1] as $rawName) {
+        $name = dvsModsUsableDmrName($rawName, $callsign);
+        if ($name === false) { continue; }
+        if ($resolved !== false && strcasecmp($resolved, $name) !== 0) {
+            return $cache[$callsign] = false;
+        }
+        $resolved = $name;
+    }
+    return $cache[$callsign] = $resolved;
+}
 
 function dvsModsDmrIdCallsign($rawCallsign) {
     static $cache = array();
@@ -9,21 +68,18 @@ function dvsModsDmrIdCallsign($rawCallsign) {
     if (!preg_match('/^[0-9]{7}$/D', $value)) { return $value; }
     if (array_key_exists($value, $cache)) { return $cache[$value]; }
 
-    global $dmrIDline;
-    $database = isset($dmrIDline) && is_string($dmrIDline) ? $dmrIDline : false;
-    if ($database === false) {
-        $path = defined('DMRIDDATPATH') ? DMRIDDATPATH.'/DMRIds.dat' : '/var/lib/mmdvm/DMRIds.dat';
-        $database = @file_get_contents($path);
-    }
-    if (!is_string($database) || $database === '') { return $cache[$value] = $value; }
+    $database = dvsModsDmrDatabase();
+    if ($database === '') { return $cache[$value] = $value; }
 
-    $pattern = '/(?:\A|\R)'.preg_quote($value, '/').'[ \t]+([A-Z0-9]{3,10})(?:[ \t]+[^\r\n]*)?(?=\R|\z)/i';
+    $pattern = '/(?:\A|\R)'.preg_quote($value, '/').'[ \t]+([A-Z0-9]{3,10})(?:[ \t]+([^\r\n]*))?(?=\R|\z)/i';
     $count = preg_match_all($pattern, $database, $matches);
     if ($count !== 1) { return $cache[$value] = $value; }
     $callsign = strtoupper($matches[1][0]);
     if (!preg_match('/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{3,10}$/D', $callsign)) {
         return $cache[$value] = $value;
     }
+    $name = isset($matches[2][0]) ? dvsModsUsableDmrName($matches[2][0], $callsign) : false;
+    if ($name !== false) { dvsModsDmrNameCache($callsign, $name, true); }
     return $cache[$value] = $callsign;
 }
 
@@ -36,6 +92,9 @@ function dvsModsFccFirstName($rawCallsign) {
     if ($slash !== false) { $callsign = substr($callsign, 0, $slash); }
     if (!preg_match('/^[A-Z0-9]{3,10}$/', $callsign)) { return '---'; }
     if (isset($cache[$callsign])) { return $cache[$callsign]; }
+
+    $dmrName = dvsModsDmrName($callsign);
+    if ($dmrName !== false) { return $cache[$callsign] = $dmrName; }
 
     $path = '/var/lib/mmdvm/dvswitch-mods-fcc-first-names.dat';
     $recordSize = 52;
