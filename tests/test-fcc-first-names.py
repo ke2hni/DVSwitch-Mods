@@ -118,14 +118,14 @@ def remove_resolver(value):
 
 
 legacy_lh = remove_resolver(patched_lh.replace(patcher.MARKER, patcher.LEGACY_MARKER, 1))
-legacy_local = remove_resolver(patched_local.replace(patcher.MARKER, patcher.LEGACY_MARKER, 1))
+legacy_local = patched_local
 v1_lh = legacy_lh.replace("width:115px", "width:140px", 1)
-v1_local = legacy_local.replace("width:115px", "width:140px", 1)
+v1_local = legacy_local
 patcher.SUPPORTED_MODIFIED_V1["lh.php"].add(patcher.digest(v1_lh))
 patcher.SUPPORTED_MODIFIED_V1["localtx.php"].add(patcher.digest(v1_local))
 patcher.SUPPORTED_MODIFIED_V2["lh.php"].add(patcher.digest(legacy_lh))
 patcher.SUPPORTED_MODIFIED_V2["localtx.php"].add(patcher.digest(legacy_local))
-for value in (patched_lh, patched_local):
+for value in (patched_lh,):
     require(value.count(patcher.MARKER) == 1, "marker missing")
     require(value.count(patcher.INCLUDE) == 1, "helper include missing")
     require(value.count("<th>Name</th>") == 1, "Name heading missing")
@@ -135,7 +135,7 @@ for value in (patched_lh, patched_local):
 require(patcher.patch_text(patched_lh, "lh.php") == patched_lh, "lh patch is not idempotent")
 require(patcher.patch_text(patched_local, "localtx.php") == patched_local, "localtx patch is not idempotent")
 require(patcher.patch_text(v1_lh, "lh.php") == patched_lh, "lh legacy version was not upgraded")
-require(patcher.patch_text(v1_local, "localtx.php") == patched_local, "localtx legacy version was not upgraded")
+require(patcher.patch_text(v1_local, "localtx.php") == v1_local, "localtx was changed")
 for name in ("lh.php", "localtx.php"):
     original_target, modified_target = patcher.target_blocks(name)
     targeted = patcher.TARGET_MARKER + "\n" + patcher.TARGET_INCLUDE + "\n" + modified_target
@@ -158,6 +158,8 @@ with tempfile.TemporaryDirectory() as directory:
         patcher.patch_file(path)
         raw = path.read_bytes()
         require(raw.count(b"\r\n") == raw.count(b"\n"), f"{name} CRLF endings were not preserved")
+        if name == "localtx.php":
+            require(raw == fixture.replace("\n", "\r\n").encode(), "localtx was modified")
         first = raw
         patcher.patch_file(path)
         require(path.read_bytes() == first, f"{name} CRLF patch is not idempotent")
