@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import re
 from pathlib import Path
 
 LEGACY_MARKER = "// DVSwitch-Mods: FCC first-name activity columns v1"
@@ -189,9 +190,39 @@ def patch_localtx(text: str) -> str:
     return text
 
 
-def patch_text(text: str, name: str) -> str:
-    if name == "localtx.php" and MARKER not in text and LEGACY_MARKER not in text:
+def remove_legacy_fcc_localtx(text: str) -> str:
+    """Remove the old FCC Name-column patch from Local Activity."""
+    if MARKER not in text and LEGACY_MARKER not in text:
         return text
+    text = text.replace(MARKER + "\n", "", 1)
+    text = text.replace(LEGACY_MARKER + "\n", "", 1)
+    text = text.replace(INCLUDE + "\n", "", 1)
+    text = text.replace(
+        '      <th style="white-space:nowrap;width:115px;">Time (<?php echo date(\'T\')?>)</th>',
+        "      <th>Time (<?php echo date('T')?>)</th>",
+        1,
+    )
+    text = text.replace(
+        "      <th>Callsign</th>\n      <th>Name</th>\n      <th>Target</th>",
+        "      <th>Callsign</th>\n      <th>Target</th>",
+        1,
+    )
+    resolver = '                           $listElem[2] = dvsModsDmrIdCallsign($listElem[2]);\n'
+    text = text.replace(resolver, "", 1)
+    name_cell = re.compile(
+        r'\s*\$dvsModsFirstName = dvsModsFccFirstName\(\$listElem\[2\]\);\n'
+        r'\s*echo \'<td align="left" style="font-weight:bold;color:#464646;">&nbsp;<b>\'.*?\n',
+        re.DOTALL,
+    )
+    text, removed = name_cell.subn("\n", text, count=1)
+    if removed != 1 or "<th>Name</th>" in text or "dvsModsFccFirstName($listElem[2])" in text:
+        raise PatchError("unsupported legacy FCC Local Activity modification")
+    return text
+
+
+def patch_text(text: str, name: str) -> str:
+    if name == "localtx.php":
+        return remove_legacy_fcc_localtx(text)
     if text.count(LEGACY_MARKER) == 1:
         value = digest(text)
         if value in SUPPORTED_MODIFIED_V1[name]:
