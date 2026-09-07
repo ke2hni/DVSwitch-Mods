@@ -183,28 +183,15 @@ def validate_current(text: str, name: str) -> None:
 
 
 def patch_localtx(text: str) -> str:
-    if not text.startswith("<?php\n"):
-        raise PatchError("unsupported localtx marker anchor")
-    text = text.replace("<?php\n", "<?php\n" + MARKER + "\n", 1)
-    text = replace_once(
-        text,
-        "include_once dirname(dirname(__FILE__)).'/include/functions.php';    \n",
-        "include_once dirname(dirname(__FILE__)).'/include/functions.php';    \n" + INCLUDE + "\n",
-        "localtx include anchor",
-    )
-    text = replace_once(text, "      <th>Time (<?php echo date('T')?>)</th>", "      <th style=\"white-space:nowrap;width:115px;\">Time (<?php echo date('T')?>)</th>", "localtx time header")
-    text = replace_once(text, "      <th>Callsign</th>\n      <th>Target</th>", "      <th>Callsign</th>\n      <th>Name</th>\n      <th>Target</th>", "localtx name header")
-    token = "if (strlen($listElem[4]) == 1)"
-    if text.count(token) != 1:
-        raise PatchError(f"unsupported or ambiguous localtx callsign block: {text.count(token)} matches")
-    insertion = text.rfind("\n", 0, text.index(token)) + 1
-    replacement = '''                        $dvsModsFirstName = dvsModsFccFirstName($listElem[2]);
-                        echo '<td align="left" style="font-weight:bold;color:#464646;">&nbsp;<b>'.htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").'</b></td>';
-'''
-    return text[:insertion] + replacement + text[insertion:]
+    # Local Activity is a transmission table and must retain its original
+    # columns.  FCC/worldwide Name lookup belongs only in Gateway Activity
+    # (lh.php).  Preserve the file, including any Target-display mod.
+    return text
 
 
 def patch_text(text: str, name: str) -> str:
+    if name == "localtx.php" and MARKER not in text and LEGACY_MARKER not in text:
+        return text
     if text.count(LEGACY_MARKER) == 1:
         value = digest(text)
         if value in SUPPORTED_MODIFIED_V1[name]:
