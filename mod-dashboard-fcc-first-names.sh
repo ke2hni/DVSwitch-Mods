@@ -214,13 +214,12 @@ prepare_dashboard() {
     [[ -d "$WORK_ROOT" && ! -L "$WORK_ROOT" ]] || die "Required work root is unavailable: $WORK_ROOT"
     [[ -n "$WORK_DIR" ]] || WORK_DIR=$(mktemp -d "$WORK_ROOT/.dvswitch-fcc-firstnames.XXXXXX")
     cp -- "$LH_TARGET" "$WORK_DIR/lh.php"
-    cp -- "$LOCALTX_TARGET" "$WORK_DIR/localtx.php"
-    python3 "$PATCHER" --lh "$WORK_DIR/lh.php" --localtx "$WORK_DIR/localtx.php"
-    php -l "$WORK_DIR/lh.php" >/dev/null; php -l "$WORK_DIR/localtx.php" >/dev/null
-    local lh_hash localtx_hash
-    lh_hash=$(file_hash "$WORK_DIR/lh.php"); localtx_hash=$(file_hash "$WORK_DIR/localtx.php")
-    python3 "$PATCHER" --lh "$WORK_DIR/lh.php" --localtx "$WORK_DIR/localtx.php"
-    [[ "$lh_hash" == "$(file_hash "$WORK_DIR/lh.php")" && "$localtx_hash" == "$(file_hash "$WORK_DIR/localtx.php")" ]] || die "Dashboard patch is not idempotent."
+    python3 "$PATCHER" --lh "$WORK_DIR/lh.php" --localtx "$LH_TARGET"
+    php -l "$WORK_DIR/lh.php" >/dev/null
+    local lh_hash
+    lh_hash=$(file_hash "$WORK_DIR/lh.php")
+    python3 "$PATCHER" --lh "$WORK_DIR/lh.php" --localtx "$LH_TARGET"
+    [[ "$lh_hash" == "$(file_hash "$WORK_DIR/lh.php")" ]] || die "Dashboard patch is not idempotent."
 }
 
 build_database() {
@@ -260,10 +259,10 @@ stage_install_component() {
 
 run_check() {
     preflight; prepare_dashboard
-    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php"; then
-        printf 'ALREADY MODIFIED: Gateway and Local Activity worldwide DMR/FCC Name columns are installed.\n'
+    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php"; then
+        printf 'ALREADY MODIFIED: Gateway Activity worldwide DMR/FCC Name column is installed; Local Activity was not modified.\n'
     else
-        printf 'MODIFICATION READY:\nBefore lh.php:      %s\nAfter lh.php:       %s\nBefore localtx.php: %s\nAfter localtx.php:  %s\n' "$(file_hash "$LH_TARGET")" "$(file_hash "$WORK_DIR/lh.php")" "$(file_hash "$LOCALTX_TARGET")" "$(file_hash "$WORK_DIR/localtx.php")"
+        printf 'MODIFICATION READY:\nBefore lh.php:      %s\nAfter lh.php:       %s\nLocal Activity:    unchanged\n' "$(file_hash "$LH_TARGET")" "$(file_hash "$WORK_DIR/lh.php")"
     fi
     if [[ -f "$DATABASE_TARGET" && ! -L "$DATABASE_TARGET" ]]; then
         local database_count database_checksum
@@ -286,7 +285,7 @@ run_check() {
 
 run_install() {
     preflight; prepare_dashboard
-    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_release_state)" == current ]]; then
+    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_release_state)" == current ]]; then
         printf 'PASS: worldwide DMR/FCC dashboard Name modification is already installed. No files changed.\n'; return
     fi
     local database_ready=0
@@ -300,7 +299,6 @@ run_install() {
     INSTALL_ACTIVE=1
     stage_updater_components
     stage_install_component "$WORK_DIR/lh.php" "$LH_TARGET" root root 0644
-    stage_install_component "$WORK_DIR/localtx.php" "$LOCALTX_TARGET" root root 0644
     stage_install_component "$HELPER_SOURCE" "$HELPER_TARGET" root root 0644
     if [[ $database_ready -eq 0 ]]; then stage_install_component "$WORK_DIR/fcc-first-names.dat" "$DATABASE_TARGET" root www-data 0644; fi
     php -l "$LH_TARGET" >/dev/null; php -l "$LOCALTX_TARGET" >/dev/null; php -l "$HELPER_TARGET" >/dev/null
