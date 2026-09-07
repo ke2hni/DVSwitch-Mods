@@ -213,7 +213,9 @@ sudo ./mod-dstar-tx-ref.sh --install
 
 **What it adds:** Dynamic `DMR BM Master` and `DMR TGIF Master` headings,
 BrandMeister/TGIF/STFU talkgroup names, saved network state, long-name wrapping,
-and protection against stale cross-mode talkgroups.
+and protection against stale cross-mode talkgroups. Blank BrandMeister names
+and valid reflector entries are accepted because they are normal records in
+the published list; unnamed entries simply have no friendly name to display.
 
 **Required first:** `mod-dstar-tx-ref.sh` and valid BrandMeister and TGIF lists.
 
@@ -227,7 +229,8 @@ the Repairs section.
 
 ### 5. Worldwide DMR/FCC names
 
-**What it adds:** A Name column to Gateway and Local Activity. DVSwitch's
+**What it adds:** A Name column to Gateway Activity only. Local Activity is
+intentionally left unchanged. DVSwitch's
 worldwide `DMRIds.dat` supplies the complete meaningful name or description,
 including international operators and entries such as club names. Blank,
 placeholder, conflicting, or malformed DMR names fall back to the FCC first-name

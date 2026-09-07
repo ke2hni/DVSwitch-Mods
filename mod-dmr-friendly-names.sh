@@ -60,13 +60,15 @@ try:
             if not line or line.startswith("#"):
                 continue
             fields = line.split(";", 3)
-            if len(fields) != 4 or not fields[0].isdigit() or fields[1] != "0":
+            if len(fields) != 4 or not fields[0].isdigit() or fields[1] not in ("0", "1"):
                 raise ValueError("invalid talkgroup record")
             number = int(fields[0])
-            if not 1 <= number <= 9999999 or number in seen or not fields[2].strip():
-                raise ValueError("invalid, duplicate, or unnamed talkgroup")
-            if fields[3] != "TG" + fields[0]:
+            if not 1 <= number <= 9999999 or number in seen:
+                raise ValueError("invalid or duplicate talkgroup number")
+            if fields[1] == "0" and fields[3] != "TG" + fields[0]:
                 raise ValueError("invalid description field")
+            if fields[1] == "1" and fields[3] != "REF" + fields[0]:
+                raise ValueError("invalid reflector description field")
             seen.add(number)
     if len(seen) < minimum or int(sentinel) not in seen:
         raise ValueError("talkgroup list failed sanity checks")
