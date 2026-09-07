@@ -49,6 +49,7 @@ SUPPORTED = {
         "d4426eaa979fb4d6d28ea018a73134e7ec0679ce04b0a6f007ec3765bd6801cc",
     },
     "localtx.php": {
+        "decf6b59e0eba78877381e2b3d9bdf70dbbeab4d9fdb24f3eefb62e3233453b4",
         "2cbd0c26fa58fe0887f6b95e70cb222f6b5aaaf2e23f79dd0545aad64ba5f336",
         "376b4d5ba19b19ae17173487e2e51e3ba6554e38700aae47bf1142357fd9c435",
         "23ba44628248f6000222adb4e4bde67d38aef9f10f136c3c62b820c4fee53ee4",
@@ -144,9 +145,16 @@ def patch_text(text: str, name: str) -> str:
         raise PatchError(f"unsupported or ambiguous Target block in {name}: {text.count(old)} matches")
     if not text.startswith("<?php\n"):
         raise PatchError(f"unsupported marker anchor in {name}")
-    include_anchor = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_fcc_first_names.php';\n"
-    if text.count(include_anchor) != 1:
-        raise PatchError(f"unsupported include anchor in {name}")
+    if name == "localtx.php":
+        include_anchor = "include_once dirname(dirname(__FILE__)).'/include/functions.php';    \n"
+        if text.count(include_anchor) != 1:
+            include_anchor = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_fcc_first_names.php';\n"
+            if text.count(include_anchor) != 1:
+                raise PatchError(f"unsupported include anchor in {name}")
+    else:
+        include_anchor = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_fcc_first_names.php';\n"
+        if text.count(include_anchor) != 1:
+            raise PatchError(f"unsupported include anchor in {name}")
     text = text.replace("<?php\n", "<?php\n" + MARKER + "\n", 1)
     text = text.replace(include_anchor, include_anchor + INCLUDE + "\n", 1)
     text = text.replace(old, new, 1)

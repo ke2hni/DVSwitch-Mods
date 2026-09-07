@@ -44,6 +44,11 @@ include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_fcc_first_names.
 '''.replace("\\t", "\t")
 patcher.SUPPORTED["lh.php"].add(patcher.digest(lh))
 patcher.SUPPORTED["localtx.php"].add(patcher.digest(localtx))
+nofcc_localtx = "<?php\ninclude_once dirname(dirname(__FILE__)).'/include/functions.php';    \n" + patcher.replacement("localtx.php")[0] + "</div>\n<br>\n"
+patcher.SUPPORTED["localtx.php"].add(patcher.digest(nofcc_localtx))
+nofcc_changed = patcher.patch_text(nofcc_localtx, "localtx.php")
+require(nofcc_changed.count(patcher.MARKER) == 1, "no-FCC localtx marker missing")
+require("dvswitch_mods_fcc_first_names" not in nofcc_changed, "Target patch added FCC include to Local Activity")
 for name, original in (("lh.php", lh), ("localtx.php", localtx)):
     changed = patcher.patch_text(original, name)
     require(changed.count(patcher.MARKER) == 1, name + " marker missing")
