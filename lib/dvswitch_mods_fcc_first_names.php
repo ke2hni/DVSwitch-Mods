@@ -3,7 +3,7 @@
 // Copyright (c) 2026 Jeff Milne, KE2HNI
 // DVSwitch-Mods: worldwide DMR and FCC name lookup v2
 
-function dvsModsDmrDatabase() {
+function dvsModsFccDmrDatabase() {
     static $database = null;
     if ($database !== null) { return $database; }
 
@@ -16,7 +16,7 @@ function dvsModsDmrDatabase() {
     return $database = is_string($contents) ? $contents : '';
 }
 
-function dvsModsUsableDmrName($rawName, $callsign) {
+function dvsModsFccUsableDmrName($rawName, $callsign) {
     $name = preg_replace('/[ \t]+/', ' ', trim((string)$rawName));
     if (!is_string($name) || $name === '' || strlen($name) > 120) { return false; }
     $upper = strtoupper($name);
@@ -26,13 +26,13 @@ function dvsModsUsableDmrName($rawName, $callsign) {
     return $name;
 }
 
-function dvsModsDmrNameCache($callsign, $value = false, $store = false) {
+function dvsModsFccDmrNameCache($callsign, $value = false, $store = false) {
     static $cache = array();
     if ($store) { $cache[$callsign] = $value; }
     return array_key_exists($callsign, $cache) ? $cache[$callsign] : false;
 }
 
-function dvsModsDmrName($rawCallsign) {
+function dvsModsFccDmrName($rawCallsign) {
     static $cache = array();
     $callsign = strtoupper(trim((string)$rawCallsign));
     $dash = strpos($callsign, '-');
@@ -41,10 +41,10 @@ function dvsModsDmrName($rawCallsign) {
     if ($slash !== false) { $callsign = substr($callsign, 0, $slash); }
     if (!preg_match('/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{3,10}$/D', $callsign)) { return false; }
     if (array_key_exists($callsign, $cache)) { return $cache[$callsign]; }
-    $remembered = dvsModsDmrNameCache($callsign);
+    $remembered = dvsModsFccDmrNameCache($callsign);
     if ($remembered !== false) { return $cache[$callsign] = $remembered; }
 
-    $database = dvsModsDmrDatabase();
+    $database = dvsModsFccDmrDatabase();
     if ($database === '') { return $cache[$callsign] = false; }
     $pattern = '/(?:\A|\R)[0-9]{7}[ \t]+'.preg_quote($callsign, '/').'[ \t]+([^\r\n]*)(?=\R|\z)/i';
     $count = preg_match_all($pattern, $database, $matches);
@@ -52,7 +52,7 @@ function dvsModsDmrName($rawCallsign) {
 
     $resolved = false;
     foreach ($matches[1] as $rawName) {
-        $name = dvsModsUsableDmrName($rawName, $callsign);
+        $name = dvsModsFccUsableDmrName($rawName, $callsign);
         if ($name === false) { continue; }
         if ($resolved !== false && strcasecmp($resolved, $name) !== 0) {
             return $cache[$callsign] = false;
@@ -68,7 +68,7 @@ function dvsModsDmrIdCallsign($rawCallsign) {
     if (!preg_match('/^[0-9]{7}$/D', $value)) { return $value; }
     if (array_key_exists($value, $cache)) { return $cache[$value]; }
 
-    $database = dvsModsDmrDatabase();
+    $database = dvsModsFccDmrDatabase();
     if ($database === '') { return $cache[$value] = $value; }
 
     $pattern = '/(?:\A|\R)'.preg_quote($value, '/').'[ \t]+([A-Z0-9]{3,10})(?:[ \t]+([^\r\n]*))?(?=\R|\z)/i';
@@ -78,8 +78,8 @@ function dvsModsDmrIdCallsign($rawCallsign) {
     if (!preg_match('/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{3,10}$/D', $callsign)) {
         return $cache[$value] = $value;
     }
-    $name = isset($matches[2][0]) ? dvsModsUsableDmrName($matches[2][0], $callsign) : false;
-    if ($name !== false) { dvsModsDmrNameCache($callsign, $name, true); }
+    $name = isset($matches[2][0]) ? dvsModsFccUsableDmrName($matches[2][0], $callsign) : false;
+    if ($name !== false) { dvsModsFccDmrNameCache($callsign, $name, true); }
     return $cache[$value] = $callsign;
 }
 
@@ -121,7 +121,7 @@ function dvsModsFccFirstName($rawCallsign) {
     }
     fclose($handle);
     if ($result === '---') {
-        $dmrName = dvsModsDmrName($callsign);
+        $dmrName = dvsModsFccDmrName($callsign);
         if ($dmrName !== false) { $result = $dmrName; }
     }
     return $cache[$callsign] = $result;

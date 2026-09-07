@@ -22,10 +22,10 @@ requireSame('Hans Juergen', dvsModsFccFirstName('VA3BOC'), 'international multi-
 requireSame('Manuel', dvsModsFccFirstName('WP4J'), 'Puerto Rico DMR name was not resolved');
 requireSame('Elite Hamster Club Inc', dvsModsFccFirstName('DX1E'), 'descriptive DMR name was shortened');
 requireSame('Paul', dvsModsFccFirstName('ZL2BEZ'), 'identical duplicate DMR names were rejected');
-requireSame(false, dvsModsDmrName('K1DUP'), 'conflicting duplicate DMR names were accepted');
-requireSame(false, dvsModsDmrName('K1BAD'), 'Unknown placeholder was accepted');
-requireSame(false, dvsModsDmrName('K2BAD'), 'dash placeholder was accepted');
-requireSame(false, dvsModsDmrName('K3BAD'), 'numeric garbage was accepted');
+requireSame(false, dvsModsFccDmrName('K1DUP'), 'conflicting duplicate DMR names were accepted');
+requireSame(false, dvsModsFccDmrName('K1BAD'), 'Unknown placeholder was accepted');
+requireSame(false, dvsModsFccDmrName('K2BAD'), 'dash placeholder was accepted');
+requireSame(false, dvsModsFccDmrName('K3BAD'), 'numeric garbage was accepted');
 requireSame('Łukasz', dvsModsFccFirstName('SP1ABC'), 'international UTF-8 name was rejected');
 
 requireSame('4000001', dvsModsDmrIdCallsign('4000001'), 'invalid mapped callsign was accepted');
