@@ -26,6 +26,12 @@ TARGET_LEGEND = TARGET_PREVIOUS_LEGEND.replace(
     "no FCC first name available; callsign may be non-U.S./international or absent from FCC data",
     "no usable worldwide DMR or FCC name data available",
 )
+TARGET_WIDE_PREVIOUS_LEGEND = TARGET_PREVIOUS_LEGEND.replace(
+    'width:640px;', 'width:min(95%,1400px);'
+)
+TARGET_WIDE_LEGEND = TARGET_LEGEND.replace(
+    'width:640px;', 'width:min(95%,1400px);'
+)
 SUPPORTED = {
     "lh.php": {
         "f8e6c9801c2613796f070921cee442943ed2dfdd4ec2466a266a6df369a8dc70",
@@ -89,7 +95,7 @@ def without_target_modification(text: str, name: str) -> str:
         text.count(TARGET_MARKER),
         text.count(TARGET_INCLUDE),
         text.count("dvsModsTargetDisplay("),
-        text.count(TARGET_LEGEND) + text.count(TARGET_PREVIOUS_LEGEND),
+        text.count(TARGET_LEGEND) + text.count(TARGET_PREVIOUS_LEGEND) + text.count(TARGET_WIDE_LEGEND) + text.count(TARGET_WIDE_PREVIOUS_LEGEND),
     )
     if counts == (0, 0, 0, 0):
         return text
@@ -103,10 +109,10 @@ def without_target_modification(text: str, name: str) -> str:
     recovered = recovered.replace(TARGET_INCLUDE + "\n", "", 1)
     recovered = recovered.replace(modified, original, 1)
     if name == "localtx.php":
-        if TARGET_LEGEND in recovered:
-            recovered = recovered.replace(TARGET_LEGEND, "", 1)
-        else:
-            recovered = recovered.replace(TARGET_PREVIOUS_LEGEND, "", 1)
+        for legend in (TARGET_LEGEND, TARGET_PREVIOUS_LEGEND, TARGET_WIDE_LEGEND, TARGET_WIDE_PREVIOUS_LEGEND):
+            if legend in recovered:
+                recovered = recovered.replace(legend, "", 1)
+                break
     return recovered
 
 
@@ -213,7 +219,10 @@ def patch_text(text: str, name: str) -> str:
         if text.count(INCLUDE) != 1 or text.count("dvsModsFccFirstName($listElem[2])") != 1 or text.count("dvsModsDmrIdCallsign($listElem[2])") != 1 or text.count("<th>Name</th>") != 1:
             raise PatchError(f"incomplete modified {name}")
         validate_current(text, name)
-        return text.replace(TARGET_PREVIOUS_LEGEND, TARGET_LEGEND, 1)
+        for old_legend, new_legend in ((TARGET_PREVIOUS_LEGEND, TARGET_LEGEND), (TARGET_WIDE_PREVIOUS_LEGEND, TARGET_WIDE_LEGEND)):
+            if old_legend in text:
+                return text.replace(old_legend, new_legend, 1)
+        return text
     if MARKER in text or LEGACY_MARKER in text:
         raise PatchError(f"duplicate markers in {name}")
     if digest(text) not in SUPPORTED[name]:
