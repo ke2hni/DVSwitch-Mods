@@ -198,11 +198,6 @@ def remove_legacy_fcc_localtx(text: str) -> str:
     text = text.replace(LEGACY_MARKER + "\n", "", 1)
     text = text.replace(INCLUDE + "\n", "", 1)
     text = text.replace(
-        '      <th style="white-space:nowrap;width:115px;">Time (<?php echo date(\'T\')?>)</th>',
-        "      <th>Time (<?php echo date('T')?>)</th>",
-        1,
-    )
-    text = text.replace(
         "      <th>Callsign</th>\n      <th>Name</th>\n      <th>Target</th>",
         "      <th>Callsign</th>\n      <th>Target</th>",
         1,
