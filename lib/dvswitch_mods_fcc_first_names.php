@@ -93,9 +93,6 @@ function dvsModsFccFirstName($rawCallsign) {
     if (!preg_match('/^[A-Z0-9]{3,10}$/', $callsign)) { return '---'; }
     if (isset($cache[$callsign])) { return $cache[$callsign]; }
 
-    $dmrName = dvsModsDmrName($callsign);
-    if ($dmrName !== false) { return $cache[$callsign] = $dmrName; }
-
     $path = '/var/lib/mmdvm/dvswitch-mods-fcc-first-names.dat';
     $recordSize = 52;
     $size = @filesize($path);
@@ -123,6 +120,10 @@ function dvsModsFccFirstName($rawCallsign) {
         else { $low = $middle + 1; }
     }
     fclose($handle);
+    if ($result === '---') {
+        $dmrName = dvsModsDmrName($callsign);
+        if ($dmrName !== false) { $result = $dmrName; }
+    }
     return $cache[$callsign] = $result;
 }
 ?>
