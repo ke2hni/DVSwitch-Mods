@@ -9,6 +9,7 @@ set -Eeuo pipefail
 umask 077
 
 readonly SCRIPT_VERSION="1.5.0"
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly BM_LIST="/var/lib/mmdvm/TGList_BM.txt"
 readonly TGIF_LIST="/var/lib/mmdvm/TGList_TGIF.txt"
