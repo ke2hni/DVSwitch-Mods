@@ -11,16 +11,6 @@ umask 077
 readonly SCRIPT_VERSION="1.0.5"
 readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dstar-tx-ref"
-readonly SUPPORTED_HASH="5b21a7a8e4e4a753ba3881bc3077ea4a1047c2e1d969cbd8f2b1c3a6c15976f3"
-readonly DSTAR_STATUS_HASH="cdd063d6974e459fca279abc8c8ad6a112de89a6dbaa0fa92e03a1933b671831"
-readonly DMR_V1_STATUS_HASH="c1a910a0f6e486f7e5077056a73208a8291e35a979897b4e250aeb492707fc64"
-readonly DMR_V2_STATUS_HASH="3f2d81aad9fed503b38271fee033821d27aafea969ca6348fc0afc1c1a994d55"
-readonly YSF_STATUS_HASH="d3ba63a6e57801697797e6a3ea747ec8def51cad9deb48054a48dfe436f34e09"
-readonly DMR_V3_YSF_STATUS_HASH="75ff8fa3363c79e2109e32b83f4a2fb75f99b2a435072d18177a40fabacb301f"
-readonly DMR_V4_YSF_STATUS_HASH="628c5b2debc3b658a132b2e3b10c1e656ff59f9e5412af4a15afc5bb7b292aee"
-readonly DMR_V5_YSF_STATUS_HASH="02f4e7c6c5208d4f44bb559711cc006e0d8da7f4ad7ba5005ea47a4062330cf8"
-readonly DMR_V6_YSF_STATUS_HASH="9c7f1749a37830d5adf51912c880d4c9faf6a79157bba249156f03f86e81b09d"
-readonly DMR_V7_YSF_STATUS_HASH="4a7c3ca33091eba398ec0517d5ee69fb383c5889621e60fda8745c737a3655c5"
 readonly MOD_MARKER="// DVSwitch-Mods: D-Star Tx TG/Ref display v1"
 
 WORK_DIR=""
@@ -43,99 +33,7 @@ check_platform() {
 }
 
 patch_candidate() {
-    STATUS_CANDIDATE="$WORK_DIR/status.php" DVS_SUPPORTED_HASH="$SUPPORTED_HASH" DVS_MOD_MARKER="$MOD_MARKER" \
-    DVS_DSTAR_STATUS_HASH="$DSTAR_STATUS_HASH" DVS_DMR_V1_STATUS_HASH="$DMR_V1_STATUS_HASH" \
-    DVS_DMR_V2_STATUS_HASH="$DMR_V2_STATUS_HASH" DVS_YSF_STATUS_HASH="$YSF_STATUS_HASH" \
-    DVS_DMR_V3_YSF_STATUS_HASH="$DMR_V3_YSF_STATUS_HASH" DVS_DMR_V4_YSF_STATUS_HASH="$DMR_V4_YSF_STATUS_HASH" \
-    DVS_DMR_V5_YSF_STATUS_HASH="$DMR_V5_YSF_STATUS_HASH" DVS_DMR_V6_YSF_STATUS_HASH="$DMR_V6_YSF_STATUS_HASH" \
-    DVS_DMR_V7_YSF_STATUS_HASH="$DMR_V7_YSF_STATUS_HASH" python3 - <<'PY_PATCH'
-from pathlib import Path
-import hashlib
-import os
-
-path = Path(os.environ["STATUS_CANDIDATE"])
-supported_hash = os.environ["DVS_SUPPORTED_HASH"]
-marker = os.environ["DVS_MOD_MARKER"]
-
-insertion_anchor = "    $abinfo = getABInfo('/tmp/ABInfo_'.ABINFO.'.json');\n"
-insertion = r'''    // DVSwitch-Mods: D-Star Tx TG/Ref display v1
-    $txValue = $abinfo['digital']['tg'];
-    if ($abinfo['tlv']['ambe_mode'] == "DSTAR") {
-        $txValue = preg_replace('/^(Linked to|Linking to)\s+/i', '', trim(strip_tags(str_replace("<br />", " ", getDSTARLinks()))));
-        $txValue = preg_replace('/\s*\(.*\)\s*$/', '', $txValue);
-    }
-'''
-
-tooltip_old = '''    echo "<br>&nbsp;&nbsp;&nbsp;txTG: ".$abinfo['digital']['tg'];'''
-tooltip_new = '''    echo "<br>&nbsp;&nbsp;&nbsp;txTG: ".$txValue;'''
-row_old = '''    echo "<tr><th width=50%>Tx TG</th><td style=\\"background: #f9f9f9;font-weight: bold;color:#ef7215;\\">".$abinfo['digital']['tg']."</td></tr>\\n";'''
-row_new = '''    echo "<tr><th width=50%>Tx TG/Ref</th><td style=\\"background: #f9f9f9;font-weight: bold;color:#ef7215;\\">".$txValue."</td></tr>\\n";'''
-
-def digest(value):
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()
-
-def require_downstream_markers(value, dmr_v1, dmr_v2, dmr_v3, dmr_v4, dmr_v5, dmr_v6, dmr_v7, ysf):
-    counts = (
-        value.count("// DVSwitch-Mods: DMR Master friendly-name display v1"),
-        value.count("// DVSwitch-Mods: DMR Master friendly-name display v2"),
-        value.count("// DVSwitch-Mods: DMR Master friendly-name display v3"),
-        value.count("// DVSwitch-Mods: DMR Master friendly-name display v4"),
-        value.count("// DVSwitch-Mods: DMR Master friendly-name display v5"),
-        value.count("// DVSwitch-Mods: DMR Master friendly-name display v6"),
-        value.count("// DVSwitch-Mods: DMR Master friendly-name display v7"),
-        value.count("// DVSwitch-Mods: YSF dashboard null repair v1"),
-    )
-    if counts != (dmr_v1, dmr_v2, dmr_v3, dmr_v4, dmr_v5, dmr_v6, dmr_v7, ysf):
-        raise SystemExit("ERROR: downstream dashboard markers are missing or ambiguous: " + repr(counts))
-
-text = path.read_text(encoding="utf-8")
-markers = text.count(marker)
-
-if markers == 0:
-    if digest(text) != supported_hash:
-        raise SystemExit("ERROR: unsupported unmodified status.php hash: " + digest(text))
-    counts = (text.count(insertion_anchor), text.count(tooltip_old), text.count(row_old))
-    if counts != (1, 1, 2):
-        raise SystemExit("ERROR: unsupported or ambiguous status.php anchors: " + repr(counts))
-    if tooltip_new in text or row_new in text or "getDSTARLinks()" in text:
-        raise SystemExit("ERROR: unexpected existing D-Star Tx display code")
-    text = text.replace(insertion_anchor, insertion_anchor + insertion, 1)
-    text = text.replace(tooltip_old, tooltip_new, 1)
-    text = text.replace(row_old, row_new)
-elif markers == 1:
-    if text.count(insertion) != 1 or text.count(tooltip_new) != 1 or text.count(row_new) != 2:
-        raise SystemExit("ERROR: incomplete or ambiguous D-Star Tx modification")
-    if tooltip_old in text or row_old in text:
-        raise SystemExit("ERROR: mixed D-Star Tx modification state")
-    recovered = text.replace(insertion, "", 1).replace(tooltip_new, tooltip_old, 1).replace(row_new, row_old)
-    value = digest(text)
-    if value == os.environ["DVS_DSTAR_STATUS_HASH"]:
-        if digest(recovered) != supported_hash:
-            raise SystemExit("ERROR: D-Star status.php does not reverse to the supported friendly-name file")
-        require_downstream_markers(text, 0, 0, 0, 0, 0, 0, 0, 0)
-    elif value == os.environ["DVS_DMR_V1_STATUS_HASH"]:
-        require_downstream_markers(text, 1, 0, 0, 0, 0, 0, 0, 0)
-    elif value == os.environ["DVS_DMR_V2_STATUS_HASH"]:
-        require_downstream_markers(text, 0, 1, 0, 0, 0, 0, 0, 0)
-    elif value == os.environ["DVS_YSF_STATUS_HASH"]:
-        require_downstream_markers(text, 0, 1, 0, 0, 0, 0, 0, 1)
-    elif value == os.environ["DVS_DMR_V3_YSF_STATUS_HASH"]:
-        require_downstream_markers(text, 0, 0, 1, 0, 0, 0, 0, 1)
-    elif value == os.environ["DVS_DMR_V4_YSF_STATUS_HASH"]:
-        require_downstream_markers(text, 0, 0, 0, 1, 0, 0, 0, 1)
-    elif value == os.environ["DVS_DMR_V5_YSF_STATUS_HASH"]:
-        require_downstream_markers(text, 0, 0, 0, 0, 1, 0, 0, 1)
-    elif value == os.environ["DVS_DMR_V6_YSF_STATUS_HASH"]:
-        require_downstream_markers(text, 0, 0, 0, 0, 0, 1, 0, 1)
-    elif value == os.environ["DVS_DMR_V7_YSF_STATUS_HASH"]:
-        require_downstream_markers(text, 0, 0, 0, 0, 0, 0, 1, 1)
-    else:
-        raise SystemExit("ERROR: unsupported modified status.php hash: " + value)
-else:
-    raise SystemExit("ERROR: duplicate D-Star Tx modification markers")
-
-path.write_text(text, encoding="utf-8")
-PY_PATCH
+    python3 "$SCRIPT_DIR/lib/patch_dashboard_dstar.py" --status "$WORK_DIR/status.php"
 }
 
 prepare_candidate() {

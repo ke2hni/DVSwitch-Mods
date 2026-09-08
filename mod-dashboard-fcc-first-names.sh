@@ -15,7 +15,6 @@ readonly UPDATER_SOURCE="$SCRIPT_DIR/lib/dvswitch_fcc_first_names_update.sh"
 readonly SERVICE_SOURCE="$SCRIPT_DIR/systemd/dvswitch-fcc-first-names-update.service"
 readonly TIMER_SOURCE="$SCRIPT_DIR/systemd/dvswitch-fcc-first-names-update.timer"
 readonly LH_TARGET="/usr/share/dvswitch/include/lh.php"
-readonly LOCALTX_TARGET="/usr/share/dvswitch/include/localtx.php"
 readonly HELPER_TARGET="/usr/share/dvswitch/include/dvswitch_mods_fcc_first_names.php"
 readonly DATABASE_TARGET="/var/lib/mmdvm/dvswitch-mods-fcc-first-names.dat"
 readonly UPDATER_TARGET="/usr/local/sbin/dvswitch-fcc-first-names-update"
@@ -96,8 +95,8 @@ preflight() {
     for command in awk chmod chown cmp cp curl date install mktemp mv php python3 rm sha256sum stat systemctl; do require_command "$command"; done
     require_file "$PATCHER"; require_file "$BUILDER"; require_file "$HELPER_SOURCE"; require_file "$TRANSACTION_LIBRARY"
     require_file "$UPDATER_SOURCE"; require_file "$SERVICE_SOURCE"; require_file "$TIMER_SOURCE"
-    require_file "$LH_TARGET"; require_file "$LOCALTX_TARGET"
-    php -l "$LH_TARGET" >/dev/null; php -l "$LOCALTX_TARGET" >/dev/null; php -l "$HELPER_SOURCE" >/dev/null
+    require_file "$LH_TARGET"
+    php -l "$LH_TARGET" >/dev/null; php -l "$HELPER_SOURCE" >/dev/null
     dashboard_health || die "Apache or the HTTPS dashboard is not healthy."
 }
 
@@ -214,11 +213,11 @@ prepare_dashboard() {
     [[ -d "$WORK_ROOT" && ! -L "$WORK_ROOT" ]] || die "Required work root is unavailable: $WORK_ROOT"
     [[ -n "$WORK_DIR" ]] || WORK_DIR=$(mktemp -d "$WORK_ROOT/.dvswitch-fcc-firstnames.XXXXXX")
     cp -- "$LH_TARGET" "$WORK_DIR/lh.php"
-    python3 "$PATCHER" --lh "$WORK_DIR/lh.php" --localtx "$LH_TARGET"
+    python3 "$PATCHER" --lh "$WORK_DIR/lh.php"
     php -l "$WORK_DIR/lh.php" >/dev/null
     local lh_hash
     lh_hash=$(file_hash "$WORK_DIR/lh.php")
-    python3 "$PATCHER" --lh "$WORK_DIR/lh.php" --localtx "$LH_TARGET"
+    python3 "$PATCHER" --lh "$WORK_DIR/lh.php"
     [[ "$lh_hash" == "$(file_hash "$WORK_DIR/lh.php")" ]] || die "Dashboard patch is not idempotent."
 }
 
@@ -301,7 +300,7 @@ run_install() {
     stage_install_component "$WORK_DIR/lh.php" "$LH_TARGET" root root 0644
     stage_install_component "$HELPER_SOURCE" "$HELPER_TARGET" root root 0644
     if [[ $database_ready -eq 0 ]]; then stage_install_component "$WORK_DIR/fcc-first-names.dat" "$DATABASE_TARGET" root www-data 0644; fi
-    php -l "$LH_TARGET" >/dev/null; php -l "$LOCALTX_TARGET" >/dev/null; php -l "$HELPER_TARGET" >/dev/null
+    php -l "$LH_TARGET" >/dev/null; php -l "$HELPER_TARGET" >/dev/null
     python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null
     if [[ $SYSTEMD_CHANGED -eq 1 ]]; then systemctl daemon-reload; fi
     if [[ $TIMER_CHANGED -eq 1 ]]; then
@@ -339,26 +338,25 @@ uninstall_backup_file() {
 
 run_uninstall() {
     preflight
-    local name=$1 directory="$BACKUP_ROOT/$1" original_lh original_local target
+    local name=$1 directory="$BACKUP_ROOT/$1" original_lh target
     [[ "$name" =~ ^install-[0-9]{8}-[0-9]{6}(-[0-9]+)?$ ]] || die "Invalid backup name."
     [[ -d "$directory" && ! -L "$directory" ]] || die "Backup not found: $name"
     require_file "$directory/MANIFEST"
     original_lh=$(uninstall_backup_file "$directory" "$LH_TARGET")
-    original_local=$(uninstall_backup_file "$directory" "$LOCALTX_TARGET")
     [[ -n "$WORK_DIR" ]] || WORK_DIR=$(mktemp -d "$WORK_ROOT/.dvswitch-fcc-firstnames.XXXXXX")
     install -d -m 0700 "$WORK_DIR/original"
-    cp -- "$original_lh" "$WORK_DIR/original/lh.php"; cp -- "$original_local" "$WORK_DIR/original/localtx.php"
-    python3 "$PATCHER" --lh "$WORK_DIR/original/lh.php" --localtx "$WORK_DIR/original/localtx.php"
+    cp -- "$original_lh" "$WORK_DIR/original/lh.php"
+    python3 "$PATCHER" --lh "$WORK_DIR/original/lh.php"
     . "$TRANSACTION_LIBRARY"
     dvsm_transaction_begin "$BACKUP_ROOT"
-    for target in "$LH_TARGET" "$LOCALTX_TARGET" "$HELPER_TARGET" "$DATABASE_TARGET"; do backup_target "$target"; done
+    for target in "$LH_TARGET" "$HELPER_TARGET" "$DATABASE_TARGET"; do backup_target "$target"; done
     while IFS= read -r target; do backup_target "$target"; done < <(updater_targets)
     INSTALL_ACTIVE=1
     systemctl disable --now "$TIMER_UNIT" >/dev/null 2>&1 || true
     dvsm_restore_backup_set "$directory"
     rm -f -- "$HELPER_TARGET" "$DATABASE_TARGET"
     while IFS= read -r target; do rm -f -- "$target"; done < <(updater_targets)
-    php -l "$LH_TARGET" >/dev/null; php -l "$LOCALTX_TARGET" >/dev/null
+    php -l "$LH_TARGET" >/dev/null
     systemctl daemon-reload
     systemctl reload apache2.service; dashboard_health
     INSTALL_ACTIVE=0
@@ -376,7 +374,7 @@ run_restore() {
     if [[ -f "$UPDATER_TARGET" && ! -L "$UPDATER_TARGET" && "$(file_hash "$UPDATER_TARGET")" == "$PREVIOUS_UPDATER_SHA256_V113" ]] && ! awk -F '\t' -v wanted="$PATCHER_TARGET" '$2 == wanted { found=1 } END { exit(found ? 0 : 1) }' "$directory/MANIFEST"; then
         rm -f -- "$PATCHER_TARGET"
     fi
-    php -l "$LH_TARGET" >/dev/null; php -l "$LOCALTX_TARGET" >/dev/null
+    php -l "$LH_TARGET" >/dev/null
     systemctl daemon-reload
     local restored_updater_state
     restored_updater_state=$(updater_state)

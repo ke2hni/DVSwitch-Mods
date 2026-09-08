@@ -42,32 +42,16 @@ include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_fcc_first_names.
 </div>
 <br>
 '''.replace("\\t", "\t")
-patcher.SUPPORTED["lh.php"].add(patcher.digest(lh))
-patcher.SUPPORTED["localtx.php"].add(patcher.digest(localtx))
-nofcc_localtx = "<?php\ninclude_once dirname(dirname(__FILE__)).'/include/functions.php';    \n" + patcher.replacement("localtx.php")[0] + "</div>\n<br>\n"
-patcher.SUPPORTED["localtx.php"].add(patcher.digest(nofcc_localtx))
-nofcc_changed = patcher.patch_text(nofcc_localtx, "localtx.php")
-require(nofcc_changed.count(patcher.MARKER) == 1, "no-FCC localtx marker missing")
-require("dvswitch_mods_fcc_first_names" not in nofcc_changed, "Target patch added FCC include to Local Activity")
 for name, original in (("lh.php", lh), ("localtx.php", localtx)):
     changed = patcher.patch_text(original, name)
     require(changed.count(patcher.MARKER) == 1, name + " marker missing")
     require(changed.count("dvsModsTargetDisplay(") == 1, name + " helper call missing")
     require(changed.count(patcher.LEGEND) == (1 if name == "localtx.php" else 0), name + " legend count incorrect")
     require(patcher.patch_text(changed, name) == changed, name + " patch not idempotent")
-    if name == "localtx.php":
-        old_legend = changed.replace(patcher.LEGEND, patcher.LEGACY_LEGEND, 1)
-        require(patcher.patch_text(old_legend, name) == changed, name + " v1.1.0 legend upgrade failed")
-        previous_legend = changed.replace(patcher.LEGEND, patcher.PREVIOUS_LEGEND, 1)
-        require(patcher.patch_text(previous_legend, name) == changed, name + " v1.1.2 legend upgrade failed")
-    legacy = changed.replace(patcher.MARKER, patcher.LEGACY_MARKER, 1).replace(patcher.LEGEND, "", 1)
+    legacy = changed.replace(patcher.MARKER, patcher.LEGACY_MARKER, 1)
     require(patcher.patch_text(legacy, name) == changed, name + " v1 upgrade failed")
-    try:
-        patcher.patch_text(changed + "<!-- altered -->\n", name)
-    except patcher.PatchError:
-        pass
-    else:
-        raise SystemExit("FAIL: altered " + name + " accepted")
+    altered = changed + "<!-- user customization -->\n"
+    require(patcher.patch_text(altered, name) == altered, name + " user customization was not preserved")
 
 with tempfile.TemporaryDirectory() as directory:
     data = Path(directory)
