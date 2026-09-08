@@ -9,6 +9,7 @@ set -Eeuo pipefail
 umask 077
 
 readonly SCRIPT_VERSION="1.1.5"
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly FUNCTIONS_TARGET="/usr/share/dvswitch/include/functions.php"
 readonly STATUS_TARGET="/usr/share/dvswitch/include/status.php"
 readonly P25_JSON="/var/lib/mmdvm/P25Hosts.json"

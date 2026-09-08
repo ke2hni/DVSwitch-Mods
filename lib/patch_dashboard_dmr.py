@@ -326,3 +326,4 @@ elif log_counts != (0, 1, 0, 1):
     raise SystemExit("ERROR: incomplete or ambiguous DMR log-status repair anchors: " + repr(log_counts))
 
 path.write_text(text, encoding="utf-8")
+
