@@ -23,7 +23,7 @@ readonly FCC_URL="https://data.fcc.gov/download/pub/uls/complete/l_amat.zip"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"
 readonly LOCK_FILE="/run/lock/dvswitch-fcc-first-names-update.lock"
 readonly BUILDER_SHA256="d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2"
-readonly PATCHER_SHA256="b7cf61c02b674124c43b69c8cad011c5a97171622b17de7a627ae6f3eb7f00f0"
+readonly PATCHER_SHA256="f53500cb3f9de67525946d3ff0b2e149cef4260588cb77132d751703f38d0ffe"
 readonly TRANSACTION_SHA256="13d743d6065f88888725a1aefe98c8d4ad957974ec5cd991a52ff20ac44a6532"
 readonly HELPER_SHA256="94f2b480fe6a67f550799864dd1e63ca395d09a5cc27275d9d61e46f1419bc1a"
 

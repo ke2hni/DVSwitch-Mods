@@ -14,6 +14,7 @@ readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly HOSTS_FILE="/var/lib/mmdvm/YSFHosts.txt"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/ysf-dashboard-null"
 readonly SUPPORTED_HASH="3f2d81aad9fed503b38271fee033821d27aafea969ca6348fc0afc1c1a994d55"
+readonly VIRGIN_STATUS_HASH="b573126d4d0ac54fdb8c331de6d75e260419f65a1d66fff6f711e4f7bfd0f2ab"
 readonly DMR_V4_YSF_STATUS_HASH="628c5b2debc3b658a132b2e3b10c1e656ff59f9e5412af4a15afc5bb7b292aee"
 readonly DMR_V5_YSF_STATUS_HASH="02f4e7c6c5208d4f44bb559711cc006e0d8da7f4ad7ba5005ea47a4062330cf8"
 readonly DMR_V6_YSF_STATUS_HASH="9c7f1749a37830d5adf51912c880d4c9faf6a79157bba249156f03f86e81b09d"
@@ -67,7 +68,7 @@ PY_HOSTS
 }
 
 patch_candidate() {
-    STATUS_CANDIDATE="$WORK_DIR/status.php" DVS_SUPPORTED_HASH="$SUPPORTED_HASH" \
+    STATUS_CANDIDATE="$WORK_DIR/status.php" DVS_SUPPORTED_HASH="$SUPPORTED_HASH" DVS_VIRGIN_STATUS_HASH="$VIRGIN_STATUS_HASH" \
     DVS_DMR_V4_YSF_STATUS_HASH="$DMR_V4_YSF_STATUS_HASH" DVS_DMR_V5_YSF_STATUS_HASH="$DMR_V5_YSF_STATUS_HASH" \
     DVS_DMR_V6_YSF_STATUS_HASH="$DMR_V6_YSF_STATUS_HASH" DVS_DMR_V7_STATUS_HASH="$DMR_V7_STATUS_HASH" \
     DVS_DMR_V7_YSF_STATUS_HASH="$DMR_V7_YSF_STATUS_HASH" \
@@ -94,7 +95,7 @@ dmr_v2_output = '''                        echo "<tr><td  style=\\"background: #
 dmr_v3_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;text-align:center;\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
 
 def supported_base(value):
-    if digest(value) in (supported_hash, os.environ["DVS_DMR_V7_STATUS_HASH"]):
+    if digest(value) in (supported_hash, os.environ["DVS_VIRGIN_STATUS_HASH"], os.environ["DVS_DMR_V7_STATUS_HASH"]):
         return True
     counts = (value.count(dmr_v2_marker), value.count(dmr_v3_marker), value.count(dmr_v2_output), value.count(dmr_v3_output))
     if counts != (0, 1, 0, 1):

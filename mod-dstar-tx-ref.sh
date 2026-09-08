@@ -11,6 +11,7 @@ umask 077
 readonly SCRIPT_VERSION="1.0.5"
 readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dstar-tx-ref"
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly MOD_MARKER="// DVSwitch-Mods: D-Star Tx TG/Ref display v1"
 
 WORK_DIR=""
