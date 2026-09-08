@@ -31,6 +31,7 @@ readonly PREVIOUS_UPDATER_SHA256_V113="cccb47f9f0dec56556f239372fc722dd83623ab8b
 readonly PREVIOUS_UPDATER_SHA256_V120="ff766bf6ed68e81b52e48bd7f6efd1df230ce986ae4e6573dcf98599eb6ed4f5"
 readonly PREVIOUS_PATCHER_SHA256_V120="aff53f3636f25a0ba45c9240958b6654fa95468ab81db28802ff727986c564fd"
 readonly PREVIOUS_UPDATER_SHA256_V121="ff2c45c1e0258a13ed1b819dae6cbc9a99e0be2b7d8d7fb73aa13faeaba426dd"
+readonly PREVIOUS_UPDATER_SHA256_V122="c22227aa1fc83e7e4a50072d7fc61743872ac8a88911174d7ef93969055f8983"
 readonly PREVIOUS_PATCHER_SHA256_V121="80ba8c7e998a596ef43a138ab678457b1a5afce61cb1a2396099fac735ef9a4d"
 readonly PREVIOUS_PATCHER_SHA256_V122="c106ff14a42c7e635e6d36f881b9f2394d37ae0373ebcfd28fb4dc453ec5be79"
 readonly BUILDER_SHA256_V113="d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2"
@@ -143,6 +144,7 @@ updater_release_state() {
     fi
     if { [[ "$(file_hash "$UPDATER_TARGET")" == "$PREVIOUS_UPDATER_SHA256_V120" && "$(file_hash "$PATCHER_TARGET")" == "$PREVIOUS_PATCHER_SHA256_V120" ]] ||
          [[ "$(file_hash "$UPDATER_TARGET")" == "$PREVIOUS_UPDATER_SHA256_V121" && "$(file_hash "$PATCHER_TARGET")" == "$PREVIOUS_PATCHER_SHA256_V121" ]] ||
+         [[ "$(file_hash "$UPDATER_TARGET")" == "$PREVIOUS_UPDATER_SHA256_V122" && "$(file_hash "$PATCHER_TARGET")" == "$PATCHER_SHA256" ]] ||
          [[ "$(file_hash "$UPDATER_TARGET")" == "$(file_hash "$UPDATER_SOURCE")" && "$(file_hash "$PATCHER_TARGET")" == "$PREVIOUS_PATCHER_SHA256_V122" ]]; }; then
         cmp -s "$BUILDER" "$BUILDER_TARGET" || die "Installed FCC builder does not match the supported previous release."
         cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die "Installed FCC transaction helper does not match the supported previous release."
