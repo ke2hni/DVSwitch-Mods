@@ -9,7 +9,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.1.0"
+readonly SCRIPT_VERSION="1.2.0"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly STATE_DIR="/var/lib/dvswitch-mods/manager"
 readonly STATE_FILE="$STATE_DIR/active-installs.tsv"
@@ -43,6 +43,7 @@ readonly -a COMPONENTS=(
     ysf-dashboard-null
     dashboard-fcc-first-names
     dashboard-targets
+    dashboard-cell-padding
 )
 
 COMPONENT=""
@@ -94,6 +95,7 @@ select_component() {
         ysf-dashboard-null) CHILD_SCRIPT="$SCRIPT_DIR/repair-ysf-dashboard-null.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/ysf-dashboard-null" ;;
         dashboard-fcc-first-names) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-fcc-first-names.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"; UNINSTALL_ACTION="--uninstall" ;;
         dashboard-targets) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-targets.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-targets" ;;
+        dashboard-cell-padding) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-cell-padding.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-cell-padding" ;;
         *) die "Unknown component: $COMPONENT" ;;
     esac
     require_regular "$CHILD_SCRIPT"
