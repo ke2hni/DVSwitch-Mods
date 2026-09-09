@@ -1,169 +1,130 @@
 #!/usr/bin/env bash
 set -u
 
-VERSION="1.0.0"
-CSS_FILE="${CSS_FILE:-/usr/share/dvswitch/css/css.php}"
+VERSION="1.1.0"
+ROOT="/usr/share/dvswitch"
+CSS_FILE="${CSS_FILE:-$ROOT/css/css.php}"
+LH_FILE="${LH_FILE:-$ROOT/include/lh.php}"
+LOCALTX_FILE="${LOCALTX_FILE:-$ROOT/include/localtx.php}"
 BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/dvswitch-mods/dashboard-cell-padding}"
 
-die(){ echo "ERROR: $*" >&2; exit 1; }
+[ "$(id -u)" -eq 0 ] || { echo "ERROR: Run with sudo." >&2; exit 1; }
 
-require_root(){
-  [ "$(id -u)" -eq 0 ] || die "Run with sudo."
-}
-
-count_text(){
-  local text="$1" file="$2"
-  python3 - "$text" "$file" <<'PY'
+python3 - "$CSS_FILE" "$LH_FILE" "$LOCALTX_FILE" "${1:---check}" "$BACKUP_ROOT" <<'PY'
+import os
+import shutil
 import sys
-from pathlib import Path
-needle = sys.argv[1]
-data = Path(sys.argv[2]).read_text()
-print(data.count(needle))
-PY
-}
-
-patch_file(){
-  local source="$1" destination="$2"
-  python3 - "$source" "$destination" <<'PY'
-import sys
+import tempfile
+from datetime import datetime
 from pathlib import Path
 
-source = Path(sys.argv[1])
-destination = Path(sys.argv[2])
-data = source.read_text()
+VERSION = "1.1.0"
+css_path, lh_path, localtx_path = map(Path, sys.argv[1:4])
+action = sys.argv[4]
+backup_root = Path(sys.argv[5])
 
-original_th = '''table th {
+def pair(old, new, expected=1):
+    return (old, new, expected)
+
+targets = {
+    css_path: [
+        pair('''table th {
     font-family: "Lucidia Console",Monaco,monospace;
     text-shadow: 1px 1px #<?php echo $tableHeadDropShaddow; ?>;
     text-decoration: none;
     background: #<?php echo $backgroundBanners; ?>;
     border: 1px solid #c0c0c0;
-}'''
-
-original_td = '''table td {
-    color: #000000;
-    font-family: "Lucidia Console",Monaco,monospace;
-    text-decoration: none;
-    border: 1px solid #000000;
-    overflow-x: hidden;
-}'''
-
-modified_th = '''table th {
+}''', '''table th {
     font-family: "Lucidia Console",Monaco,monospace;
     text-shadow: 1px 1px #<?php echo $tableHeadDropShaddow; ?>;
     text-decoration: none;
     background: #<?php echo $backgroundBanners; ?>;
     border: 1px solid #c0c0c0;
     padding: 2px 4px;
-}'''
-
-modified_td = '''table td {
+}'''),
+        pair('''table td {
+    color: #000000;
+    font-family: "Lucidia Console",Monaco,monospace;
+    text-decoration: none;
+    border: 1px solid #000000;
+    overflow-x: hidden;
+}''', '''table td {
     color: #000000;
     font-family: "Lucidia Console",Monaco,monospace;
     text-decoration: none;
     border: 1px solid #000000;
     overflow-x: hidden;
     padding: 2px 4px;
-}'''
+}'''),
+    ],
+    lh_path: [
+        pair('echo"<td align=\\"left\\" style=\\"color:green; font-weight:bold;\\">&nbsp;$listElem[1]</td>";', 'echo"<td align=\\"left\\" style=\\"color:green; font-weight:bold;\\">$listElem[1]</td>";'),
+        pair('echo "<td align=\\"left\\" style=\\"color:#464646;\\">&nbsp;<a href=\\"https://database.radioid.net/database/view?id=$listElem[2]\\" target=\\"_blank\\"><span style=\\"color:#464646;font-weight:bold;\\">$listElem[2]</span></a></td>";', 'echo "<td align=\\"left\\" style=\\"color:#464646;\\"><a href=\\"https://database.radioid.net/database/view?id=$listElem[2]\\" target=\\"_blank\\"><span style=\\"color:#464646;font-weight:bold;\\">$listElem[2]</span></a></td>";'),
+        pair('echo "<td align=\\"left\\" style=\\"color:#464646;\\"><b>&nbsp;$listElem[2]</b></td>";', 'echo "<td align=\\"left\\" style=\\"color:#464646;\\"><b>$listElem[2]</b></td>";', 1),
+        pair('echo \'<td align="left" style="font-weight:bold;color:#464646;">&nbsp;<b>\'.htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").\'</b></td>\';', 'echo \'<td align="left" style="font-weight:bold;color:#464646;"><b>\'.htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").\'</b></td>\';'),
+        pair('echo \'<td align="left">&nbsp;<span style="color:#b5651d;font-weight:bold;white-space:normal;">\'.htmlspecialchars($dvsModsTarget, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").\'</span></td>\';', 'echo \'<td align="left"><span style="display:block;color:#b5651d;font-weight:bold;white-space:normal;">\'.htmlspecialchars($dvsModsTarget, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").\'</span></td>\';'),
+    ],
+    localtx_path: [
+        pair('echo"<td align=\\"left\\" style=\\"color:green; font-weight:bold;\\">&nbsp;$listElem[1]</td>";', 'echo"<td align=\\"left\\" style=\\"color:green; font-weight:bold;\\">$listElem[1]</td>";'),
+        pair('echo "<td align=\\"left\\" style=\\"color:#464646;\\"><b>&nbsp;$listElem[2]</b></td>";', 'echo "<td align=\\"left\\" style=\\"color:#464646;\\"><b>$listElem[2]</b></td>";', 2),
+        pair('echo \'<td align="left">&nbsp;<span style="color:#b5651d;font-weight:bold;white-space:normal;">\'.htmlspecialchars($dvsModsTarget, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").\'</span></td>\';', 'echo \'<td align="left"><span style="display:block;color:#b5651d;font-weight:bold;white-space:normal;">\'.htmlspecialchars($dvsModsTarget, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").\'</span></td>\';'),
+    ],
+}
 
-if data.count(original_th) != 1 or data.count(original_td) != 1:
-    raise SystemExit("exact original blocks changed or ambiguous")
+for path in targets:
+    if not path.is_file():
+        print(f"ERROR: missing file: {path}")
+        raise SystemExit(1)
 
-data = data.replace(original_th, modified_th, 1)
-data = data.replace(original_td, modified_td, 1)
-destination.write_text(data)
+data = {path: path.read_text() for path in targets}
+states = []
+for path, replacements in targets.items():
+    for old, new, expected in replacements:
+        states.append((path, data[path].count(old), data[path].count(new), expected))
+
+if all(new_count == expected for _, _, new_count, expected in states):
+    print("ALREADY MODIFIED: dashboard cell spacing and Target wrapping are installed. No files changed.")
+    raise SystemExit(0)
+
+if not all(old_count == expected for _, old_count, _, expected in states):
+    print("UNSUPPORTED or CUSTOMIZED: exact original activity-table targets were not found exactly once.")
+    for path, old_count, new_count, expected in states:
+        print(f"{path}: original={old_count}, modified={new_count}, expected={expected}")
+    raise SystemExit(1)
+
+if action in ("--check", "check"):
+    print("READY: exact original dashboard cell-spacing targets found. No files changed.")
+    raise SystemExit(0)
+
+if action not in ("--install", "install"):
+    print(f"Dashboard cell spacing modification {VERSION}")
+    print("Usage: sudo mod-dashboard-cell-padding.sh --check|--install")
+    raise SystemExit(0)
+
+backup = backup_root / f"install-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+backup.mkdir(parents=True, exist_ok=False)
+for path in targets:
+    shutil.copy2(path, backup / path.name)
+
+temporary = []
+try:
+    for path, replacements in targets.items():
+        changed = data[path]
+        for old, new, expected in replacements:
+            changed = changed.replace(old, new)
+        fd, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent))
+        os.close(fd)
+        temp = Path(name)
+        shutil.copystat(path, temp)
+        temp.write_text(changed)
+        temporary.append((temp, path))
+    for temp, path in temporary:
+        os.replace(temp, path)
+except Exception:
+    for temp, _ in temporary:
+        temp.unlink(missing_ok=True)
+    raise
+
+print("PASS: dashboard cell spacing and Target wrapping installed atomically.")
+print(f"Backup: {backup}")
 PY
-}
-
-check(){
-  [ -f "$CSS_FILE" ] || die "Missing file: $CSS_FILE"
-  local original_th original_td modified_th modified_td
-  original_th=$(cat <<'EOF'
-table th {
-    font-family: "Lucidia Console",Monaco,monospace;
-    text-shadow: 1px 1px #<?php echo $tableHeadDropShaddow; ?>;
-    text-decoration: none;
-    background: #<?php echo $backgroundBanners; ?>;
-    border: 1px solid #c0c0c0;
-}
-EOF
-)
-  original_td=$(cat <<'EOF'
-table td {
-    color: #000000;
-    font-family: "Lucidia Console",Monaco,monospace;
-    text-decoration: none;
-    border: 1px solid #000000;
-    overflow-x: hidden;
-}
-EOF
-)
-  modified_th=$(cat <<'EOF'
-table th {
-    font-family: "Lucidia Console",Monaco,monospace;
-    text-shadow: 1px 1px #<?php echo $tableHeadDropShaddow; ?>;
-    text-decoration: none;
-    background: #<?php echo $backgroundBanners; ?>;
-    border: 1px solid #c0c0c0;
-    padding: 2px 4px;
-}
-EOF
-)
-  modified_td=$(cat <<'EOF'
-table td {
-    color: #000000;
-    font-family: "Lucidia Console",Monaco,monospace;
-    text-decoration: none;
-    border: 1px solid #000000;
-    overflow-x: hidden;
-    padding: 2px 4px;
-}
-EOF
-)
-
-  if [ "$(count_text "$modified_th" "$CSS_FILE")" -eq 1 ] && [ "$(count_text "$modified_td" "$CSS_FILE")" -eq 1 ]; then
-    echo "ALREADY MODIFIED: dashboard table-cell padding is installed. No files changed."
-    return 0
-  fi
-  local th_count td_count
-  th_count="$(count_text "$original_th" "$CSS_FILE")"
-  td_count="$(count_text "$original_td" "$CSS_FILE")"
-  if [ "$th_count" -ne 1 ] || [ "$td_count" -ne 1 ]; then
-    echo "UNSUPPORTED or CUSTOMIZED: exact original table-cell blocks were not found exactly once."
-    echo "table th matches: $th_count"
-    echo "table td matches: $td_count"
-    return 1
-  fi
-  echo "READY: exact original table-cell blocks found. No files changed."
-}
-
-install_mod(){
-  require_root
-  local check_output
-  check_output="$(check)" || { echo "$check_output"; return 1; }
-  echo "$check_output" | grep -q '^ALREADY MODIFIED:' && return 0
-  local stamp backup temp
-  stamp="$(date +%Y%m%d-%H%M%S)"
-  backup="$BACKUP_ROOT/install-$stamp"
-  temp="$(mktemp "$CSS_FILE.tmp.XXXXXX")" || die "Could not create temporary file"
-  trap 'rm -f "$temp"' RETURN
-  mkdir -p "$backup" || die "Could not create backup directory"
-  cp -a "$CSS_FILE" "$backup/css.php" || die "Could not create backup"
-  patch_file "$CSS_FILE" "$temp" || die "Could not create patched file"
-  chown --reference="$CSS_FILE" "$temp" || die "Could not preserve ownership"
-  chmod --reference="$CSS_FILE" "$temp" || die "Could not preserve permissions"
-  mv -f "$temp" "$CSS_FILE" || die "Could not install patched file"
-  trap - RETURN
-  echo "PASS: dashboard table-cell padding installed atomically."
-  echo "Backup: $backup"
-}
-
-case "${1:---check}" in
-  --check) check ;;
-  --install) install_mod ;;
-  --help|-h)
-    echo "Dashboard table-cell padding modification $VERSION"
-    echo "Usage: sudo $0 --check|--install"
-    ;;
-  *) die "Usage: sudo $0 --check|--install" ;;
-esac
