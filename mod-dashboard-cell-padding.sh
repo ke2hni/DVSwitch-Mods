@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 set -u
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 ROOT="/usr/share/dvswitch"
 CSS_FILE="${CSS_FILE:-$ROOT/css/css.php}"
 LH_FILE="${LH_FILE:-$ROOT/include/lh.php}"
-LOCALTX_FILE="${LOCALTX_FILE:-$ROOT/include/localtx.php}"
 BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/dvswitch-mods/dashboard-cell-padding}"
 
 [ "$(id -u)" -eq 0 ] || { echo "ERROR: Run with sudo." >&2; exit 1; }
 
-python3 - "$CSS_FILE" "$LH_FILE" "$LOCALTX_FILE" "${1:---check}" "$BACKUP_ROOT" <<'PY'
+python3 - "$CSS_FILE" "$LH_FILE" "${1:---check}" "$BACKUP_ROOT" <<'PY'
 import os
 import shutil
 import sys
@@ -18,10 +17,10 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-VERSION = "1.1.0"
-css_path, lh_path, localtx_path = map(Path, sys.argv[1:4])
-action = sys.argv[4]
-backup_root = Path(sys.argv[5])
+VERSION = "1.2.0"
+css_path, lh_path = map(Path, sys.argv[1:3])
+action = sys.argv[3]
+backup_root = Path(sys.argv[4])
 
 def pair(old, new, expected=1):
     return (old, new, expected)
@@ -60,13 +59,10 @@ targets = {
     lh_path: [
         pair('echo"<td align=\\"left\\" style=\\"color:green; font-weight:bold;\\">&nbsp;$listElem[1]</td>";', 'echo"<td align=\\"left\\" style=\\"color:green; font-weight:bold;\\">$listElem[1]</td>";'),
         pair('echo "<td align=\\"left\\" style=\\"color:#464646;\\">&nbsp;<a href=\\"https://database.radioid.net/database/view?id=$listElem[2]\\" target=\\"_blank\\"><span style=\\"color:#464646;font-weight:bold;\\">$listElem[2]</span></a></td>";', 'echo "<td align=\\"left\\" style=\\"color:#464646;\\"><a href=\\"https://database.radioid.net/database/view?id=$listElem[2]\\" target=\\"_blank\\"><span style=\\"color:#464646;font-weight:bold;\\">$listElem[2]</span></a></td>";'),
+        pair('echo "<td align=\\"left\\">&nbsp;<a href=\\"http://www.qrz.com/db/$listElem[2]\\" target=\\"_blank\\"><b>$listElem[2]</b></a><span style=\\"color:#464646;font-weight:bold;\\">/$listElem[3]</span></td>";', 'echo "<td align=\\"left\\"><a href=\\"http://www.qrz.com/db/$listElem[2]\\" target=\\"_blank\\"><b>$listElem[2]</b></a><span style=\\"color:#464646;font-weight:bold;\\">/$listElem[3]</span></td>";'),
+        pair('echo "<td align=\\"left\\">&nbsp;<a href=\\"http://www.qrz.com/db/$listElem[2]\\" target=\\"_blank\\"><b>$listElem[2]</b></a></td>";', 'echo "<td align=\\"left\\"><a href=\\"http://www.qrz.com/db/$listElem[2]\\" target=\\"_blank\\"><b>$listElem[2]</b></a></td>";'),
         pair('echo "<td align=\\"left\\" style=\\"color:#464646;\\"><b>&nbsp;$listElem[2]</b></td>";', 'echo "<td align=\\"left\\" style=\\"color:#464646;\\"><b>$listElem[2]</b></td>";', 1),
         pair('echo \'<td align="left" style="font-weight:bold;color:#464646;">&nbsp;<b>\'.htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").\'</b></td>\';', 'echo \'<td align="left" style="font-weight:bold;color:#464646;"><b>\'.htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").\'</b></td>\';'),
-        pair('echo \'<td align="left">&nbsp;<span style="color:#b5651d;font-weight:bold;white-space:normal;">\'.htmlspecialchars($dvsModsTarget, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").\'</span></td>\';', 'echo \'<td align="left"><span style="display:block;color:#b5651d;font-weight:bold;white-space:normal;">\'.htmlspecialchars($dvsModsTarget, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").\'</span></td>\';'),
-    ],
-    localtx_path: [
-        pair('echo"<td align=\\"left\\" style=\\"color:green; font-weight:bold;\\">&nbsp;$listElem[1]</td>";', 'echo"<td align=\\"left\\" style=\\"color:green; font-weight:bold;\\">$listElem[1]</td>";'),
-        pair('echo "<td align=\\"left\\" style=\\"color:#464646;\\"><b>&nbsp;$listElem[2]</b></td>";', 'echo "<td align=\\"left\\" style=\\"color:#464646;\\"><b>$listElem[2]</b></td>";', 2),
         pair('echo \'<td align="left">&nbsp;<span style="color:#b5651d;font-weight:bold;white-space:normal;">\'.htmlspecialchars($dvsModsTarget, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").\'</span></td>\';', 'echo \'<td align="left"><span style="display:block;color:#b5651d;font-weight:bold;white-space:normal;">\'.htmlspecialchars($dvsModsTarget, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").\'</span></td>\';'),
     ],
 }
@@ -86,7 +82,7 @@ if all(new_count == expected for _, _, new_count, expected in states):
     print("ALREADY MODIFIED: dashboard cell spacing and Target wrapping are installed. No files changed.")
     raise SystemExit(0)
 
-if not all(old_count == expected for _, old_count, _, expected in states):
+if not all(old_count == expected or new_count == expected for _, old_count, new_count, expected in states):
     print("UNSUPPORTED or CUSTOMIZED: exact original activity-table targets were not found exactly once.")
     for path, old_count, new_count, expected in states:
         print(f"{path}: original={old_count}, modified={new_count}, expected={expected}")
