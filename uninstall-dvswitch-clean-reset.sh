@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# DVSwitch-Mods complete test-node reset v1.0.0
+# DVSwitch-Mods complete test-node reset v1.1.1
 # Order: remove DVSwitch, remove backups, remove installed mod/repair files.
 # This intentionally does not restore dashboard files because DVSwitch is removed.
 
-readonly SCRIPT_VERSION="1.0.0"
+readonly SCRIPT_VERSION="1.1.1"
 readonly MOD_BACKUPS="/var/backups/dvswitch-mods"
 readonly UNINSTALLER_BACKUPS="/var/backups/dvswitch-uninstaller"
 readonly FRESH_UPDATER_BACKUPS="/var/backups/dvswitch-fresh-install-updater"
@@ -16,7 +16,10 @@ readonly PACKAGES=(
   analog-bridge mmdvm-bridge md380-emu ysfgateway p25gateway nxdngateway
   nxdnparrot p25parrot ysfparrot ircddbgateway quantar-bridge monit
   dvswitch-monit libapache2-mod-php php-cgi qemu-user qemu-user-binfmt
-  qemu-user-static
+  qemu-user-static p25reflector analog-reflector mosquitto mosquitto-clients
+  libmosquitto-dev nlohmann-json3-dev libwxgtk3.2-dev netcat-openbsd bc
+  php-common php8.4-cgi php8.4-cli php8.4-common php8.4-opcache php8.4-readline
+  libapache2-mod-php8.4 quantar
 )
 
 readonly SERVICES=(
@@ -41,12 +44,24 @@ readonly DVSWITCH_PATHS=(
   /usr/local/src/dvswitch-fresh-install-updater /usr/local/src/dvswitch-full-updater
   /usr/local/sbin/dvswitch-fcc-first-names-update
   /usr/local/lib/dvswitch-mods
+  /var/lib/dvswitch-mods /var/lib/dvswitch-uninstaller
   /etc/systemd/system/dvswitch-fcc-first-names-update.service
   /etc/systemd/system/dvswitch-fcc-first-names-update.timer
   /etc/systemd/system/ysfgw-mqtt-cache.service
   /etc/systemd/system/p25gw-mqtt-cache.service
   /usr/local/sbin/ysfgw_mqtt_cache.sh /usr/local/sbin/p25gw_mqtt_cache.sh
   /usr/share/dvswitch/css/dvs-theme.css /usr/share/dvswitch/scripts/dvs-theme.js
+  /usr/local/dvs /usr/local/sbin/DVSM_Update.sh /usr/local/sbin/DVSwitch-startup
+  /usr/local/sbin/dvswitch-log-cleanup /usr/local/sbin/netcheck
+  /usr/local/sbin/platformDetect.sh /usr/local/sbin/update-config.sh
+  /usr/local/bin/ircddbgateway /usr/local/bin/ircddbgatewayd /usr/local/bin/ircddbgatewayconfig
+  /usr/bin/ircddbgateway /usr/bin/ircddbgatewayd /usr/bin/ircddbgatewayconfig
+  /usr/share/ircddbgateway /usr/share/opendv /usr/local/share/ircddbgateway
+  /etc/ircddbgateway /etc/opendv /var/log/ircddbgateway /var/log/opendv
+  /etc/systemd/system/ircddbgatewayd.service
+  /usr/lib/systemd/system/ircddbgatewayd.service /lib/systemd/system/ircddbgatewayd.service
+  /usr/local/bin/dstar /etc/systemd/system/ircddbgatewayd.service.d
+  /usr/share/dvswitch/.dvs-dashboard-display-original
 )
 
 need_root() { [[ $EUID -eq 0 ]] || { echo "ERROR: run with sudo." >&2; exit 1; }; }
@@ -71,12 +86,13 @@ show_plan() {
   echo
   echo "Installed DVSwitch packages:"; installed_packages | sed 's/^/  /' || true
   echo "Existing target paths:"; for path in "${DVSWITCH_PATHS[@]}"; do [[ -e "$path" || -L "$path" ]] && echo "  $path"; done
-  echo "Existing backup roots:"; for path in "$MOD_BACKUPS" "$UNINSTALLER_BACKUPS" "$FRESH_UPDATER_BACKUPS" "$FULL_UPDATER_BACKUPS"; do [[ -e "$path" ]] && echo "  $path"; done
+  echo "Existing backup roots:"; for path in "$MOD_BACKUPS" "$UNINSTALLER_BACKUPS" "$FRESH_UPDATER_BACKUPS" "$FULL_UPDATER_BACKUPS" /usr/share/dvswitch/.dvs-dashboard-display-backup-*; do [[ -e "$path" ]] && echo "  $path"; done
+  return 0
 }
 
-remove_services() { local unit; for unit in "${SERVICES[@]}"; do systemctl stop "$unit" 2>/dev/null || true; systemctl disable "$unit" 2>/dev/null || true; done; }
-remove_paths() { local path; for path in "${DVSWITCH_PATHS[@]}"; do [[ -e "$path" || -L "$path" ]] && rm -rf --one-file-system -- "$path"; done; }
-remove_backups() { local path; for path in "$MOD_BACKUPS" "$UNINSTALLER_BACKUPS" "$FRESH_UPDATER_BACKUPS" "$FULL_UPDATER_BACKUPS"; do [[ -e "$path" ]] && rm -rf --one-file-system -- "$path"; done; }
+remove_services() { local unit; for unit in "${SERVICES[@]}"; do systemctl stop "$unit" 2>/dev/null || true; systemctl disable "$unit" 2>/dev/null || true; done; return 0; }
+remove_paths() { local path; for path in "${DVSWITCH_PATHS[@]}"; do [[ -e "$path" || -L "$path" ]] && rm -rf --one-file-system -- "$path" || true; done; return 0; }
+remove_backups() { local path; for path in "$MOD_BACKUPS" "$UNINSTALLER_BACKUPS" "$FRESH_UPDATER_BACKUPS" "$FULL_UPDATER_BACKUPS"; do [[ -e "$path" ]] && rm -rf --one-file-system -- "$path" || true; done; return 0; }
 
 run_uninstall() {
   echo "WARNING: this permanently removes DVSwitch and all listed DVSwitch-Mods data."
@@ -93,5 +109,5 @@ run_uninstall() {
   echo "Recommended: reboot before beginning fresh-install testing."
 }
 
-main() { need_root; case "${1:-}" in --check) show_plan ;; --uninstall) show_plan; run_uninstall ;; -h|--help) usage ;; *) usage >&2; exit 2 ;; esac; }
+main() { need_root; case "${1:---uninstall}" in --check) show_plan ;; --uninstall) show_plan; run_uninstall ;; -h|--help) usage ;; *) usage >&2; exit 2 ;; esac; }
 main "$@"
