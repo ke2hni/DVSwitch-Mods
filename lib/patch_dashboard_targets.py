@@ -48,6 +48,19 @@ def block(name: str) -> tuple[str, str]:
     return old, new
 
 
+def cell_padding_block(name: str) -> str:
+    """Return the equivalent Target block after the later cell-padding mod."""
+    if name == "lh.php":
+        return '''\t\t$dvsModsTarget = dvsModsTargetDisplay($listElem[1], $listElem[4], $listElem[6]);
+\t\techo '<td align="left"><span style="display:block;color:#b5651d;font-weight:bold;white-space:normal;">'.htmlspecialchars($dvsModsTarget, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").'</span></td>';
+'''
+    if name == "localtx.php":
+        return '''\t\t\t$dvsModsTarget = dvsModsTargetDisplay($listElem[1], $listElem[4], $listElem[6]);
+\t\t\techo '<td align="left"><span style="display:block;color:#b5651d;font-weight:bold;white-space:normal;">'.htmlspecialchars($dvsModsTarget, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").'</span></td>';
+'''
+    raise PatchError(f"unsupported dashboard file: {name}")
+
+
 def once(text: str, old: str, new: str, description: str) -> str:
     count = text.count(old)
     if count != 1:
@@ -57,11 +70,12 @@ def once(text: str, old: str, new: str, description: str) -> str:
 
 def patch_text(text: str, name: str) -> str:
     old, new = block(name)
+    post_cell_padding = cell_padding_block(name)
     marker_count = text.count(MARKER) + text.count(LEGACY_MARKER)
     if marker_count > 1:
         raise PatchError(f"duplicate Target markers in {name}")
     if marker_count == 1:
-        if text.count(INCLUDE) != 1 or text.count(new) != 1:
+        if text.count(INCLUDE) != 1 or (text.count(new) + text.count(post_cell_padding)) != 1:
             raise PatchError(f"incomplete Target modification in {name}")
         if name == "localtx.php" and text.count(LEGEND) != 1:
             raise PatchError("incomplete Local Activity Target legend")
