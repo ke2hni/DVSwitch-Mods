@@ -46,23 +46,66 @@ readonly -a COMPONENTS=(
     dashboard-cell-padding
 )
 
+readonly DARK_MODE_SCRIPT="$SCRIPT_DIR/dvswitch-dark-mode.sh"
+readonly DISPLAY_LAYOUT_SCRIPT="$SCRIPT_DIR/dvswitch-display-layout.sh"
+
 COMPONENT=""
 CHILD_SCRIPT=""
 BACKUP_ROOT=""
 UNINSTALL_ACTION="--restore"
 
 die() { printf 'ERROR: %s\n' "$1" >&2; exit 1; }
+
+require_executable_script() {
+    local script=$1
+    require_regular "$script"
+    [[ -x "$script" ]] || die "Installer script is not executable: $script"
+}
+
+run_optional_mod_installer() {
+    local label=$1 script=$2
+    require_root
+    require_executable_script "$script"
+    printf '\n=== %s ===\n' "$label"
+    "$script" apply
+}
+
+show_menu() {
+    local choice
+    require_root
+    printf '%s\n' \
+        "DVSwitch-Mods installer menu $SCRIPT_VERSION" \
+        "" \
+        "1) Install all standard DVSwitch repairs and modifications" \
+        "2) Install/launch the Dark Mode dashboard installer" \
+        "3) Install/launch the Widescreen Display Layout installer" \
+        "0) Exit" \
+        ""
+    printf 'Choose an option [0/1/2/3]: '
+    read -r choice
+    case "$choice" in
+        1) initialize_state; install_requested all ;;
+        2) run_optional_mod_installer "DARK MODE" "$DARK_MODE_SCRIPT" ;;
+        3) run_optional_mod_installer "DISPLAY LAYOUT" "$DISPLAY_LAYOUT_SCRIPT" ;;
+        0) exit 0 ;;
+        *) die "Invalid choice" ;;
+    esac
+}
+
 usage() {
     printf '%s\n' \
         "DVSwitch-Mods manager $SCRIPT_VERSION" \
-        "Usage: sudo $(basename "$0") --list" \
+        "Usage: sudo $(basename "$0")                 (interactive menu)" \
+        "       sudo $(basename "$0") --list" \
         "       sudo $(basename "$0") --status" \
         "       sudo $(basename "$0") --check COMPONENT|all" \
         "       sudo $(basename "$0") --install COMPONENT|all" \
         "       sudo $(basename "$0") --uninstall COMPONENT|all" \
         "       sudo $(basename "$0") --reset-after-reinstall" \
         "" \
-        "Only installations performed and recorded by this manager can be" \
+        "With no arguments, choose the standard install, Dark Mode, or" \
+        "Widescreen Display Layout from the interactive menu." \
+        "Only standard installations performed and recorded by this manager can be" \
         "uninstalled through it. Uninstall operations run in strict reverse" \
         "installation order so overlapping DVSwitch files remain consistent."
 }
@@ -449,7 +492,7 @@ main() {
         --uninstall) [[ $# -eq 2 ]] || die "--uninstall requires a component name or all."; initialize_state; uninstall_requested "$2" ;;
         --reset-after-reinstall) [[ $# -eq 1 ]] || die "Unexpected arguments."; initialize_state; reset_after_reinstall ;;
         --help|-h) usage ;;
-        "") usage; exit 2 ;;
+        "") show_menu ;;
         *) die "Unknown option: $1" ;;
     esac
 }
