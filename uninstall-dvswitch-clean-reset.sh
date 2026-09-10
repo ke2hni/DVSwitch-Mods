@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# DVSwitch-Mods complete test-node reset v1.1.1
+# DVSwitch-Mods complete test-node reset v1.1.2
 # Order: remove DVSwitch, remove backups, remove installed mod/repair files.
 # This intentionally does not restore dashboard files because DVSwitch is removed.
 
-readonly SCRIPT_VERSION="1.1.1"
+readonly SCRIPT_VERSION="1.1.2"
 readonly MOD_BACKUPS="/var/backups/dvswitch-mods"
 readonly UNINSTALLER_BACKUPS="/var/backups/dvswitch-uninstaller"
 readonly FRESH_UPDATER_BACKUPS="/var/backups/dvswitch-fresh-install-updater"
 readonly FULL_UPDATER_BACKUPS="/var/backups/dvswitch-full-updater"
+readonly DVSWITCH_MODS_REPO="${DVSWITCH_MODS_REPO:-/home/asl/DVSwitch-Mods}"
 
 readonly PACKAGES=(
   dvswitch-server dvswitch dvswitch-base dvswitch-dashboard dvswitch-menu
@@ -81,18 +82,21 @@ show_plan() {
   echo "  1. Stop/disable DVSwitch services and purge DVSwitch packages/files."
   echo "  2. Remove DVSwitch-Mods and DVSwitch updater backup directories."
   echo "  3. Remove installed DVSwitch-Mods helper/runtime files."
+  echo "  4. Remove the local DVSwitch-Mods Git checkout."
   echo
   echo "ASL3, Asterisk, AllStarLink, allmon3, Debian, networking, SSH, Git, and the working repository are preserved."
   echo
   echo "Installed DVSwitch packages:"; installed_packages | sed 's/^/  /' || true
   echo "Existing target paths:"; for path in "${DVSWITCH_PATHS[@]}"; do [[ -e "$path" || -L "$path" ]] && echo "  $path"; done
   echo "Existing backup roots:"; for path in "$MOD_BACKUPS" "$UNINSTALLER_BACKUPS" "$FRESH_UPDATER_BACKUPS" "$FULL_UPDATER_BACKUPS" /usr/share/dvswitch/.dvs-dashboard-display-backup-*; do [[ -e "$path" ]] && echo "  $path"; done
+  [[ -d "$DVSWITCH_MODS_REPO" ]] && echo "Local repository: $DVSWITCH_MODS_REPO"
   return 0
 }
 
 remove_services() { local unit; for unit in "${SERVICES[@]}"; do systemctl stop "$unit" 2>/dev/null || true; systemctl disable "$unit" 2>/dev/null || true; done; return 0; }
 remove_paths() { local path; for path in "${DVSWITCH_PATHS[@]}"; do [[ -e "$path" || -L "$path" ]] && rm -rf --one-file-system -- "$path" || true; done; return 0; }
 remove_backups() { local path; for path in "$MOD_BACKUPS" "$UNINSTALLER_BACKUPS" "$FRESH_UPDATER_BACKUPS" "$FULL_UPDATER_BACKUPS"; do [[ -e "$path" ]] && rm -rf --one-file-system -- "$path" || true; done; return 0; }
+remove_repository() { [[ -d "$DVSWITCH_MODS_REPO" ]] || return 0; cd /tmp; rm -rf --one-file-system -- "$DVSWITCH_MODS_REPO"; }
 
 run_uninstall() {
   echo "WARNING: this permanently removes DVSwitch and all listed DVSwitch-Mods data."
@@ -104,8 +108,9 @@ run_uninstall() {
   apt-get purge -y apache2-mod-php 2>/dev/null || true
   remove_paths
   remove_backups
+  remove_repository
   systemctl daemon-reload
-  echo "PASS: DVSwitch and listed DVSwitch-Mods files/backups were removed."
+  echo "PASS: DVSwitch, DVSwitch-Mods files/backups, and local repository were removed."
   echo "Recommended: reboot before beginning fresh-install testing."
 }
 
