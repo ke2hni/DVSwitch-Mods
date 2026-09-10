@@ -32,13 +32,24 @@ function dvsModsFccDmrNameCache($callsign, $value = false, $store = false) {
     return array_key_exists($callsign, $cache) ? $cache[$callsign] : false;
 }
 
-function dvsModsFccDmrName($rawCallsign) {
-    static $cache = array();
+// Normalize only the private lookup copy. The dashboard continues to display
+// the original transmitted value. Replacement characters are common when a
+// gateway appends an unsupported symbol to an otherwise valid callsign.
+function dvsModsNormalizeLookupCallsign($rawCallsign) {
     $callsign = strtoupper(trim((string)$rawCallsign));
+    $callsign = preg_replace('/[[:space:]]+/u', '', $callsign);
+    $callsign = preg_replace('/\x{FFFD}+/u', '', $callsign);
+    if (!is_string($callsign)) { return ''; }
     $dash = strpos($callsign, '-');
     if ($dash !== false) { $callsign = substr($callsign, 0, $dash); }
     $slash = strpos($callsign, '/');
     if ($slash !== false) { $callsign = substr($callsign, 0, $slash); }
+    return $callsign;
+}
+
+function dvsModsFccDmrName($rawCallsign) {
+    static $cache = array();
+    $callsign = dvsModsNormalizeLookupCallsign($rawCallsign);
     if (!preg_match('/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{3,10}$/D', $callsign)) { return false; }
     if (array_key_exists($callsign, $cache)) { return $cache[$callsign]; }
     $remembered = dvsModsFccDmrNameCache($callsign);
@@ -85,11 +96,7 @@ function dvsModsDmrIdCallsign($rawCallsign) {
 
 function dvsModsFccFirstName($rawCallsign) {
     static $cache = array();
-    $callsign = strtoupper(trim((string)$rawCallsign));
-    $dash = strpos($callsign, '-');
-    if ($dash !== false) { $callsign = substr($callsign, 0, $dash); }
-    $slash = strpos($callsign, '/');
-    if ($slash !== false) { $callsign = substr($callsign, 0, $slash); }
+    $callsign = dvsModsNormalizeLookupCallsign($rawCallsign);
     if (!preg_match('/^[A-Z0-9]{3,10}$/', $callsign)) { return '---'; }
     if (isset($cache[$callsign])) { return $cache[$callsign]; }
 

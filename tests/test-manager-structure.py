@@ -34,6 +34,7 @@ def main() -> None:
         "repair-ysf-dashboard-null.sh",
         "mod-dashboard-fcc-first-names.sh",
         "mod-dashboard-targets.sh",
+        "mod-dashboard-cell-padding.sh",
     )
     for name in children:
         path = ROOT / name

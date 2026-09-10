@@ -238,6 +238,12 @@ database; `---` is shown only when neither source supplies usable data. The mod 
 installs a self-contained weekly FCC database updater and randomized systemd
 timer.
 
+Lookup input is normalized only for the private database lookup: surrounding or
+internal spaces and trailing Unicode replacement characters are removed, and
+standard `/suffix` or `-suffix` forms are reduced to the base callsign. The
+original transmitted callsign remains unchanged on the dashboard. This handles
+values such as `WD1V ��` without converting international suffixes into FCC data.
+
 **Required first:** Independent of the P25/NXDN/DMR chain, but install it before
 the dashboard Target display modification. Internet access is required for the
 initial FCC database build.
@@ -284,6 +290,7 @@ The unified manager handles this order automatically:
 9. YSF dashboard null repair
 10. Worldwide DMR/FCC names
 11. Dashboard target display
+12. Dashboard cell spacing and Target wrapping
 
 > [!NOTE]
 > The DVSwitch database updater cannot be run more than once per hour. The
