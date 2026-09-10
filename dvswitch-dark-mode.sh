@@ -500,6 +500,12 @@ apply_theme(){
 
   write_theme_files
 
+  # These files are served directly by Apache.  The script intentionally uses
+  # umask 077 for logs and backup metadata, so explicitly set web-asset
+  # ownership and permissions after creating or updating the theme files.
+  chown root:root "$CSS_FILE" "$JS_FILE" || die "Could not set theme asset ownership"
+  chmod 0644 "$CSS_FILE" "$JS_FILE" || die "Could not set theme asset permissions"
+
   if ! grep -q 'css/dvs-theme.css' "$INDEX_FILE"; then
     sed -i '/<link href="css\/featherlight.css" type="text\/css" rel="stylesheet" \/>/i <link href="css/dvs-theme.css" type="text/css" rel="stylesheet" />' "$INDEX_FILE" || die "Could not add theme CSS include"
     log "Added theme CSS include to index.php"
