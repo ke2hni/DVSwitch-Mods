@@ -480,7 +480,15 @@ Repository-authored code is licensed under the MIT License. See `LICENSE` and
 
 <div align="center">
 
+### DVSwitch default looking Dashboard after being freshly installed
+
+<img width="1600" height="900" alt="Screenshot 2026-09-10 203809" src="https://github.com/user-attachments/assets/615d83c7-a08d-43db-9f36-a443e6f1dc83" />
+
 ### DVSwitch Dashboard with the optional modifications installed
+
+<img width="1600" height="900" alt="Screenshot 2026-09-10 220525" src="https://github.com/user-attachments/assets/162d7b7a-5127-4459-87c3-86a8c4ce88cc" />
+
+<img width="1600" height="900" alt="Screenshot 2026-09-10 220512" src="https://github.com/user-attachments/assets/cb79a14d-e21f-4c3c-aed8-e4cef28ae65b" />
 
 <img width="1200" alt="DVSwitch Dashboard" src="https://github.com/user-attachments/assets/1b9a319b-c6e2-49b7-a001-5e3519560408" />
 
