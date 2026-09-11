@@ -504,9 +504,17 @@ sudo ./repair-mmdvm-spacing-armhf.sh --install
 ```
 
 > [!CAUTION]
-> Never run more than one architecture-specific MMDVM repair against the same
-> executable. Prefer `manage-mmdvm-spacing.sh`, which selects only the detected
-> architecture.
+> For the normal installation, do not run the individual MMDVM spacing repair
+> scripts yourself. Run:
+>
+> ```bash
+> sudo ./manage-mmdvm-spacing.sh --check
+> sudo ./manage-mmdvm-spacing.sh --install
+> ```
+>
+> The manager automatically selects the correct repair for your system. The
+> individual ARM64, AMD64/i386, and ARMHF scripts are provided only for
+> advanced testing or troubleshooting.
 
 ---
 
