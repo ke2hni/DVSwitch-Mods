@@ -339,7 +339,7 @@ dependency_hint() {
         dstar-tx-ref) printf 'install p25-nxdn-friendly-names first' ;;
         dmr-friendly-names) printf 'install dstar-tx-ref first' ;;
         ysf-dashboard-null) printf 'install dmr-friendly-names first' ;;
-        dashboard-targets) printf 'install dashboard-fcc-first-names first' ;;
+        dashboard-targets) printf 'review the detailed Target-modification error shown above' ;;
         *) printf 'review the detailed error shown above' ;;
     esac
 }

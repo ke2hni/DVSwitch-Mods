@@ -77,8 +77,12 @@ def patch_text(text: str, name: str) -> str:
     if marker_count == 1:
         if text.count(INCLUDE) != 1 or (text.count(new) + text.count(post_cell_padding)) != 1:
             raise PatchError(f"incomplete Target modification in {name}")
-        if name == "localtx.php" and text.count(LEGEND) != 1:
-            raise PatchError("incomplete Local Activity Target legend")
+        if name == "localtx.php":
+            legend_count = text.count(LEGEND)
+            if legend_count > 1:
+                raise PatchError("duplicate Local Activity Target legends")
+            if legend_count == 0:
+                text = once(text, "</div>\n<br>", "</div>\n" + LEGEND + "<br>", "older Local Activity Target legend anchor")
         return text.replace(LEGACY_MARKER, MARKER, 1)
     if MARKER in text or LEGACY_MARKER in text or INCLUDE in text or "dvsModsTargetDisplay(" in text:
         raise PatchError(f"partial Target modification in {name}")
