@@ -82,7 +82,7 @@ def patch_text(text: str, name: str) -> str:
             if legend_count > 1:
                 raise PatchError("duplicate Local Activity Target legends")
             if legend_count == 0:
-                text = once(text, "</div>\n<br>", "</div>\n" + LEGEND + "<br>", "older Local Activity Target legend anchor")
+                text = once(text, "</div>\n<br>", "</div>\n<br>\n" + LEGEND + "<br>", "older Local Activity Target legend anchor")
         return text.replace(LEGACY_MARKER, MARKER, 1)
     if MARKER in text or LEGACY_MARKER in text or INCLUDE in text or "dvsModsTargetDisplay(" in text:
         raise PatchError(f"partial Target modification in {name}")
@@ -101,7 +101,7 @@ def patch_text(text: str, name: str) -> str:
     text = text.replace(anchor, anchor + INCLUDE + "\n", 1)
     text = text.replace(old, new, 1)
     if name == "localtx.php":
-        text = once(text, "</div>\n<br>", "</div>\n" + LEGEND + "<br>", "Local Activity legend anchor")
+        text = once(text, "</div>\n<br>", "</div>\n<br>\n" + LEGEND + "<br>", "Local Activity legend anchor")
     return text
 
 
