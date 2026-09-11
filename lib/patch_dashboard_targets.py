@@ -82,7 +82,11 @@ def patch_text(text: str, name: str) -> str:
             if legend_count > 1:
                 raise PatchError("duplicate Local Activity Target legends")
             if legend_count == 1:
-                text = once(text, "</div>\n" + LEGEND + "<br>\n", "</div>\n<br>\n" + LEGEND + "<br>\n", "existing Local Activity Target legend spacing")
+                spaced_legend = "<br>\n" + LEGEND
+                if text.count(spaced_legend) == 0:
+                    text = once(text, LEGEND, spaced_legend, "existing Local Activity Target legend spacing")
+                elif text.count(spaced_legend) != 1:
+                    raise PatchError("ambiguous Local Activity Target legend spacing")
             else:
                 text = once(text, "</div>\n<br>", "</div>\n<br>\n" + LEGEND + "<br>", "older Local Activity Target legend anchor")
         return text.replace(LEGACY_MARKER, MARKER, 1)
