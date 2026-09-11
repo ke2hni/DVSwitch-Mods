@@ -81,7 +81,9 @@ def patch_text(text: str, name: str) -> str:
             legend_count = text.count(LEGEND)
             if legend_count > 1:
                 raise PatchError("duplicate Local Activity Target legends")
-            if legend_count == 0:
+            if legend_count == 1:
+                text = once(text, "</div>\n" + LEGEND + "<br>", "</div>\n<br>\n" + LEGEND + "<br>", "existing Local Activity Target legend spacing")
+            else:
                 text = once(text, "</div>\n<br>", "</div>\n<br>\n" + LEGEND + "<br>", "older Local Activity Target legend anchor")
         return text.replace(LEGACY_MARKER, MARKER, 1)
     if MARKER in text or LEGACY_MARKER in text or INCLUDE in text or "dvsModsTargetDisplay(" in text:
