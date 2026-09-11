@@ -59,7 +59,36 @@ green **Code** button on GitHub or use the
 **[direct ZIP download](https://github.com/ke2hni/DVSwitch-Mods/archive/refs/heads/main.zip)**.
 Do not download the scripts individually.
 
-### 2. Check the complete installation
+### 2. Use the installer menu
+
+Run the manager without arguments:
+
+```bash
+sudo ./manage-dvswitch-mods.sh
+```
+
+The menu provides three installation choices:
+
+1. **Standard DVSwitch repairs and modifications** — runs the complete
+   dependency-ordered installation and records its reversible backups.
+2. **Dark Mode** — launches the standalone dashboard theme installer. It adds
+   the Auto/Light/Dark selector and creates its own protected and per-run
+   backups.
+3. **Widescreen Display Layout** — launches the standalone responsive-layout
+   installer. It creates its own protected and per-run backups.
+
+The Dark Mode and Display Layout installers do not require the standard
+component chain. For a complete dashboard setup, run option 1 first, then
+option 2, then option 3. Option 0 exits without changing anything.
+
+The standalone installers can also be run directly:
+
+```bash
+sudo ./dvswitch-dark-mode.sh apply
+sudo ./dvswitch-display-layout.sh apply
+```
+
+### 3. Check the complete standard installation
 
 ```bash
 sudo ./manage-dvswitch-mods.sh --check all
@@ -69,7 +98,7 @@ On a fresh DVSwitch installation, the first check normally reports early
 components as ready and later components as blocked by prerequisites. It checks
 everything, changes nothing, and prints the correct installation order.
 
-### 3. Install every applicable repair and modification
+### 4. Install every applicable standard repair and modification
 
 ```bash
 sudo ./manage-dvswitch-mods.sh --install all
@@ -80,7 +109,7 @@ MMDVM repair for the installed architecture, skips components that do not
 apply, records every backup, and resumes safely if an installation is
 interrupted.
 
-### 4. Verify the completed installation
+### 5. Verify the completed standard installation
 
 ```bash
 sudo ./manage-dvswitch-mods.sh --check all
@@ -273,6 +302,63 @@ sudo ./mod-dashboard-targets.sh --check
 sudo ./mod-dashboard-targets.sh --install
 ```
 
+### 7. Dashboard Dark Mode
+
+**What it adds:** A dashboard theme selector with **Auto**, **Light**, and
+**Dark** modes. Auto follows the browser or operating-system color preference.
+The theme is applied to the dashboard without changing DVSwitch's live status
+colors.
+
+**Required first:** None. This is a standalone dashboard overlay and is also
+available as option 2 in the manager menu. It may be run after the standard
+installation and before the display-layout installer.
+
+```bash
+sudo ./dvswitch-dark-mode.sh apply
+```
+
+The generated web assets are installed as readable Apache files with
+`root:root` ownership and mode `0644`, including on a completely fresh
+installation.
+
+Restore the latest Dark Mode run backup:
+
+```bash
+sudo ./dvswitch-dark-mode.sh restore-latest
+```
+
+Restore the protected pre-theme dashboard files:
+
+```bash
+sudo ./dvswitch-dark-mode.sh restore-original
+```
+
+### 8. Widescreen Display Layout
+
+**What it adds:** Responsive dashboard width, readable table wrapping, wider
+Gateway and Local Activity panels, and centered Hardware Info on compatible
+screens.
+
+**Required first:** None. This is a standalone dashboard layout installer and
+is also available as option 3 in the manager menu. Run it after Dark Mode when
+both are being installed together.
+
+```bash
+sudo ./dvswitch-display-layout.sh apply
+```
+
+Restore the latest layout run backup:
+
+```bash
+sudo ./dvswitch-display-layout.sh restore-latest
+```
+
+Restore the protected pre-layout dashboard files:
+
+```bash
+sudo ./dvswitch-display-layout.sh restore-original
+```
+
 ---
 
 ## 🧭 Complete installation order
@@ -291,6 +377,15 @@ The unified manager handles this order automatically:
 10. Worldwide DMR/FCC names
 11. Dashboard target display
 12. Dashboard cell spacing and Target wrapping
+
+The optional standalone dashboard installers are run separately from the
+manager's recorded standard-component order:
+
+13. Dark Mode overlay
+14. Widescreen Display Layout
+
+The menu launches these two installers after the standard installation choice;
+their backups are maintained by the standalone scripts.
 
 > [!NOTE]
 > The DVSwitch database updater cannot be run more than once per hour. The
