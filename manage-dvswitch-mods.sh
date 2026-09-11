@@ -241,11 +241,12 @@ snapshot_backups() {
 }
 
 record_install() {
-    local component=$1 script=$2 root=$3 backup=$4 action=$5 temporary
+    local component=$1 script=$2 root=$3 backup=$4 action=$5 temporary replaced
     [[ "$component" != *$'\t'* && "$script" != *$'\t'* && "$root" != *$'\t'* && "$backup" != *$'\t'* ]] || die "Invalid state value."
     temporary=$(mktemp --tmpdir="$STATE_DIR" .active-installs.XXXXXX)
-    cat "$STATE_FILE" > "$temporary"
-    printf '%s\t%s\t%s\t%s\t%s\n' "$component" "$script" "$root" "$backup" "$action" >> "$temporary"
+    awk -F '\t' -v OFS='\t' -v wanted="$component" -v replacement="$component\t$script\t$root\t$backup\t$action" \
+        'BEGIN { replaced=0 } $1 == wanted { if (!replaced) { print replacement; replaced=1 } next } { print } END { if (!replaced) print replacement }' \
+        "$STATE_FILE" > "$temporary"
     chown root:root "$temporary"
     chmod 0600 "$temporary"
     mv -fT -- "$temporary" "$STATE_FILE"
@@ -450,18 +451,10 @@ install_requested() {
                 printf '\n=== SKIP: %s is not supported on this host ===\n' "$component"
                 continue
             fi
-            if component_is_recorded "$component"; then
-                printf '\n=== SKIP: %s ===\nThis installation is already recorded by the manager; continuing from the next unrecorded component.\n' "$component"
-                continue
-            fi
             install_one "$component"
             if [[ $component == p25-nxdn-json ]]; then ensure_databases; fi
         done
     else
-        if component_is_recorded "$requested"; then
-            printf 'NOTICE: %s is already recorded as installed by this manager. No files changed.\n' "$requested"
-            return
-        fi
         install_one "$requested"
         if [[ $requested == p25-nxdn-json ]]; then ensure_databases; fi
     fi
