@@ -37,13 +37,22 @@ function dvsModsFccDmrNameCache($callsign, $value = false, $store = false) {
 // gateway appends an unsupported symbol to an otherwise valid callsign.
 function dvsModsNormalizeLookupCallsign($rawCallsign) {
     $callsign = strtoupper(trim((string)$rawCallsign));
-    $callsign = preg_replace('/[[:space:]]+/u', '', $callsign);
     $callsign = preg_replace('/\x{FFFD}+/u', '', $callsign);
     if (!is_string($callsign)) { return ''; }
-    $dash = strpos($callsign, '-');
-    if ($dash !== false) { $callsign = substr($callsign, 0, $dash); }
     $slash = strpos($callsign, '/');
     if ($slash !== false) { $callsign = substr($callsign, 0, $slash); }
+    $callsign = trim($callsign);
+    // D-Star commonly supplies a module after a space (for example N4KF Z).
+    // Keep a valid callsign token and discard only that module; ordinary
+    // embedded callsign spaces such as W D 1 V are still compacted below.
+    $tokens = preg_split('/[[:space:]]+/u', $callsign, -1, PREG_SPLIT_NO_EMPTY);
+    if (is_array($tokens) && count($tokens) > 1 && preg_match('/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{3,10}$/D', $tokens[0])) {
+        $callsign = $tokens[0];
+    } else {
+        $callsign = preg_replace('/[[:space:]]+/u', '', $callsign);
+    }
+    $dash = strpos($callsign, '-');
+    if ($dash !== false) { $callsign = substr($callsign, 0, $dash); }
     return $callsign;
 }
 
