@@ -229,10 +229,8 @@ show_status() {
     done < "$STATE_FILE"
 }
 
-is_arm64_host() { [[ $(uname -m) == aarch64 ]]; }
-
 should_skip_all_component() {
-    [[ $1 == p25-audio-announcement ]] && ! is_arm64_host
+    return 1
 }
 
 snapshot_backups() {
@@ -364,7 +362,7 @@ check_all() {
     for component in "${COMPONENTS[@]}"; do
         if should_skip_all_component "$component"; then
             printf '\n=== SKIP: %s ===\nRequires an ARM64 host; this component does not apply here.\n' "$component"
-            skipped+=("$component — ARM64 hosts only")
+            skipped+=("$component — unsupported host")
             continue
         fi
         expected+=("$component")
@@ -449,7 +447,7 @@ install_requested() {
     if [[ $requested == all ]]; then
         for component in "${COMPONENTS[@]}"; do
             if should_skip_all_component "$component"; then
-                printf '\n=== SKIP: %s requires an ARM64 host ===\n' "$component"
+                printf '\n=== SKIP: %s is not supported on this host ===\n' "$component"
                 continue
             fi
             if component_is_recorded "$component"; then

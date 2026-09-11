@@ -161,8 +161,8 @@ sudo ./repair-dvswitch-txt-updater.sh --install
 **What it fixes:** Makes P25 remote voice announcements begin immediately and
 adds an 800 ms silent lead-in so the start of the announcement is not clipped.
 
-**Prerequisite:** ARM64, Internet access during the pinned source build, and
-the exact supported stock P25Gateway binary.
+**Prerequisite:** ARM64 or AMD64, Internet access during the pinned source
+build, and P25Gateway version `20201105`.
 
 ```bash
 sudo ./repair-p25-audio-announcement.sh --check
@@ -367,7 +367,7 @@ The unified manager handles this order automatically:
 
 1. MMDVM spacing repair for the detected architecture
 2. DVSwitch database updater repair
-3. P25 audio announcement on ARM64 only
+3. P25 audio announcement repair for ARM64 or AMD64
 4. P25 dashboard repair
 5. P25/NXDN JSON databases
 6. P25/NXDN friendly names

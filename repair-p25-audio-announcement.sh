@@ -8,18 +8,13 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.0.0"
+readonly SCRIPT_VERSION="1.1.0"
 readonly TARGET="/opt/P25Gateway/P25Gateway"
 readonly SOURCE_URL="https://github.com/g4klx/P25Clients.git"
 readonly SOURCE_COMMIT="99b3c15b33a4d16b632cb2393695a74c76c66da7"
 readonly SERVICE="p25gateway.service"
 readonly DASHBOARD="https://127.0.0.1/dvswitch/"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/p25-audio-announcement"
-readonly STOCK_BINARY_HASH="51b1b2ed197d6be35c425a87e35b84fcbf765a4151739b2afd1523bb29334e7b"
-readonly STOCK_GATEWAY_CPP_HASH="1902b5f09dfe6ef3969ca1a21486d36762e3ff7e9f3a56af6aca3166a7c75785"
-readonly STOCK_VOICE_CPP_HASH="e0f2e1abca81461a45d56b1cc22f189929fe1c3b9219055259da910006de68c0"
-readonly STOCK_VERSION_H_HASH="ca51c1fb4b789f68f0f629b1f4ed8be9bd6615e4859761e4202a5411ce9536b8"
-readonly STOCK_MAKEFILE_HASH="b803cac0f066a5bb815389c74fd79de54cf4ac58ae7ecf866cfa8aee8b04e6f5"
 readonly PATCHED_VERSION="P25Gateway version 20201105-p25voice2"
 
 WORK_DIR=""
@@ -64,30 +59,21 @@ version_is_patched() {
     [[ "$1" == "$PATCHED_VERSION" || "$1" == "$PATCHED_VERSION git #"* ]]
 }
 
-check_source_hashes() {
-    local directory=$1
-    [[ $(hash_of "$directory/P25Gateway.cpp") == "$STOCK_GATEWAY_CPP_HASH" ]] || die "Unsupported P25Gateway.cpp."
-    [[ $(hash_of "$directory/Voice.cpp") == "$STOCK_VOICE_CPP_HASH" ]] || die "Unsupported Voice.cpp."
-    [[ $(hash_of "$directory/Version.h") == "$STOCK_VERSION_H_HASH" ]] || die "Unsupported Version.h."
-    [[ $(hash_of "$directory/Makefile") == "$STOCK_MAKEFILE_HASH" ]] || die "Unsupported Makefile."
-}
-
 preflight() {
     require_root
     for command in awk bash chmod chown cmp cp curl date file git grep install make mktemp mv python3 readelf rm sha256sum stat strings systemctl; do require_command "$command"; done
-    [[ $(dpkg --print-architecture) == arm64 ]] || die "Only Debian arm64 is supported."
-    [[ $(uname -m) == aarch64 ]] || die "Only an AArch64 kernel is supported."
+    case "$(dpkg --print-architecture)" in arm64|amd64) ;; *) die "Only Debian arm64 or amd64 is supported." ;; esac
+    case "$(uname -m)" in aarch64|x86_64) ;; *) die "Only AArch64 or x86-64 kernels are supported." ;; esac
     require_regular "$TARGET"
     systemctl cat "$SERVICE" >/dev/null
 }
 
 state() {
-    local binary_hash version
-    binary_hash=$(hash_of "$TARGET")
+    local version
     version=$(current_version)
     if version_is_patched "$version"; then
         printf 'PATCHED\n'
-    elif [[ "$binary_hash" == "$STOCK_BINARY_HASH" && "$version" == "P25Gateway version 20201105" ]]; then
+    elif [[ "$version" == "P25Gateway version 20201105" ]]; then
         printf 'STOCK\n'
     else
         printf 'UNSUPPORTED\n'
@@ -138,12 +124,11 @@ prepare_candidate() {
     git -C "$WORK_DIR/source" checkout --quiet --detach "$SOURCE_COMMIT"
     [[ $(git -C "$WORK_DIR/source" rev-parse HEAD) == "$SOURCE_COMMIT" ]] || die "Pinned source commit validation failed."
     mv -- "$WORK_DIR/source/P25Gateway" "$WORK_DIR/build"
-    check_source_hashes "$WORK_DIR/build"
     patch_sources
     make -C "$WORK_DIR/build" clean >/dev/null
     make -C "$WORK_DIR/build" -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" >/dev/null
     require_regular "$WORK_DIR/build/P25Gateway"
-    file -b "$WORK_DIR/build/P25Gateway" | grep -q 'ELF 64-bit.*ARM aarch64' || die "Built candidate is not an AArch64 ELF executable."
+    case "$(file -b "$WORK_DIR/build/P25Gateway")" in *'ELF 64-bit'*'ARM aarch64'*|*'ELF 64-bit'*'x86-64'*) ;; *) die "Built candidate is not an ARM64 or x86-64 ELF executable." ;; esac
     candidate_version=$(strings "$WORK_DIR/build/P25Gateway" | grep -Fx '20201105-p25voice2' | head -n 1)
     [[ "$candidate_version" == '20201105-p25voice2' ]] || die "Built candidate version marker is incorrect."
     printf 'Candidate version marker: %s\n' "$candidate_version"
