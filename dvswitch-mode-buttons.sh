@@ -36,7 +36,7 @@ added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif
 #dvs-mode-buttons {
   position: fixed;
   z-index: 30;
-  left: max(8px, calc(50% - 740px));
+  left: max(8px, calc((100vw - 1200px) / 4 - 56px));
   top: 50%;
   transform: translateY(-50%);
   width: 112px;
@@ -61,7 +61,7 @@ added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif
   vertical-align: middle;
 }
 #dvs-mode-buttons .dvs-mode-button.dvs-mode-selected {
-  background-color: #356244;
+  background-color: #008000;
   color: white;
 }
 #dvs-mode-buttons .dvs-mode-button:focus-visible {
@@ -72,7 +72,7 @@ added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif
   background-color: #3a87cd;
 }
 #dvs-mode-buttons .dvs-mode-button.dvs-mode-selected:hover {
-  background-color: #356244;
+  background-color: #008000;
 }
 @media (max-width: 1450px) {
   #dvs-mode-buttons { display: none; }
@@ -80,7 +80,14 @@ added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif
 </style>
 <script type="text/javascript">
 (function () {
+  var rail = document.getElementById('dvs-mode-buttons');
   var buttons = document.querySelectorAll('#dvs-mode-buttons .dvs-mode-button');
+  function centerRailWithStatus() {
+    var status = document.getElementById('modeInfo');
+    if (!rail || !status) return;
+    var box = status.getBoundingClientRect();
+    rail.style.top = (box.top + box.height / 2) + 'px';
+  }
   for (var i = 0; i < buttons.length; i++) {
     buttons[i].addEventListener('click', function () {
       for (var j = 0; j < buttons.length; j++) {
@@ -89,6 +96,9 @@ added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif
       this.classList.add('dvs-mode-selected');
     });
   }
+  window.addEventListener('resize', centerRailWithStatus);
+  setTimeout(centerRailWithStatus, 0);
+  setInterval(centerRailWithStatus, 1000);
 }());
 </script>'''
 
