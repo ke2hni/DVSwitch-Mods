@@ -4,7 +4,7 @@
 
 set -u
 
-VERSION="2.0.0"
+VERSION="2.2.0"
 ROOT="/usr/share/dvswitch"
 INDEX_FILE="${INDEX_FILE:-$ROOT/index.php}"
 BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/dvswitch-mods/mode-buttons}"
@@ -22,6 +22,7 @@ action = sys.argv[2]
 backup_root = Path(sys.argv[3])
 repo_root = Path(sys.argv[4])
 helper_src = repo_root / 'lib' / 'dvswitch-dashboard-mode'
+dmr_helper_src = repo_root / 'lib' / 'dvswitch-dashboard-dmr-network'
 php_src = repo_root / 'dvswitch-mode.php'
 sudoers_src = repo_root / 'lib' / 'dvswitch-dashboard-mode.sudoers'
 
@@ -99,7 +100,7 @@ added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif
         buttons[j].classList.remove('dvs-mode-selected');
       }
       var button = this;
-      var modeMap = {P25: 'P25', YSF: 'YSF', NXDN: 'NXDN', 'D-Star': 'DSTAR', STFU: 'STFU'};
+      var modeMap = {BM: 'BM', TGIF: 'TGIF', P25: 'P25', YSF: 'YSF', NXDN: 'NXDN', 'D-Star': 'DSTAR', STFU: 'STFU'};
       var commandMode = modeMap[button.dataset.mode];
       if (!commandMode) return;
       button.disabled = true;
@@ -132,6 +133,7 @@ has_current_centering = data.count('function centerRailWithStatus()') == 1
 has_current_color = data.count('background-color: #008000;') == 2
 has_visual_v104_click = data.count("this.classList.add('dvs-mode-selected');") == 1
 has_functional_v2001 = data.count("fetch('/dvswitch/dvswitch-mode.php'") == 1 and data.count("['P25','YSF','NXDN','DSTAR','STFU']") == 1
+has_functional_v210 = data.count("var modeMap = {BM: 'BM', TGIF: 'TGIF'") == 1
 upgrade = False
 if added_count == 1 and current_count == 1 and has_current_centering and has_current_color:
     print("ALREADY MODIFIED: visual Select Mode buttons are installed. No files changed."); raise SystemExit(0)
@@ -152,7 +154,8 @@ if added_count == 1:
         has_current_color,
         has_functional_v2001,
     )
-    if not all(legacy_markers) and not all(visual_v104_markers) and not all(functional_v2001_markers):
+    functional_v210_markers = (has_current_centering, has_current_color, has_functional_v210)
+    if not all(legacy_markers) and not all(visual_v104_markers) and not all(functional_v2001_markers) and not all(functional_v210_markers):
         print("UNSUPPORTED or CUSTOMIZED: existing mode-button block is not a recognized prior version.")
         raise SystemExit(1)
     upgrade = True
@@ -160,7 +163,7 @@ elif original_count != 1:
     print("UNSUPPORTED or CUSTOMIZED: exact dashboard body insertion target was not found exactly once.")
     print(f"{index}: original body={original_count}, mode-button marker={added_count}, expected original body=1, marker=0")
     raise SystemExit(1)
-for required in (helper_src, php_src, sudoers_src):
+for required in (helper_src, dmr_helper_src, php_src, sudoers_src):
     if not required.is_file():
         print(f"ERROR: required repository file missing: {required}"); raise SystemExit(1)
 if action in ("--check", "check"):
@@ -177,7 +180,7 @@ if action not in ("--install", "install", "apply"):
 backup = backup_root / f"install-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 backup.mkdir(parents=True, exist_ok=False)
 shutil.copy2(index, backup / index.name)
-for src, dest in ((helper_src, Path('/usr/local/sbin/dvswitch-dashboard-mode')), (php_src, Path('/usr/share/dvswitch/dvswitch-mode.php')), (sudoers_src, Path('/etc/sudoers.d/dvswitch-dashboard-mode'))):
+for src, dest in ((helper_src, Path('/usr/local/sbin/dvswitch-dashboard-mode')), (dmr_helper_src, Path('/usr/local/sbin/dvswitch-dashboard-dmr-network')), (php_src, Path('/usr/share/dvswitch/dvswitch-mode.php')), (sudoers_src, Path('/etc/sudoers.d/dvswitch-dashboard-mode'))):
     if dest.exists(): shutil.copy2(dest, backup / dest.name)
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_name('.' + dest.name + '.tmp')
