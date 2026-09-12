@@ -4,7 +4,7 @@
 
 set -u
 
-VERSION="1.0.0"
+VERSION="1.0.3"
 ROOT="/usr/share/dvswitch"
 INDEX_FILE="${INDEX_FILE:-$ROOT/index.php}"
 BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/dvswitch-mods/mode-buttons}"
