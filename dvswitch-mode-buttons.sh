@@ -8,10 +8,11 @@ VERSION="2.0.0"
 ROOT="/usr/share/dvswitch"
 INDEX_FILE="${INDEX_FILE:-$ROOT/index.php}"
 BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/dvswitch-mods/mode-buttons}"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
 [ "$(id -u)" -eq 0 ] || { echo "ERROR: Run with sudo." >&2; exit 1; }
 
-python3 - "$INDEX_FILE" "${1:---check}" "$BACKUP_ROOT" <<'PY'
+python3 - "$INDEX_FILE" "${1:---check}" "$BACKUP_ROOT" "$SCRIPT_DIR" <<'PY'
 import os, shutil, sys, tempfile
 from datetime import datetime
 from pathlib import Path
@@ -19,6 +20,10 @@ from pathlib import Path
 index = Path(sys.argv[1])
 action = sys.argv[2]
 backup_root = Path(sys.argv[3])
+repo_root = Path(sys.argv[4])
+helper_src = repo_root / 'lib' / 'dvswitch-dashboard-mode'
+php_src = repo_root / 'dvswitch-mode.php'
+sudoers_src = repo_root / 'lib' / 'dvswitch-dashboard-mode.sudoers'
 
 original = '<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif;">'
 added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif;">
@@ -147,7 +152,11 @@ elif original_count != 1:
     print("UNSUPPORTED or CUSTOMIZED: exact dashboard body insertion target was not found exactly once.")
     print(f"{index}: original body={original_count}, mode-button marker={added_count}, expected original body=1, marker=0")
     raise SystemExit(1)
+for required in (helper_src, php_src, sudoers_src):
+    if not required.is_file():
+        print(f"ERROR: required repository file missing: {required}"); raise SystemExit(1)
 if action in ("--check", "check"):
+    print("PASS: mode-switch backend source files are present. No files changed.")
     if upgrade:
         print("READY: recognized earlier Select Mode button version can be upgraded. No files changed.")
     else:
@@ -160,6 +169,13 @@ if action not in ("--install", "install", "apply"):
 backup = backup_root / f"install-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 backup.mkdir(parents=True, exist_ok=False)
 shutil.copy2(index, backup / index.name)
+for src, dest in ((helper_src, Path('/usr/local/sbin/dvswitch-dashboard-mode')), (php_src, Path('/usr/share/dvswitch/dvswitch-mode.php')), (sudoers_src, Path('/etc/sudoers.d/dvswitch-dashboard-mode'))):
+    if dest.exists(): shutil.copy2(dest, backup / dest.name)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_name('.' + dest.name + '.tmp')
+    shutil.copy2(src, tmp)
+    os.chmod(tmp, 0o755 if dest.name == 'dvswitch-dashboard-mode' else 0o644)
+    os.replace(tmp, dest)
 if upgrade:
     start = data.index(marker)
     end = data.index('</script>', start) + len('</script>')
