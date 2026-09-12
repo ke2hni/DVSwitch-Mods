@@ -1,0 +1,1 @@
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/dvswitch-dashboard-mode P25, /usr/local/sbin/dvswitch-dashboard-mode YSF, /usr/local/sbin/dvswitch-dashboard-mode NXDN, /usr/local/sbin/dvswitch-dashboard-mode DSTAR, /usr/local/sbin/dvswitch-dashboard-mode STFU

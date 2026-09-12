@@ -4,7 +4,7 @@
 
 set -u
 
-VERSION="1.0.4"
+VERSION="2.0.0"
 ROOT="/usr/share/dvswitch"
 INDEX_FILE="${INDEX_FILE:-$ROOT/index.php}"
 BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/dvswitch-mods/mode-buttons}"
@@ -93,7 +93,19 @@ added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif
       for (var j = 0; j < buttons.length; j++) {
         buttons[j].classList.remove('dvs-mode-selected');
       }
-      this.classList.add('dvs-mode-selected');
+      var button = this;
+      if (['P25','YSF','NXDN','DSTAR','STFU'].indexOf(button.dataset.mode) < 0) return;
+      button.disabled = true;
+      var body = new URLSearchParams(); body.set('mode', button.dataset.mode);
+      fetch('/dvswitch/dvswitch-mode.php', {method: 'POST', body: body, credentials: 'same-origin'})
+        .then(function (response) { if (!response.ok) throw new Error('switch failed'); return response.json(); })
+        .then(function (result) {
+          if (!result.ok) throw new Error('switch rejected');
+          for (var k = 0; k < buttons.length; k++) buttons[k].classList.remove('dvs-mode-selected');
+          button.classList.add('dvs-mode-selected');
+        })
+        .catch(function () { alert('Mode switch failed. The current mode was not changed visually.'); })
+        .finally(function () { button.disabled = false; });
     });
   }
   window.addEventListener('resize', centerRailWithStatus);
