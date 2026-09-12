@@ -4,7 +4,7 @@
 
 set -u
 
-VERSION="1.0.3"
+VERSION="1.0.4"
 ROOT="/usr/share/dvswitch"
 INDEX_FILE="${INDEX_FILE:-$ROOT/index.php}"
 BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/dvswitch-mods/mode-buttons}"
@@ -108,14 +108,32 @@ data = index.read_text()
 marker = '<div id="dvs-mode-buttons" aria-label="Select Mode">'
 original_count = data.count(original)
 added_count = data.count(marker)
-if added_count == 1 and data.count(added) == 1:
+current_count = data.count(added)
+has_current_centering = data.count('function centerRailWithStatus()') == 1
+has_current_color = data.count('background-color: #008000;') == 2
+upgrade = False
+if added_count == 1 and current_count == 1 and has_current_centering and has_current_color:
     print("ALREADY MODIFIED: visual Select Mode buttons are installed. No files changed."); raise SystemExit(0)
-if original_count != 1 or added_count != 0:
+if added_count == 1:
+    legacy_markers = (
+        data.count('left: max(8px, calc(50% - 740px));') == 1,
+        data.count('background-color: #356244;') == 2,
+        data.count("this.classList.add('dvs-mode-selected');") == 1,
+    )
+    if not all(legacy_markers):
+        print("UNSUPPORTED or CUSTOMIZED: existing mode-button block is not a recognized prior version.")
+        raise SystemExit(1)
+    upgrade = True
+elif original_count != 1:
     print("UNSUPPORTED or CUSTOMIZED: exact dashboard body insertion target was not found exactly once.")
     print(f"{index}: original body={original_count}, mode-button marker={added_count}, expected original body=1, marker=0")
     raise SystemExit(1)
 if action in ("--check", "check"):
-    print("READY: exact dashboard body insertion target found. No files changed."); raise SystemExit(0)
+    if upgrade:
+        print("READY: recognized earlier Select Mode button version can be upgraded. No files changed.")
+    else:
+        print("READY: exact dashboard body insertion target found. No files changed.")
+    raise SystemExit(0)
 if action not in ("--install", "install", "apply"):
     print(f"DVSwitch visual mode buttons {VERSION}")
     print("Usage: sudo dvswitch-mode-buttons.sh --check|--install|apply"); raise SystemExit(0)
@@ -123,7 +141,12 @@ if action not in ("--install", "install", "apply"):
 backup = backup_root / f"install-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 backup.mkdir(parents=True, exist_ok=False)
 shutil.copy2(index, backup / index.name)
-changed = data.replace(original, added, 1)
+if upgrade:
+    start = data.index(marker)
+    end = data.index('</script>', start) + len('</script>')
+    changed = data[:start] + added.split('\n', 1)[1] + data[end:]
+else:
+    changed = data.replace(original, added, 1)
 fd, name = tempfile.mkstemp(prefix=f".{index.name}.", dir=str(index.parent)); os.close(fd)
 temp = Path(name)
 try:
