@@ -44,6 +44,7 @@ readonly -a COMPONENTS=(
     dashboard-fcc-first-names
     dashboard-targets
     dashboard-cell-padding
+    dashboard-hostname-title
 )
 
 readonly DARK_MODE_SCRIPT="$SCRIPT_DIR/dvswitch-dark-mode.sh"
@@ -139,6 +140,7 @@ select_component() {
         dashboard-fcc-first-names) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-fcc-first-names.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"; UNINSTALL_ACTION="--uninstall" ;;
         dashboard-targets) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-targets.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-targets" ;;
         dashboard-cell-padding) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-cell-padding.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-cell-padding" ;;
+        dashboard-hostname-title) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-hostname-title.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-hostname-title" ;;
         *) die "Unknown component: $COMPONENT" ;;
     esac
     require_regular "$CHILD_SCRIPT"
