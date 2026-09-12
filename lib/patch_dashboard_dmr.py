@@ -114,6 +114,8 @@ function dvsModsDmrMasterDisplay($master, $abinfo) {
         if (!$isDmr) {
                 unset($state['blocked_tg']);
         } else {
+                // Record the deliberately selected DMR network even when TG9 is blocked.
+                $state['current_network'] = $network;
                 $blocked = isset($state['blocked_tg']) ? trim((string)$state['blocked_tg']) : '';
                 if ($mode === 'DMR' && $network === 'TGIF' && $liveTalkgroup === '9' && isset($state[$network]['tg']) && dvsModsDmrName($network, (string)$state[$network]['tg']) === '' && dvsModsDmrForeignTalkgroup((string)$state[$network]['tg'])) {
                         unset($state[$network]);
@@ -326,4 +328,3 @@ elif log_counts != (0, 1, 0, 1):
     raise SystemExit("ERROR: incomplete or ambiguous DMR log-status repair anchors: " + repr(log_counts))
 
 path.write_text(text, encoding="utf-8")
-

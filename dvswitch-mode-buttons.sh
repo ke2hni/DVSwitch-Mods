@@ -97,6 +97,17 @@ added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif
     var box = status.getBoundingClientRect();
     rail.style.top = (box.top + box.height / 2) + 'px';
   }
+  function selectButton(mode) {
+    for (var i = 0; i < buttons.length; i++) {
+      var buttonMode = buttons[i].dataset.mode.toUpperCase().replace('-', '');
+      buttons[i].classList.toggle('dvs-mode-selected', buttonMode === mode);
+    }
+  }
+  function restoreSelectedButton() {
+    var saved = '';
+    try { saved = window.localStorage.getItem('dvswitch-selected-mode') || ''; } catch (e) {}
+    if (saved) selectButton(saved.toUpperCase());
+  }
   for (var i = 0; i < buttons.length; i++) {
     buttons[i].addEventListener('click', function () {
       for (var j = 0; j < buttons.length; j++) {
@@ -114,6 +125,7 @@ added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif
           if (!result.ok) throw new Error('switch rejected');
           for (var k = 0; k < buttons.length; k++) buttons[k].classList.remove('dvs-mode-selected');
           button.classList.add('dvs-mode-selected');
+          try { window.localStorage.setItem('dvswitch-selected-mode', button.dataset.mode.toUpperCase().replace('-', '')); } catch (e) {}
         })
         .catch(function () { alert('Mode switch failed. The current mode was not changed visually.'); })
         .finally(function () { button.disabled = false; });
@@ -121,6 +133,7 @@ added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif
   }
   window.addEventListener('resize', centerRailWithStatus);
   setTimeout(centerRailWithStatus, 0);
+  setTimeout(restoreSelectedButton, 100);
   setInterval(centerRailWithStatus, 1000);
 }());
 </script>'''
