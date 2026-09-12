@@ -5,8 +5,10 @@ PRESETS=/etc/dvswitch-mods/dmr-presets
 BACKUPS=/var/backups/dvswitch-mods/dmr-network
 case "${1-}" in bm) preset="$PRESETS/MMDVM_Bridge.BM.ini"; expected='brandmeister' ;; tgif) preset="$PRESETS/MMDVM_Bridge.TGIF.ini"; expected='tgif.network' ;; status) sed -n '/^\[DMR Network\]/,/^\[/s/^Address=//p' "$LIVE" | head -n1; exit ;; *) exit 64 ;; esac
 [[ -r "$preset" && -r "$LIVE" ]] || exit 1
+[[ "$(stat -c %a "$PRESETS")" == 700 && "$(stat -c %a "$preset")" == 600 ]] || exit 1
 address(){ sed -n '/^\[DMR Network\]/,/^\[/s/^Address=//p' "$1" | head -n1; }
 addr=$(address "$preset"); [[ "$addr" == *"$expected"* ]] || exit 1
 mkdir -p "$BACKUPS"; stamp=$(date +%Y%m%d-%H%M%S); backup="$BACKUPS/$stamp"; mkdir "$backup"; cp -a "$LIVE" "$backup/MMDVM_Bridge.ini"
-tmp="$LIVE.dmr-switch.$$"; trap 'rm -f "$tmp"; if [[ "$?" -ne 0 ]]; then cp -a "$backup/MMDVM_Bridge.ini" "$LIVE"; systemctl restart analog_bridge.service mmdvm_bridge.service >/dev/null 2>&1 || true; fi' EXIT
-install -o root -g www-data -m 0640 "$preset" "$tmp"; mv -f "$tmp" "$LIVE"; systemctl restart analog_bridge.service mmdvm_bridge.service; sleep 3; /opt/MMDVM_Bridge/dvswitch.sh mode dmr; [[ "$(address "$LIVE")" == "$addr" ]]; systemctl is-active --quiet analog_bridge.service; systemctl is-active --quiet mmdvm_bridge.service; trap - EXIT; echo "DMR network switched to $1"
+tmp="$LIVE.dmr-switch.$$"; live_mode=$(stat -c %a "$LIVE"); live_uid=$(stat -c %u "$LIVE"); live_gid=$(stat -c %g "$LIVE")
+trap 'status=$?; rm -f "$tmp"; if [[ "$status" -ne 0 ]]; then install -o "$live_uid" -g "$live_gid" -m "$live_mode" "$backup/MMDVM_Bridge.ini" "$LIVE"; systemctl restart analog_bridge.service mmdvm_bridge.service >/dev/null 2>&1 || true; fi' EXIT
+install -o "$live_uid" -g "$live_gid" -m "$live_mode" "$preset" "$tmp"; mv -f "$tmp" "$LIVE"; systemctl restart analog_bridge.service mmdvm_bridge.service; sleep 3; /opt/MMDVM_Bridge/dvswitch.sh mode dmr; [[ "$(address "$LIVE")" == "$addr" ]]; systemctl is-active --quiet analog_bridge.service; systemctl is-active --quiet mmdvm_bridge.service; trap - EXIT; echo "DMR network switched to $1"

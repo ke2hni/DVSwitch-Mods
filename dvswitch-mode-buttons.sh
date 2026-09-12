@@ -13,7 +13,7 @@ SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 [ "$(id -u)" -eq 0 ] || { echo "ERROR: Run with sudo." >&2; exit 1; }
 
 python3 - "$INDEX_FILE" "${1:---check}" "$BACKUP_ROOT" "$SCRIPT_DIR" <<'PY'
-import os, shutil, sys, tempfile
+import getpass, os, re, shutil, sys, tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -25,6 +25,9 @@ helper_src = repo_root / 'lib' / 'dvswitch-dashboard-mode'
 dmr_helper_src = repo_root / 'lib' / 'dvswitch-dashboard-dmr-network'
 php_src = repo_root / 'dvswitch-mode.php'
 sudoers_src = repo_root / 'lib' / 'dvswitch-dashboard-mode.sudoers'
+live_ini = Path('/opt/MMDVM_Bridge/MMDVM_Bridge.ini')
+preset_dir = Path('/etc/dvswitch-mods/dmr-presets')
+dmr_backup_root = Path('/var/backups/dvswitch-mods/dmr-network')
 
 original = '<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif;">'
 added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif;">
@@ -183,6 +186,59 @@ if action not in ("--install", "install", "apply"):
     print(f"DVSwitch visual mode buttons {VERSION}")
     print("Usage: sudo dvswitch-mode-buttons.sh --check|--install|apply"); raise SystemExit(0)
 
+def dmr_section_values(text):
+    match = re.search(r'(?ms)^\[DMR Network\]\n(.*?)(?=^\[|\Z)', text)
+    if not match:
+        raise RuntimeError('missing [DMR Network] section')
+    values = {}
+    for line in match.group(1).splitlines():
+        if '=' in line and not line.lstrip().startswith('#'):
+            key, value = line.split('=', 1)
+            values[key.strip()] = value.strip()
+    return match, values
+
+def replace_dmr_values(text, replacements):
+    match, _ = dmr_section_values(text)
+    section = match.group(0)
+    for key, value in replacements.items():
+        section, count = re.subn(rf'(?m)^{re.escape(key)}=.*$', f'{key}={value}', section, count=1)
+        if count != 1:
+            raise RuntimeError(f'missing [DMR Network] key: {key}')
+    return text[:match.start()] + section + text[match.end():]
+
+def create_dmr_presets():
+    if not live_ini.is_file():
+        raise RuntimeError(f'missing source file: {live_ini}')
+    source = live_ini.read_text()
+    _, values = dmr_section_values(source)
+    address, password = values.get('Address', ''), values.get('Password', '')
+    if not address or not values.get('Port') or not password or password == '[Redacted]':
+        raise RuntimeError('active MMDVM_Bridge.ini has incomplete [DMR Network] values')
+    if 'brandmeister' in address.lower():
+        active, other = 'BM', 'TGIF'; other_values = {'Address': 'tgif.network', 'Port': '62031'}
+    elif address.lower() == 'tgif.network':
+        active, other = 'TGIF', 'BM'; other_values = {'Address': '3104.master.brandmeister.network', 'Port': '62031'}
+    else:
+        raise RuntimeError(f'cannot identify active DMR network from Address={address}')
+    other_password = getpass.getpass(f'Enter the {other} password (input hidden): ')
+    if not other_password:
+        raise RuntimeError(f'{other} password is required')
+    preset_dir.mkdir(parents=True, exist_ok=True)
+    os.chown(preset_dir, 0, 0); os.chmod(preset_dir, 0o700)
+    dmr_backup_root.mkdir(parents=True, exist_ok=True)
+    backup = dmr_backup_root / f'install-{datetime.now().strftime("%Y%m%d-%H%M%S")}'
+    backup.mkdir()
+    for name in ('MMDVM_Bridge.BM.ini', 'MMDVM_Bridge.TGIF.ini'):
+        target = preset_dir / name
+        if target.exists(): shutil.copy2(target, backup / name)
+    active_path = preset_dir / f'MMDVM_Bridge.{active}.ini'
+    other_path = preset_dir / f'MMDVM_Bridge.{other}.ini'
+    shutil.copy2(live_ini, active_path)
+    other_path.write_text(replace_dmr_values(source, {**other_values, 'Password': other_password}))
+    for target in (active_path, other_path):
+        os.chown(target, 0, 0); os.chmod(target, 0o600)
+    print(f'Created protected BM/TGIF presets; active network detected as {active}.')
+
 backup = backup_root / f"install-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 backup.mkdir(parents=True, exist_ok=False)
 shutil.copy2(index, backup / index.name)
@@ -191,8 +247,14 @@ for src, dest in ((helper_src, Path('/usr/local/sbin/dvswitch-dashboard-mode')),
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_name('.' + dest.name + '.tmp')
     shutil.copy2(src, tmp)
-    os.chmod(tmp, 0o755 if dest.name == 'dvswitch-dashboard-mode' else 0o644)
+    mode = 0o755 if dest.name in ('dvswitch-dashboard-mode', 'dvswitch-dashboard-dmr-network') else (0o440 if dest.name == 'dvswitch-dashboard-mode.sudoers' else 0o644)
+    os.chmod(tmp, mode)
     os.replace(tmp, dest)
+try:
+    create_dmr_presets()
+except Exception as exc:
+    print(f"ERROR: cannot create protected BM/TGIF presets: {exc}")
+    raise SystemExit(1)
 if upgrade:
     start = data.index(marker)
     end = data.index('</script>', start) + len('</script>')
