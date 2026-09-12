@@ -99,9 +99,11 @@ added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif
         buttons[j].classList.remove('dvs-mode-selected');
       }
       var button = this;
-      if (['P25','YSF','NXDN','DSTAR','STFU'].indexOf(button.dataset.mode) < 0) return;
+      var modeMap = {P25: 'P25', YSF: 'YSF', NXDN: 'NXDN', 'D-Star': 'DSTAR', STFU: 'STFU'};
+      var commandMode = modeMap[button.dataset.mode];
+      if (!commandMode) return;
       button.disabled = true;
-      var body = new URLSearchParams(); body.set('mode', button.dataset.mode);
+      var body = new URLSearchParams(); body.set('mode', commandMode);
       fetch('/dvswitch/dvswitch-mode.php', {method: 'POST', body: body, credentials: 'same-origin'})
         .then(function (response) { if (!response.ok) throw new Error('switch failed'); return response.json(); })
         .then(function (result) {
