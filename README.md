@@ -98,7 +98,7 @@ On a fresh DVSwitch installation, the first check normally reports early
 components as ready and later components as blocked by prerequisites. It checks
 everything, changes nothing, and prints the correct installation order.
 
-### 4. Install every applicable standard repair and modification
+### 4. Install or update every applicable standard repair and modification
 
 ```bash
 sudo ./manage-dvswitch-mods.sh --install all
@@ -107,7 +107,15 @@ sudo ./manage-dvswitch-mods.sh --install all
 The manager installs components in the required order, selects the correct
 MMDVM repair for the installed architecture, skips components that do not
 apply, records every backup, and resumes safely if an installation is
-interrupted.
+interrupted. It is upgrade-aware: manager records do not cause components to
+be skipped. Each component's current `--check` and `--install` logic decides
+whether it is current, needs a newer compatible repository update, or must be
+refused as unsupported or customized.
+
+When a newer compatible version is available, the manager creates a new
+protected backup and replaces that component's active manager record. When the
+installed version is current, the component remains idempotent and no new
+backup is created.
 
 ### 5. Verify the completed standard installation
 
@@ -291,8 +299,9 @@ sudo ./mod-dashboard-fcc-first-names.sh --update
 ### 6. Cleaner dashboard targets
 
 **What it adds:** Row-specific friendly talkgroup and reflector names, D-Star
-routes, Group Call, General Call, GPS/Data labels, and a compact legend. History
-rows remain tied to the destination recorded when each reception occurred.
+routes, Group Call, General Call, GPS/Data labels, and a compact legend with
+separation from the Local Activity grid. History rows remain tied to the
+destination recorded when each reception occurred.
 
 **Required first:** `mod-dashboard-fcc-first-names.sh`; valid P25/NXDN JSON and
 BrandMeister/TGIF lists provide the friendly names.
@@ -388,6 +397,12 @@ The menu launches these two installers after the standard installation choice;
 their backups are maintained by the standalone scripts.
 
 > [!NOTE]
+> Re-running `--install all` after downloading a newer repository version is
+> supported. The manager rechecks every applicable component instead of
+> relying only on its previous installation record. Component installers still
+> refuse missing, ambiguous, customized, or unsupported targets.
+
+> [!NOTE]
 > The DVSwitch database updater cannot be run more than once per hour. The
 > manager enforces this limit and reports how long remains before another
 > attempt is permitted.
@@ -401,6 +416,10 @@ List the changes installed and recorded by the manager:
 ```bash
 sudo ./manage-dvswitch-mods.sh --status
 ```
+
+The status file records the currently active reversible backup for each
+component. An upgrade replaces that component's active record with the new
+backup; older backup directories are retained for manual recovery.
 
 Remove everything installed by the manager in safe reverse order:
 
