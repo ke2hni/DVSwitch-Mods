@@ -608,9 +608,10 @@ Repository-authored code is licensed under the MIT License. See `LICENSE` and
 
 ### DVSwitch Dashboard with the optional modifications installed
 
-<img width="1600" height="900" alt="Screenshot 2026-09-10 220525" src="https://github.com/user-attachments/assets/162d7b7a-5127-4459-87c3-86a8c4ce88cc" />
+<img width="1600" height="900" alt="Screenshot 2026-09-11 212505" src="https://github.com/user-attachments/assets/9fbdeda1-0c96-448a-ad1d-5cd83b05f004" />
 
-<img width="1600" height="900" alt="Screenshot 2026-09-10 220512" src="https://github.com/user-attachments/assets/cb79a14d-e21f-4c3c-aed8-e4cef28ae65b" />
+<img width="1600" height="900" alt="Screenshot 2026-09-11 212403" src="https://github.com/user-attachments/assets/fcb8704b-617e-4103-b196-15475bc27c78" />
+
 
 <img width="1200" alt="DVSwitch Dashboard" src="https://github.com/user-attachments/assets/1b9a319b-c6e2-49b7-a001-5e3519560408" />
 
