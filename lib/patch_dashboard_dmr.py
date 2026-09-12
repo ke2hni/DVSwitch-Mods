@@ -163,6 +163,8 @@ function dvsModsDmrMasterDisplay($master, $abinfo) {
 
 '''
 
+legacy_v7_helper = helper.replace("                // Record the deliberately selected DMR network even when TG9 is blocked.\n                $state['current_network'] = $network;\n", "")
+
 old_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight: bold\\">".$dmrMasterHost."</span></td></tr>\\n";}'''
 v2_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight: bold\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
 new_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;text-align:center;\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
@@ -303,9 +305,9 @@ elif markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 an
     v2_text = v3_text.replace(v3_marker, v2_marker, 1).replace(new_output, v2_output, 1)
     text = text.replace(v6_helper, helper, 1)
 elif markers == 1 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 and v4_markers == 0 and v5_markers == 0 and v6_markers == 0:
-    if text.count(helper) != 1 or text.count(new_output) != 1 or text.count(v2_output) != 0 or text.count(old_output) != 0:
+    if (text.count(helper) + text.count(legacy_v7_helper)) != 1 or text.count(new_output) != 1 or text.count(v2_output) != 0 or text.count(old_output) != 0:
         raise SystemExit("ERROR: incomplete or ambiguous DMR friendly-name modification")
-    reversible_text = text.replace(helper, v5_helper, 1).replace(new_heading, old_heading, 1).replace(new_log_lookup, old_log_lookup, 1).replace(new_status_condition, old_status_condition, 1)
+    reversible_text = text.replace(legacy_v7_helper, v5_helper, 1).replace(new_heading, old_heading, 1).replace(new_log_lookup, old_log_lookup, 1).replace(new_status_condition, old_status_condition, 1)
     v3_text = reversible_text.replace(v5_marker, v3_marker, 1).replace(v5_master, v3_master, 1)
     v2_text = v3_text.replace(v3_marker, v2_marker, 1).replace(new_output, v2_output, 1)
     ysf_markers = text.count("// DVSwitch-Mods: YSF dashboard null repair v1")
