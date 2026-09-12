@@ -4,7 +4,7 @@
 
 set -u
 
-VERSION="2.2.0"
+VERSION="2.3.0"
 ROOT="/usr/share/dvswitch"
 INDEX_FILE="${INDEX_FILE:-$ROOT/index.php}"
 BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/dvswitch-mods/mode-buttons}"
@@ -134,6 +134,12 @@ has_current_color = data.count('background-color: #008000;') == 2
 has_visual_v104_click = data.count("this.classList.add('dvs-mode-selected');") == 1
 has_functional_v2001 = data.count("fetch('/dvswitch/dvswitch-mode.php'") == 1 and data.count("['P25','YSF','NXDN','DSTAR','STFU']") == 1
 has_functional_v210 = data.count("var modeMap = {BM: 'BM', TGIF: 'TGIF'") == 1
+has_known_rail_structure = (
+    data.count('id="dvs-mode-buttons"') == 1 and
+    data.count('class="dvs-mode-buttons-title"') == 1 and
+    all(data.count(f'data-mode="{mode}"') == 1 for mode in ('BM', 'TGIF', 'STFU', 'YSF', 'P25', 'NXDN', 'D-Star')) and
+    data.count('function centerRailWithStatus()') == 1
+)
 upgrade = False
 if added_count == 1 and current_count == 1 and has_current_centering and has_current_color:
     print("ALREADY MODIFIED: visual Select Mode buttons are installed. No files changed."); raise SystemExit(0)
@@ -155,7 +161,7 @@ if added_count == 1:
         has_functional_v2001,
     )
     functional_v210_markers = (has_current_centering, has_current_color, has_functional_v210)
-    if not all(legacy_markers) and not all(visual_v104_markers) and not all(functional_v2001_markers) and not all(functional_v210_markers):
+    if not all(legacy_markers) and not all(visual_v104_markers) and not all(functional_v2001_markers) and not all(functional_v210_markers) and not has_known_rail_structure:
         print("UNSUPPORTED or CUSTOMIZED: existing mode-button block is not a recognized prior version.")
         raise SystemExit(1)
     upgrade = True
