@@ -123,6 +123,7 @@ added_count = data.count(marker)
 current_count = data.count(added)
 has_current_centering = data.count('function centerRailWithStatus()') == 1
 has_current_color = data.count('background-color: #008000;') == 2
+has_visual_v104_click = data.count("this.classList.add('dvs-mode-selected');") == 1
 upgrade = False
 if added_count == 1 and current_count == 1 and has_current_centering and has_current_color:
     print("ALREADY MODIFIED: visual Select Mode buttons are installed. No files changed."); raise SystemExit(0)
@@ -132,7 +133,13 @@ if added_count == 1:
         data.count('background-color: #356244;') == 2,
         data.count("this.classList.add('dvs-mode-selected');") == 1,
     )
-    if not all(legacy_markers):
+    visual_v104_markers = (
+        data.count('left: max(8px, calc((100vw - 1200px) / 4 - 56px));') == 1,
+        has_current_centering,
+        has_current_color,
+        has_visual_v104_click,
+    )
+    if not all(legacy_markers) and not all(visual_v104_markers):
         print("UNSUPPORTED or CUSTOMIZED: existing mode-button block is not a recognized prior version.")
         raise SystemExit(1)
     upgrade = True
