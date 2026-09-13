@@ -296,11 +296,21 @@ elif markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 an
     v2_text = v3_text.replace(v3_marker, v2_marker, 1).replace(new_output, v2_output, 1)
     text = text.replace(v6_helper, helper, 1)
 elif markers == 1 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 and v4_markers == 0 and v5_markers == 0 and v6_markers == 0:
-    if (text.count(helper) + text.count(legacy_v7_helper)) != 1 or text.count(new_output) != 1 or text.count(v2_output) != 0 or text.count(old_output) != 0:
+    if text.count(new_output) != 1 or text.count(v2_output) != 0 or text.count(old_output) != 0:
         raise SystemExit("ERROR: incomplete or ambiguous DMR friendly-name modification")
-    reversible_text = text.replace(legacy_v7_helper, v5_helper, 1).replace(new_heading, old_heading, 1).replace(new_log_lookup, old_log_lookup, 1).replace(new_status_condition, old_status_condition, 1)
-    v3_text = reversible_text.replace(v5_marker, v3_marker, 1).replace(v5_master, v3_master, 1)
-    v2_text = v3_text.replace(v3_marker, v2_marker, 1).replace(new_output, v2_output, 1)
+    old_heading_network = "        if ($mode === 'STFU') {\n                $network = 'BM';\n        } else if ($mode === 'DMR') {\n                $network = dvsModsDmrNetwork($master);\n        } else if (isset($state['current_network']) && ($state['current_network'] === 'BM' || $state['current_network'] === 'TGIF')) {"
+    new_heading_network = "        if (isset($state['current_network']) && ($state['current_network'] === 'BM' || $state['current_network'] === 'TGIF')) {"
+    old_display_network = "        $network = ($mode === 'STFU') ? 'BM' : dvsModsDmrNetwork($master);"
+    new_display_network = "        $network = (isset($state['current_network']) && ($state['current_network'] === 'BM' || $state['current_network'] === 'TGIF')) ? $state['current_network'] : dvsModsDmrNetwork($master);"
+    old_state_assignment = "                // Record the deliberately selected DMR network even when TG9 is blocked.\n                $state['current_network'] = $network;\n"
+    old_non_dmr_fallback = "        if (!$isDmr && isset($state['current_network']) && ($state['current_network'] === 'BM' || $state['current_network'] === 'TGIF')) {\n                $network = $state['current_network'];\n        }\n"
+    required_counts = (text.count(old_heading_network), text.count(old_display_network), text.count(old_state_assignment), text.count(old_non_dmr_fallback))
+    if required_counts != (1, 1, 1, 1):
+        raise SystemExit("ERROR: incomplete or ambiguous installed v7 DMR network logic: " + repr(required_counts))
+    text = text.replace(old_heading_network, new_heading_network, 1)
+    text = text.replace(old_display_network, new_display_network, 1)
+    text = text.replace(old_state_assignment, '', 1)
+    text = text.replace(old_non_dmr_fallback, '', 1)
     ysf_markers = text.count("// DVSwitch-Mods: YSF dashboard null repair v1")
     if ysf_markers not in (0, 1):
         raise SystemExit("ERROR: unexpected YSF marker in DMR-only dashboard state")
