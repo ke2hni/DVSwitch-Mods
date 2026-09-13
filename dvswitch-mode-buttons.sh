@@ -158,6 +158,7 @@ has_current_split = (
     data.count("fetch('/dvswitch/dvswitch-dmr-network.php'") == 1 and
     data.count("var modeMap = {P25: 'P25', YSF: 'YSF', NXDN: 'NXDN', 'D-Star': 'DSTAR', STFU: 'STFU'};") == 1 and
     data.count("localStorage.setItem('dvswitch-selected-mode'") == 2 and
+    data.count('window.location.reload();') == 2 and
     data.count("function restoreSelectedButton()") == 1
 )
 has_current_centering = data.count('function centerRailWithStatus()') == 1
