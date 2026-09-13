@@ -299,19 +299,25 @@ elif markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 an
 elif markers == 1 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 and v4_markers == 0 and v5_markers == 0 and v6_markers == 0:
     if text.count(new_output) != 1 or text.count(v2_output) != 0 or text.count(old_output) != 0:
         raise SystemExit("ERROR: incomplete or ambiguous DMR friendly-name modification")
-    old_heading_network = re.compile(r"(?ms)^[ \t]*if \(\$mode === 'STFU'\) \{\r?\n[ \t]*\$network = 'BM';\r?\n[ \t]*\} else if \(\$mode === 'DMR'\) \{\r?\n[ \t]*\$network = dvsModsDmrNetwork\(\$master\);\r?\n[ \t]*\} else if \(isset\(\$state\['current_network'\]\).*?\) \{\r?\n")
-    new_heading_network = "        if (isset($state['current_network']) && ($state['current_network'] === 'BM' || $state['current_network'] === 'TGIF')) {"
-    old_display_network = re.compile(r"(?m)^[ \t]*\$network = \(\$mode === 'STFU'\) \? 'BM' : dvsModsDmrNetwork\(\$master\);\r?\n")
-    new_display_network = "        $network = (isset($state['current_network']) && ($state['current_network'] === 'BM' || $state['current_network'] === 'TGIF')) ? $state['current_network'] : dvsModsDmrNetwork($master);"
-    old_state_assignment = re.compile(r"(?m)^[ \t]*(?:// Record the deliberately selected DMR network even when TG9 is blocked\.\r?\n[ \t]*)?\$state\['current_network'\] = \$network;\r?\n")
-    old_non_dmr_fallback = re.compile(r"(?ms)^[ \t]*if \(!\$isDmr && isset\(\$state\['current_network'\].*?\r?\n[ \t]*\$network = \$state\['current_network'\];\r?\n[ \t]*\}\r?\n")
-    required_counts = (len(old_heading_network.findall(text)), len(old_display_network.findall(text)), len(old_state_assignment.findall(text)), len(old_non_dmr_fallback.findall(text)))
-    if required_counts != (1, 1, 1, 1):
-        raise SystemExit("ERROR: incomplete or ambiguous installed v7 DMR network logic: " + repr(required_counts))
-    text = old_heading_network.sub(new_heading_network, text, count=1)
-    text = old_display_network.sub(new_display_network + "\n", text, count=1)
-    text = old_state_assignment.sub('', text, count=1)
-    text = old_non_dmr_fallback.sub('', text, count=1)
+    # Replace the complete v7 helper by PHP function boundaries.  This is
+    # intentionally independent of indentation and CRLF/LF line endings.
+    start = text.index(marker)
+    display_start = text.index('function dvsModsDmrMasterDisplay(', start)
+    brace_start = text.index('{', display_start)
+    depth = 0
+    end = None
+    for pos in range(brace_start, len(text)):
+        if text[pos] == '{': depth += 1
+        elif text[pos] == '}':
+            depth -= 1
+            if depth == 0:
+                end = pos + 1
+                break
+    if end is None:
+        raise SystemExit("ERROR: unterminated installed v7 DMR helper")
+    replacement = helper.replace("                $state['current_network'] = $network;\n", '')
+    replacement = replacement.replace("        $state['current_network'] = $network;\n", '')
+    text = text[:start] + replacement.rstrip() + text[end:]
     ysf_markers = text.count("// DVSwitch-Mods: YSF dashboard null repair v1")
     if ysf_markers not in (0, 1):
         raise SystemExit("ERROR: unexpected YSF marker in DMR-only dashboard state")
