@@ -24,6 +24,7 @@ repo_root = Path(sys.argv[4])
 helper_src = repo_root / 'lib' / 'dvswitch-dashboard-mode'
 dmr_helper_src = repo_root / 'lib' / 'dvswitch-dashboard-dmr-network'
 php_src = repo_root / 'dvswitch-mode.php'
+dmr_php_src = repo_root / 'dvswitch-dmr-network.php'
 sudoers_src = repo_root / 'lib' / 'dvswitch-dashboard-mode.sudoers'
 live_ini = Path('/opt/MMDVM_Bridge/MMDVM_Bridge.ini')
 preset_dir = Path('/etc/dvswitch-mods/dmr-presets')
@@ -97,16 +98,13 @@ added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif
     var box = status.getBoundingClientRect();
     rail.style.top = (box.top + box.height / 2) + 'px';
   }
-  function selectButton(mode) {
-    for (var i = 0; i < buttons.length; i++) {
-      var buttonMode = buttons[i].dataset.mode.toUpperCase().replace('-', '');
-      buttons[i].classList.toggle('dvs-mode-selected', buttonMode === mode);
-    }
-  }
   function restoreSelectedButton() {
     var saved = '';
     try { saved = window.localStorage.getItem('dvswitch-selected-mode') || ''; } catch (e) {}
-    if (saved) selectButton(saved.toUpperCase());
+    if (!saved) return;
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].classList.toggle('dvs-mode-selected', buttons[i].dataset.mode.toUpperCase().replace('-', '') === saved.toUpperCase());
+    }
   }
   for (var i = 0; i < buttons.length; i++) {
     buttons[i].addEventListener('click', function () {
@@ -114,8 +112,18 @@ added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif
         buttons[j].classList.remove('dvs-mode-selected');
       }
       var button = this;
-      var modeMap = {BM: 'BM', TGIF: 'TGIF', P25: 'P25', YSF: 'YSF', NXDN: 'NXDN', 'D-Star': 'DSTAR', STFU: 'STFU'};
+      var modeMap = {P25: 'P25', YSF: 'YSF', NXDN: 'NXDN', 'D-Star': 'DSTAR', STFU: 'STFU'};
       var commandMode = modeMap[button.dataset.mode];
+      var dmrNetwork = {BM: 'bm', TGIF: 'tgif'}[button.dataset.mode];
+      if (dmrNetwork) {
+        var dmrBody = new URLSearchParams(); dmrBody.set('network', dmrNetwork);
+        fetch('/dvswitch/dvswitch-dmr-network.php', {method: 'POST', body: dmrBody, credentials: 'same-origin'})
+          .then(function (response) { if (!response.ok) throw new Error('network switch failed'); return response.json(); })
+          .then(function (result) { if (!result.ok) throw new Error('network switch rejected'); button.classList.add('dvs-mode-selected'); try { window.localStorage.setItem('dvswitch-selected-mode', button.dataset.mode.toUpperCase()); } catch (e) {} })
+          .catch(function () { alert('DMR network switch failed. The current network was not changed visually.'); })
+          .finally(function () { button.disabled = false; });
+        return;
+      }
       if (!commandMode) return;
       button.disabled = true;
       var body = new URLSearchParams(); body.set('mode', commandMode);
@@ -185,7 +193,7 @@ elif original_count != 1:
     print("UNSUPPORTED or CUSTOMIZED: exact dashboard body insertion target was not found exactly once.")
     print(f"{index}: original body={original_count}, mode-button marker={added_count}, expected original body=1, marker=0")
     raise SystemExit(1)
-for required in (helper_src, dmr_helper_src, php_src, sudoers_src):
+for required in (helper_src, dmr_helper_src, php_src, dmr_php_src, sudoers_src):
     if not required.is_file():
         print(f"ERROR: required repository file missing: {required}"); raise SystemExit(1)
 if action in ("--check", "check"):
@@ -255,12 +263,12 @@ def create_dmr_presets():
 backup = backup_root / f"install-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 backup.mkdir(parents=True, exist_ok=False)
 shutil.copy2(index, backup / index.name)
-for src, dest in ((helper_src, Path('/usr/local/sbin/dvswitch-dashboard-mode')), (dmr_helper_src, Path('/usr/local/sbin/dvswitch-dashboard-dmr-network')), (php_src, Path('/usr/share/dvswitch/dvswitch-mode.php')), (sudoers_src, Path('/etc/sudoers.d/dvswitch-dashboard-mode'))):
+for src, dest in ((helper_src, Path('/usr/local/sbin/dvswitch-dashboard-mode')), (dmr_helper_src, Path('/usr/local/sbin/dvswitch-dashboard-dmr-network')), (php_src, Path('/usr/share/dvswitch/dvswitch-mode.php')), (dmr_php_src, Path('/usr/share/dvswitch/dvswitch-dmr-network.php')), (sudoers_src, Path('/etc/sudoers.d/dvswitch-dashboard-mode'))):
     if dest.exists(): shutil.copy2(dest, backup / dest.name)
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_name('.' + dest.name + '.tmp')
     shutil.copy2(src, tmp)
-    mode = 0o755 if dest.name in ('dvswitch-dashboard-mode', 'dvswitch-dashboard-dmr-network') else (0o440 if dest.name == 'dvswitch-dashboard-mode.sudoers' else 0o644)
+    mode = 0o755 if dest.name in ('dvswitch-dashboard-mode', 'dvswitch-dashboard-dmr-network') else (0o440 if dest.parent == Path('/etc/sudoers.d') else 0o644)
     os.chmod(tmp, mode)
     os.replace(tmp, dest)
 try:

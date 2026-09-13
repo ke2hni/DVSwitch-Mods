@@ -3,6 +3,5 @@ set -eu
 mode="${1-}"
 case "$mode" in
   P25|YSF|NXDN|DSTAR|STFU) exec /opt/MMDVM_Bridge/dvswitch.sh mode "$mode" ;;
-  BM|TGIF) exec /usr/local/sbin/dvswitch-dashboard-dmr-network "$(printf '%s' "$mode" | tr '[:upper:]' '[:lower:]')" ;;
   *) echo "Unsupported mode" >&2; exit 64 ;;
 esac
