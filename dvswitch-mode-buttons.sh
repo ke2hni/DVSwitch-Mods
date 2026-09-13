@@ -119,7 +119,7 @@ added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif
         var dmrBody = new URLSearchParams(); dmrBody.set('network', dmrNetwork);
         fetch('/dvswitch/dvswitch-dmr-network.php', {method: 'POST', body: dmrBody, credentials: 'same-origin'})
           .then(function (response) { if (!response.ok) throw new Error('network switch failed'); return response.json(); })
-          .then(function (result) { if (!result.ok) throw new Error('network switch rejected'); button.classList.add('dvs-mode-selected'); try { window.localStorage.setItem('dvswitch-selected-mode', button.dataset.mode.toUpperCase()); } catch (e) {} window.location.reload(); })
+          .then(function (result) { if (!result.ok) throw new Error('network switch rejected'); button.classList.add('dvs-mode-selected'); try { window.localStorage.setItem('dvswitch-selected-mode', button.dataset.mode.toUpperCase()); } catch (e) {} setTimeout(function () { window.location.reload(); }, 3000); })
           .catch(function () { alert('DMR network switch failed. The current network was not changed visually.'); })
           .finally(function () { button.disabled = false; });
         return;
@@ -134,7 +134,7 @@ added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif
           for (var k = 0; k < buttons.length; k++) buttons[k].classList.remove('dvs-mode-selected');
           button.classList.add('dvs-mode-selected');
           try { window.localStorage.setItem('dvswitch-selected-mode', button.dataset.mode.toUpperCase().replace('-', '')); } catch (e) {}
-          window.location.reload();
+          setTimeout(function () { window.location.reload(); }, 3000);
         })
         .catch(function () { alert('Mode switch failed. The current mode was not changed visually.'); })
         .finally(function () { button.disabled = false; });

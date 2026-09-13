@@ -41,11 +41,7 @@ function dvsModsDmrStateWrite($state) {
 function dvsModsDmrMasterHeading($master, $abinfo) {
         $state = dvsModsDmrStateRead();
         $mode = isset($abinfo['tlv']['ambe_mode']) ? strtoupper(trim((string)$abinfo['tlv']['ambe_mode'])) : '';
-        if ($mode === 'STFU') {
-                $network = 'BM';
-        } else if ($mode === 'DMR') {
-                $network = dvsModsDmrNetwork($master);
-        } else if (isset($state['current_network']) && ($state['current_network'] === 'BM' || $state['current_network'] === 'TGIF')) {
+        if (isset($state['current_network']) && ($state['current_network'] === 'BM' || $state['current_network'] === 'TGIF')) {
                 $network = $state['current_network'];
         } else {
                 $network = dvsModsDmrNetwork($master);
@@ -105,7 +101,7 @@ function dvsModsDmrMasterDisplay($master, $abinfo) {
         $state = dvsModsDmrStateRead();
         $originalState = $state;
         $mode = isset($abinfo['tlv']['ambe_mode']) ? strtoupper(trim((string)$abinfo['tlv']['ambe_mode'])) : '';
-        $network = ($mode === 'STFU') ? 'BM' : dvsModsDmrNetwork($master);
+        $network = (isset($state['current_network']) && ($state['current_network'] === 'BM' || $state['current_network'] === 'TGIF')) ? $state['current_network'] : dvsModsDmrNetwork($master);
         $liveTalkgroup = dvsModsDmrTalkgroup($abinfo);
         $previousMode = isset($state['observed_mode']) ? strtoupper(trim((string)$state['observed_mode'])) : '';
         $previousNetwork = isset($state['observed_network']) ? strtoupper(trim((string)$state['observed_network'])) : '';
@@ -114,8 +110,6 @@ function dvsModsDmrMasterDisplay($master, $abinfo) {
         if (!$isDmr) {
                 unset($state['blocked_tg']);
         } else {
-                // Record the deliberately selected DMR network even when TG9 is blocked.
-                $state['current_network'] = $network;
                 $blocked = isset($state['blocked_tg']) ? trim((string)$state['blocked_tg']) : '';
                 if ($mode === 'DMR' && $network === 'TGIF' && $liveTalkgroup === '9' && isset($state[$network]['tg']) && dvsModsDmrName($network, (string)$state[$network]['tg']) === '' && dvsModsDmrForeignTalkgroup((string)$state[$network]['tg'])) {
                         unset($state[$network]);
@@ -145,9 +139,6 @@ function dvsModsDmrMasterDisplay($master, $abinfo) {
         if ($liveTalkgroup !== '') { $state['observed_tg'] = $liveTalkgroup; }
         else { unset($state['observed_tg']); }
         if ($state !== $originalState) { dvsModsDmrStateWrite($state); }
-        if (!$isDmr && isset($state['current_network']) && ($state['current_network'] === 'BM' || $state['current_network'] === 'TGIF')) {
-                $network = $state['current_network'];
-        }
         $talkgroup = '';
         if (isset($state[$network]) && is_array($state[$network]) && isset($state[$network]['tg'])) {
                 $candidate = trim((string)$state[$network]['tg']);
@@ -163,7 +154,7 @@ function dvsModsDmrMasterDisplay($master, $abinfo) {
 
 '''
 
-legacy_v7_helper = helper.replace("                // Record the deliberately selected DMR network even when TG9 is blocked.\n                $state['current_network'] = $network;\n", "")
+legacy_v7_helper = helper.replace("                $blocked =", "                // Record the deliberately selected DMR network even when TG9 is blocked.\n                $state['current_network'] = $network;\n                $blocked =", 1)
 
 old_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight: bold\\">".$dmrMasterHost."</span></td></tr>\\n";}'''
 v2_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight: bold\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
