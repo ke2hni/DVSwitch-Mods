@@ -5,6 +5,7 @@
 
 from pathlib import Path
 import os
+import re
 
 path = Path(os.environ["STATUS_CANDIDATE"])
 marker = os.environ["DVS_MOD_MARKER"]
