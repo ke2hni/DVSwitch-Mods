@@ -2,313 +2,58 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Jeff Milne, KE2HNI
 
-set -u
+set -Eeuo pipefail
+readonly VERSION="1.0.0"
+readonly TARGET="/usr/share/dvswitch/index.php"
+readonly BACKUP_ROOT="/var/backups/dvswitch-mods/mode-buttons"
 
-VERSION="2.3.0"
-ROOT="/usr/share/dvswitch"
-INDEX_FILE="${INDEX_FILE:-$ROOT/index.php}"
-BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/dvswitch-mods/mode-buttons}"
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+[[ ${EUID:-$(id -u)} -eq 0 ]] || { echo "ERROR: Run with sudo." >&2; exit 1; }
+[[ -f "$TARGET" && ! -L "$TARGET" ]] || { echo "ERROR: Required regular file not found: $TARGET" >&2; exit 1; }
 
-[ "$(id -u)" -eq 0 ] || { echo "ERROR: Run with sudo." >&2; exit 1; }
-
-python3 - "$INDEX_FILE" "${1:---check}" "$BACKUP_ROOT" "$SCRIPT_DIR" <<'PY'
-import getpass, os, re, shutil, sys, tempfile
+python3 - "$TARGET" "${1:---check}" "$BACKUP_ROOT" <<'PY'
+import os, shutil, sys, tempfile
 from datetime import datetime
 from pathlib import Path
 
-index = Path(sys.argv[1])
-action = sys.argv[2]
-backup_root = Path(sys.argv[3])
-repo_root = Path(sys.argv[4])
-helper_src = repo_root / 'lib' / 'dvswitch-dashboard-mode'
-dmr_helper_src = repo_root / 'lib' / 'dvswitch-dashboard-dmr-network'
-php_src = repo_root / 'dvswitch-mode.php'
-dmr_php_src = repo_root / 'dvswitch-dmr-network.php'
-sudoers_src = repo_root / 'lib' / 'dvswitch-dashboard-mode.sudoers'
-live_ini = Path('/opt/MMDVM_Bridge/MMDVM_Bridge.ini')
-preset_dir = Path('/etc/dvswitch-mods/dmr-presets')
-dmr_backup_root = Path('/var/backups/dvswitch-mods/dmr-network')
-
-original = '<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif;">'
-added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif;">
+target, action, backup_root = Path(sys.argv[1]), sys.argv[2], Path(sys.argv[3])
+factory = '<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif;">'
+marker = '<div id="dvs-mode-buttons" aria-label="Select Mode">'
+block = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif;">
 <div id="dvs-mode-buttons" aria-label="Select Mode">
 <div class="dvs-mode-buttons-title">Select Mode</div>
-<button type="button" class="button link dvs-mode-button" data-mode="BM">BM</button>
-<button type="button" class="button link dvs-mode-button" data-mode="TGIF">TGIF</button>
-<button type="button" class="button link dvs-mode-button" data-mode="STFU">STFU</button>
-<button type="button" class="button link dvs-mode-button" data-mode="YSF">YSF</button>
-<button type="button" class="button link dvs-mode-button" data-mode="P25">P25</button>
-<button type="button" class="button link dvs-mode-button" data-mode="NXDN">NXDN</button>
-<button type="button" class="button link dvs-mode-button" data-mode="D-Star">D-Star</button>
+<button type="button" class="button link dvs-mode-button">BM</button>
+<button type="button" class="button link dvs-mode-button">TGIF</button>
+<button type="button" class="button link dvs-mode-button">STFU</button>
+<button type="button" class="button link dvs-mode-button">YSF</button>
+<button type="button" class="button link dvs-mode-button">P25</button>
+<button type="button" class="button link dvs-mode-button">NXDN</button>
+<button type="button" class="button link dvs-mode-button">D-Star</button>
 </div>
 <style type="text/css">
-#dvs-mode-buttons {
-  position: fixed;
-  z-index: 30;
-  left: max(8px, calc((100vw - 1200px) / 4 - 56px));
-  top: 50%;
-  transform: translateY(-50%);
-  width: 112px;
-  text-align: center;
-}
-#dvs-mode-buttons .dvs-mode-buttons-title {
-  margin: 0 0 8px;
-  color: inherit;
-  font-weight: bold;
-  text-align: center;
-  white-space: nowrap;
-}
-#dvs-mode-buttons .dvs-mode-button {
-  box-sizing: border-box;
-  display: block;
-  width: 112px;
-  height: 32px;
-  margin: 4px 0;
-  padding: 0;
-  line-height: 32px;
-  text-align: center;
-  vertical-align: middle;
-}
-#dvs-mode-buttons .dvs-mode-button.dvs-mode-selected {
-  background-color: #008000;
-  color: white;
-}
-#dvs-mode-buttons .dvs-mode-button:focus-visible {
-  outline: 2px solid #f0c419;
-  outline-offset: 2px;
-}
-#dvs-mode-buttons .dvs-mode-button:hover {
-  background-color: #3a87cd;
-}
-#dvs-mode-buttons .dvs-mode-button.dvs-mode-selected:hover {
-  background-color: #008000;
-}
-@media (max-width: 1450px) {
-  #dvs-mode-buttons { display: none; }
-}
-</style>
-<script type="text/javascript">
-(function () {
-  var rail = document.getElementById('dvs-mode-buttons');
-  var buttons = document.querySelectorAll('#dvs-mode-buttons .dvs-mode-button');
-  function centerRailWithStatus() {
-    var status = document.getElementById('modeInfo');
-    if (!rail || !status) return;
-    var box = status.getBoundingClientRect();
-    rail.style.top = (box.top + box.height / 2) + 'px';
-  }
-  function restoreSelectedButton() {
-    var saved = '';
-    try { saved = window.localStorage.getItem('dvswitch-selected-mode') || ''; } catch (e) {}
-    if (!saved) return;
-    for (var i = 0; i < buttons.length; i++) {
-      buttons[i].classList.toggle('dvs-mode-selected', buttons[i].dataset.mode.toUpperCase().replace('-', '') === saved.toUpperCase());
-    }
-  }
-  for (var i = 0; i < buttons.length; i++) {
-    buttons[i].addEventListener('click', function () {
-      for (var j = 0; j < buttons.length; j++) {
-        buttons[j].classList.remove('dvs-mode-selected');
-      }
-      var button = this;
-      var modeMap = {P25: 'P25', YSF: 'YSF', NXDN: 'NXDN', 'D-Star': 'DSTAR', STFU: 'STFU'};
-      var commandMode = modeMap[button.dataset.mode];
-      var dmrNetwork = {BM: 'bm', TGIF: 'tgif'}[button.dataset.mode];
-      if (dmrNetwork) {
-        var dmrBody = new URLSearchParams(); dmrBody.set('network', dmrNetwork);
-        fetch('/dvswitch/dvswitch-dmr-network.php', {method: 'POST', body: dmrBody, credentials: 'same-origin'})
-          .then(function (response) { if (!response.ok) throw new Error('network switch failed'); return response.json(); })
-          .then(function (result) { if (!result.ok) throw new Error('network switch rejected'); button.classList.add('dvs-mode-selected'); try { window.localStorage.setItem('dvswitch-selected-mode', button.dataset.mode.toUpperCase()); } catch (e) {} setTimeout(function () { window.location.reload(); }, 3000); })
-          .catch(function () { alert('DMR network switch failed. The current network was not changed visually.'); })
-          .finally(function () { button.disabled = false; });
-        return;
-      }
-      if (!commandMode) return;
-      button.disabled = true;
-      var body = new URLSearchParams(); body.set('mode', commandMode);
-      fetch('/dvswitch/dvswitch-mode.php', {method: 'POST', body: body, credentials: 'same-origin'})
-        .then(function (response) { if (!response.ok) throw new Error('switch failed'); return response.json(); })
-        .then(function (result) {
-          if (!result.ok) throw new Error('switch rejected');
-          for (var k = 0; k < buttons.length; k++) buttons[k].classList.remove('dvs-mode-selected');
-          button.classList.add('dvs-mode-selected');
-          try { window.localStorage.setItem('dvswitch-selected-mode', button.dataset.mode.toUpperCase().replace('-', '')); } catch (e) {}
-          window.location.reload();
-        })
-        .catch(function () { alert('Mode switch failed. The current mode was not changed visually.'); })
-        .finally(function () { button.disabled = false; });
-    });
-  }
-  window.addEventListener('resize', centerRailWithStatus);
-  setTimeout(centerRailWithStatus, 0);
-  setTimeout(restoreSelectedButton, 100);
-  setInterval(centerRailWithStatus, 1000);
-}());
-</script>'''
-
-if not index.is_file():
-    print(f"ERROR: missing file: {index}"); raise SystemExit(1)
-data = index.read_text()
-marker = '<div id="dvs-mode-buttons" aria-label="Select Mode">'
-original_count = data.count(original)
-added_count = data.count(marker)
-current_count = data.count(added)
-has_current_split = (
-    data.count("fetch('/dvswitch/dvswitch-dmr-network.php'") == 1 and
-    data.count("var modeMap = {P25: 'P25', YSF: 'YSF', NXDN: 'NXDN', 'D-Star': 'DSTAR', STFU: 'STFU'};") == 1 and
-    data.count("localStorage.setItem('dvswitch-selected-mode'") == 2 and
-    data.count('window.location.reload();') == 2 and
-    data.count("function restoreSelectedButton()") == 1
-)
-has_current_centering = data.count('function centerRailWithStatus()') == 1
-has_current_color = data.count('background-color: #008000;') == 2
-has_visual_v104_click = data.count("this.classList.add('dvs-mode-selected');") == 1
-has_functional_v2001 = data.count("fetch('/dvswitch/dvswitch-mode.php'") == 1 and data.count("['P25','YSF','NXDN','DSTAR','STFU']") == 1
-has_functional_v210 = data.count("var modeMap = {BM: 'BM', TGIF: 'TGIF'") == 1
-has_known_rail_structure = (
-    data.count('id="dvs-mode-buttons"') == 1 and
-    data.count('class="dvs-mode-buttons-title"') == 1 and
-    all(data.count(f'data-mode="{mode}"') == 1 for mode in ('BM', 'TGIF', 'STFU', 'YSF', 'P25', 'NXDN', 'D-Star')) and
-    data.count('function centerRailWithStatus()') == 1
-)
-upgrade = False
-if added_count == 1:
-    legacy_markers = (
-        data.count('left: max(8px, calc(50% - 740px));') == 1,
-        data.count('background-color: #356244;') == 2,
-        data.count("this.classList.add('dvs-mode-selected');") == 1,
-    )
-    visual_v104_markers = (
-        data.count('left: max(8px, calc((100vw - 1200px) / 4 - 56px));') == 1,
-        has_current_centering,
-        has_current_color,
-        has_visual_v104_click,
-    )
-    functional_v2001_markers = (
-        has_current_centering,
-        has_current_color,
-        has_functional_v2001,
-    )
-    functional_v210_markers = (has_current_centering, has_current_color, has_functional_v210)
-    if has_current_split:
-        upgrade = False
-    elif not all(legacy_markers) and not all(visual_v104_markers) and not all(functional_v2001_markers) and not all(functional_v210_markers) and not has_known_rail_structure:
-        print("UNSUPPORTED or CUSTOMIZED: existing mode-button block is not a recognized prior version.")
-        raise SystemExit(1)
-    else:
-        upgrade = True
-elif original_count != 1:
-    print("UNSUPPORTED or CUSTOMIZED: exact dashboard body insertion target was not found exactly once.")
-    print(f"{index}: original body={original_count}, mode-button marker={added_count}, expected original body=1, marker=0")
-    raise SystemExit(1)
-for required in (helper_src, dmr_helper_src, php_src, dmr_php_src, sudoers_src):
-    if not required.is_file():
-        print(f"ERROR: required repository file missing: {required}"); raise SystemExit(1)
+#dvs-mode-buttons { position: fixed; z-index: 30; left: max(8px, calc(50% - 740px)); top: 50%; transform: translateY(-50%); width: 112px; text-align: center; }
+#dvs-mode-buttons .dvs-mode-buttons-title { margin: 0 0 8px; color: inherit; font-weight: bold; text-align: center; white-space: nowrap; }
+#dvs-mode-buttons .dvs-mode-button { box-sizing: border-box; display: block; width: 112px; height: 32px; margin: 4px 0; padding: 0; line-height: 32px; text-align: center; vertical-align: middle; }
+@media (max-width: 1450px) { #dvs-mode-buttons { display: none; } }
+</style>'''
+data = target.read_text(encoding="utf-8")
+if data.count(marker) == 1 and data.count(block) == 1:
+    print("ALREADY MODIFIED: visual Select Mode buttons are installed. No files changed."); raise SystemExit(0)
+if data.count(marker) != 0 or data.count(factory) != 1:
+    print(f"UNSUPPORTED or CUSTOMIZED: exact factory dashboard insertion target was not found exactly once. factory body={data.count(factory)}, button marker={data.count(marker)}", file=sys.stderr); raise SystemExit(1)
 if action in ("--check", "check"):
-    print("PASS: mode-switch backend source files are present. No files changed.")
-    if upgrade:
-        print("READY: recognized earlier Select Mode button version can be upgraded. No files changed.")
-    else:
-        print("READY: exact dashboard body insertion target found. No files changed.")
-    raise SystemExit(0)
-if action not in ("--install", "install", "apply"):
-    print(f"DVSwitch visual mode buttons {VERSION}")
-    print("Usage: sudo dvswitch-mode-buttons.sh --check|--install|apply"); raise SystemExit(0)
-
-deployments = [(helper_src, Path('/usr/local/sbin/dvswitch-dashboard-mode'), 0o755), (dmr_helper_src, Path('/usr/local/sbin/dvswitch-dashboard-dmr-network'), 0o755), (php_src, Path('/usr/share/dvswitch/dvswitch-mode.php'), 0o644), (dmr_php_src, Path('/usr/share/dvswitch/dvswitch-dmr-network.php'), 0o644), (sudoers_src, Path('/etc/sudoers.d/dvswitch-dashboard-mode'), 0o440)]
-backend_changed = any(not dest.is_file() or dest.read_bytes() != src.read_bytes() or (dest.stat().st_mode & 0o777) != mode for src, dest, mode in deployments)
-preset_ready = all(path.is_file() and (path.stat().st_mode & 0o777) == 0o600 for path in (preset_dir / 'MMDVM_Bridge.BM.ini', preset_dir / 'MMDVM_Bridge.TGIF.ini'))
-ui_changed = upgrade or (original_count == 1 and added_count == 0)
-if not ui_changed and not backend_changed and preset_ready:
-    print("ALREADY MODIFIED: Select Mode buttons and DMR backend are installed. No files changed."); raise SystemExit(0)
-
-def dmr_section_values(text):
-    match = re.search(r'(?ms)^\[DMR Network\]\n(.*?)(?=^\[|\Z)', text)
-    if not match:
-        raise RuntimeError('missing [DMR Network] section')
-    values = {}
-    for line in match.group(1).splitlines():
-        if '=' in line and not line.lstrip().startswith('#'):
-            key, value = line.split('=', 1)
-            values[key.strip()] = value.strip()
-    return match, values
-
-def replace_dmr_values(text, replacements):
-    match, _ = dmr_section_values(text)
-    section = match.group(0)
-    for key, value in replacements.items():
-        section, count = re.subn(rf'(?m)^{re.escape(key)}=.*$', f'{key}={value}', section, count=1)
-        if count != 1:
-            raise RuntimeError(f'missing [DMR Network] key: {key}')
-    return text[:match.start()] + section + text[match.end():]
-
-def create_dmr_presets():
-    if not live_ini.is_file():
-        raise RuntimeError(f'missing source file: {live_ini}')
-    source = live_ini.read_text()
-    _, values = dmr_section_values(source)
-    address, password = values.get('Address', ''), values.get('Password', '')
-    if not address or not values.get('Port') or not password or password == '[Redacted]':
-        raise RuntimeError('active MMDVM_Bridge.ini has incomplete [DMR Network] values')
-    if 'brandmeister' in address.lower():
-        active, other = 'BM', 'TGIF'; other_values = {'Address': 'tgif.network', 'Port': '62031'}
-    elif address.lower() == 'tgif.network':
-        active, other = 'TGIF', 'BM'; other_values = {'Address': '3104.master.brandmeister.network', 'Port': '62031'}
-    else:
-        raise RuntimeError(f'cannot identify active DMR network from Address={address}')
-    other_password = getpass.getpass(f'Enter the {other} password (input hidden): ')
-    if not other_password:
-        raise RuntimeError(f'{other} password is required')
-    preset_dir.mkdir(parents=True, exist_ok=True)
-    os.chown(preset_dir, 0, 0); os.chmod(preset_dir, 0o700)
-    dmr_backup_root.mkdir(parents=True, exist_ok=True)
-    backup = dmr_backup_root / f'install-{datetime.now().strftime("%Y%m%d-%H%M%S")}'
-    backup.mkdir()
-    for name in ('MMDVM_Bridge.BM.ini', 'MMDVM_Bridge.TGIF.ini'):
-        target = preset_dir / name
-        if target.exists(): shutil.copy2(target, backup / name)
-    active_path = preset_dir / f'MMDVM_Bridge.{active}.ini'
-    other_path = preset_dir / f'MMDVM_Bridge.{other}.ini'
-    shutil.copy2(live_ini, active_path)
-    other_path.write_text(replace_dmr_values(source, {**other_values, 'Password': other_password}))
-    for target in (active_path, other_path):
-        os.chown(target, 0, 0); os.chmod(target, 0o600)
-    print(f'Created protected BM/TGIF presets; active network detected as {active}.')
-
-backup = backup_root / f"install-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-backup.mkdir(parents=True, exist_ok=False)
-if ui_changed: shutil.copy2(index, backup / index.name)
-for src, dest, mode in deployments:
-    if dest.is_file() and dest.read_bytes() == src.read_bytes() and (dest.stat().st_mode & 0o777) == mode:
-        continue
-    if dest.exists(): shutil.copy2(dest, backup / dest.name)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_name('.' + dest.name + '.tmp')
-    shutil.copy2(src, tmp)
-    os.chmod(tmp, mode)
-    os.replace(tmp, dest)
-if not preset_ready:
-    try:
-        create_dmr_presets()
-    except Exception as exc:
-        print(f"ERROR: cannot create protected BM/TGIF presets: {exc}")
-        raise SystemExit(1)
-if upgrade:
-    start = data.index(marker)
-    end = data.index('</script>', start) + len('</script>')
-    changed = data[:start] + added.split('\n', 1)[1] + data[end:]
-elif ui_changed:
-    changed = data.replace(original, added, 1)
-else:
-    changed = data
-if ui_changed:
-    fd, name = tempfile.mkstemp(prefix=f".{index.name}.", dir=str(index.parent)); os.close(fd)
-    temp = Path(name)
-    try:
-        shutil.copystat(index, temp); temp.write_text(changed); os.replace(temp, index)
-    except Exception:
-        temp.unlink(missing_ok=True); raise
-print("PASS: visual Select Mode button rail installed atomically.")
+    print("READY: exact factory dashboard insertion target found. No files changed."); raise SystemExit(0)
+if action not in ("--install", "install"):
+    print(f"Visual Select Mode buttons {VERSION}\nUsage: sudo dvswitch-mode-buttons.sh --check|--install"); raise SystemExit(0)
+stamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+backup_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+backup = backup_root / f"install-{stamp}"; suffix = 0
+while backup.exists(): suffix += 1; backup = backup_root / f"install-{stamp}-{suffix}"
+backup.mkdir(mode=0o700); shutil.copy2(target, backup / target.name)
+temporary = Path(tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)[1])
+try:
+    shutil.copystat(target, temporary); temporary.write_text(data.replace(factory, block, 1), encoding="utf-8"); os.replace(temporary, target)
+except Exception:
+    temporary.unlink(missing_ok=True); raise
+print("PASS: visual Select Mode buttons installed atomically.")
 print(f"Backup: {backup}")
 PY
