@@ -1,24 +1,19 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Jeff Milne, KE2HNI
-
 set -Eeuo pipefail
-readonly VERSION="1.0.0"
-readonly TARGET="/usr/share/dvswitch/index.php"
-readonly BACKUP_ROOT="/var/backups/dvswitch-mods/mode-buttons"
-
-[[ ${EUID:-$(id -u)} -eq 0 ]] || { echo "ERROR: Run with sudo." >&2; exit 1; }
-[[ -f "$TARGET" && ! -L "$TARGET" ]] || { echo "ERROR: Required regular file not found: $TARGET" >&2; exit 1; }
-
-python3 - "$TARGET" "${1:---check}" "$BACKUP_ROOT" <<'PY'
+TARGET=/usr/share/dvswitch/index.php
+BACKUP_ROOT=/var/backups/dvswitch-mods/mode-buttons
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+[[ $EUID -eq 0 ]] || { echo 'ERROR: Run with sudo.' >&2; exit 1; }
+[[ -f $TARGET && ! -L $TARGET ]] || { echo "ERROR: Missing $TARGET" >&2; exit 1; }
+python3 - "$TARGET" "${1:---check}" "$BACKUP_ROOT" "$ROOT" <<'PY'
 import os, shutil, sys, tempfile
 from datetime import datetime
 from pathlib import Path
-
-target, action, backup_root = Path(sys.argv[1]), sys.argv[2], Path(sys.argv[3])
-factory = '<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif;">'
-marker = '<div id="dvs-mode-buttons" aria-label="Select Mode">'
-block = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif;">
+t, action, backups, root = map(Path, (sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]))
+factory='<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif;">'
+marker='<div id="dvs-mode-buttons" aria-label="Select Mode">'
+old='''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif;">
 <div id="dvs-mode-buttons" aria-label="Select Mode">
 <div class="dvs-mode-buttons-title">Select Mode</div>
 <button type="button" class="button link dvs-mode-button">BM</button>
@@ -35,25 +30,58 @@ block = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif
 #dvs-mode-buttons .dvs-mode-button { box-sizing: border-box; display: block; width: 112px; height: 32px; margin: 4px 0; padding: 0; line-height: 32px; text-align: center; vertical-align: middle; }
 @media (max-width: 1450px) { #dvs-mode-buttons { display: none; } }
 </style>'''
-data = target.read_text(encoding="utf-8")
-if data.count(marker) == 1 and data.count(block) == 1:
-    print("ALREADY MODIFIED: visual Select Mode buttons are installed. No files changed."); raise SystemExit(0)
-if data.count(marker) != 0 or data.count(factory) != 1:
-    print(f"UNSUPPORTED or CUSTOMIZED: exact factory dashboard insertion target was not found exactly once. factory body={data.count(factory)}, button marker={data.count(marker)}", file=sys.stderr); raise SystemExit(1)
-if action in ("--check", "check"):
-    print("READY: exact factory dashboard insertion target found. No files changed."); raise SystemExit(0)
-if action not in ("--install", "install"):
-    print(f"Visual Select Mode buttons {VERSION}\nUsage: sudo dvswitch-mode-buttons.sh --check|--install"); raise SystemExit(0)
-stamp = datetime.now().strftime('%Y%m%d-%H%M%S')
-backup_root.mkdir(mode=0o700, parents=True, exist_ok=True)
-backup = backup_root / f"install-{stamp}"; suffix = 0
-while backup.exists(): suffix += 1; backup = backup_root / f"install-{stamp}-{suffix}"
-backup.mkdir(mode=0o700); shutil.copy2(target, backup / target.name)
-temporary = Path(tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)[1])
-try:
-    shutil.copystat(target, temporary); temporary.write_text(data.replace(factory, block, 1), encoding="utf-8"); os.replace(temporary, target)
-except Exception:
-    temporary.unlink(missing_ok=True); raise
-print("PASS: visual Select Mode buttons installed atomically.")
-print(f"Backup: {backup}")
+new=old.replace('<button type="button" class="button link dvs-mode-button">','<button type="button" class="button link dvs-mode-button" data-mode="',1)
+# Build the functional block from the visual block so its layout remains unchanged.
+new=old
+for label, mode in [('BM',''),('TGIF',''),('STFU','STFU'),('YSF','YSF'),('P25','P25'),('NXDN','NXDN'),('D-Star','DSTAR')]:
+    new=new.replace(f'<button type="button" class="button link dvs-mode-button">{label}</button>', f'<button type="button" class="button link dvs-mode-button" data-mode="{mode}">{label}</button>')
+new += '''
+<script type="text/javascript">
+(function () {
+  var buttons = document.querySelectorAll('#dvs-mode-buttons .dvs-mode-button');
+  function markMode() {
+    var rows = document.querySelectorAll('#modeInfo tr'), mode = '';
+    for (var i = 0; i < rows.length; i++) {
+      var head = rows[i].querySelector('th'), cell = rows[i].querySelector('td');
+      if (head && cell && head.textContent.trim() === 'Mode') mode = cell.textContent.trim().toUpperCase().replace('-', '');
+    }
+    for (var j = 0; j < buttons.length; j++) buttons[j].classList.toggle('dvs-mode-selected', buttons[j].dataset.mode === mode && mode !== '');
+  }
+  for (var i = 0; i < buttons.length; i++) buttons[i].addEventListener('click', function () {
+    var button = this, mode = button.dataset.mode;
+    if (!mode) return;
+    fetch('/dvswitch/dvswitch-mode.php', {method: 'POST', body: new URLSearchParams({mode: mode}), credentials: 'same-origin'})
+      .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+      .then(function (r) { if (!r.ok) throw new Error(); markMode(); })
+      .catch(function () { alert('Mode switch failed.'); });
+  });
+  new MutationObserver(markMode).observe(document.getElementById('modeInfo'), {childList:true, subtree:true});
+  setInterval(markMode, 1000); markMode();
+}());
+</script>'''
+data=t.read_text(encoding='utf-8')
+if data.count(marker)==1 and data.count(new)==1:
+ print('ALREADY MODIFIED: functional Select Mode buttons are installed. No files changed.'); raise SystemExit
+if data.count(marker) not in (0,1) or data.count(factory)!=1:
+ print(f'UNSUPPORTED or CUSTOMIZED: factory body={data.count(factory)}, button marker={data.count(marker)}',file=sys.stderr); raise SystemExit(1)
+if action in ('--check','check'):
+ print('READY: functional Select Mode button insertion target found. No files changed.'); raise SystemExit
+if action not in ('--install','install'):
+ print('Usage: sudo dvswitch-mode-buttons.sh --check|--install'); raise SystemExit
+backups.mkdir(mode=0o700,parents=True,exist_ok=True); stamp=datetime.now().strftime('%Y%m%d-%H%M%S'); b=backups/f'install-{stamp}'; n=0
+while b.exists(): n+=1; b=backups/f'install-{stamp}-{n}'
+b.mkdir(mode=0o700); shutil.copy2(t,b/t.name)
+if data.count(marker)==1: changed=data[:data.index(marker)]+new+data[data.index(marker)+len(old):]
+else: changed=data.replace(factory,new,1)
+fd,name=tempfile.mkstemp(prefix=f'.{t.name}.',dir=t.parent); os.close(fd); temp=Path(name)
+try: shutil.copystat(t,temp); temp.write_text(changed,encoding='utf-8'); os.replace(temp,t)
+except Exception: temp.unlink(missing_ok=True); raise
+print('PASS: functional Select Mode buttons installed atomically.'); print(f'Backup: {b}')
 PY
+
+if [[ ${1:---check} == "--install" || ${1:---check} == "install" ]]; then
+  install -o root -g root -m 0755 "$ROOT/lib/dvswitch-dashboard-mode" /usr/local/sbin/dvswitch-dashboard-mode
+  install -o root -g root -m 0644 "$ROOT/dvswitch-mode.php" /usr/share/dvswitch/dvswitch-mode.php
+  install -o root -g root -m 0440 "$ROOT/lib/dvswitch-dashboard-mode.sudoers" /etc/sudoers.d/dvswitch-dashboard-mode
+  visudo -c >/dev/null
+fi
