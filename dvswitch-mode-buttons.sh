@@ -153,6 +153,12 @@ marker = '<div id="dvs-mode-buttons" aria-label="Select Mode">'
 original_count = data.count(original)
 added_count = data.count(marker)
 current_count = data.count(added)
+has_current_split = (
+    data.count("fetch('/dvswitch/dvswitch-dmr-network.php'") == 1 and
+    data.count("var modeMap = {P25: 'P25', YSF: 'YSF', NXDN: 'NXDN', 'D-Star': 'DSTAR', STFU: 'STFU'};") == 1 and
+    data.count("localStorage.setItem('dvswitch-selected-mode'") == 2 and
+    data.count("function restoreSelectedButton()") == 1
+)
 has_current_centering = data.count('function centerRailWithStatus()') == 1
 has_current_color = data.count('background-color: #008000;') == 2
 has_visual_v104_click = data.count("this.classList.add('dvs-mode-selected');") == 1
@@ -165,8 +171,6 @@ has_known_rail_structure = (
     data.count('function centerRailWithStatus()') == 1
 )
 upgrade = False
-if added_count == 1 and current_count == 1 and has_current_centering and has_current_color:
-    print("ALREADY MODIFIED: visual Select Mode buttons are installed. No files changed."); raise SystemExit(0)
 if added_count == 1:
     legacy_markers = (
         data.count('left: max(8px, calc(50% - 740px));') == 1,
@@ -185,10 +189,13 @@ if added_count == 1:
         has_functional_v2001,
     )
     functional_v210_markers = (has_current_centering, has_current_color, has_functional_v210)
-    if not all(legacy_markers) and not all(visual_v104_markers) and not all(functional_v2001_markers) and not all(functional_v210_markers) and not has_known_rail_structure:
+    if has_current_split:
+        upgrade = False
+    elif not all(legacy_markers) and not all(visual_v104_markers) and not all(functional_v2001_markers) and not all(functional_v210_markers) and not has_known_rail_structure:
         print("UNSUPPORTED or CUSTOMIZED: existing mode-button block is not a recognized prior version.")
         raise SystemExit(1)
-    upgrade = True
+    else:
+        upgrade = True
 elif original_count != 1:
     print("UNSUPPORTED or CUSTOMIZED: exact dashboard body insertion target was not found exactly once.")
     print(f"{index}: original body={original_count}, mode-button marker={added_count}, expected original body=1, marker=0")
@@ -206,6 +213,13 @@ if action in ("--check", "check"):
 if action not in ("--install", "install", "apply"):
     print(f"DVSwitch visual mode buttons {VERSION}")
     print("Usage: sudo dvswitch-mode-buttons.sh --check|--install|apply"); raise SystemExit(0)
+
+deployments = [(helper_src, Path('/usr/local/sbin/dvswitch-dashboard-mode'), 0o755), (dmr_helper_src, Path('/usr/local/sbin/dvswitch-dashboard-dmr-network'), 0o755), (php_src, Path('/usr/share/dvswitch/dvswitch-mode.php'), 0o644), (dmr_php_src, Path('/usr/share/dvswitch/dvswitch-dmr-network.php'), 0o644), (sudoers_src, Path('/etc/sudoers.d/dvswitch-dashboard-mode'), 0o440)]
+backend_changed = any(not dest.is_file() or dest.read_bytes() != src.read_bytes() or (dest.stat().st_mode & 0o777) != mode for src, dest, mode in deployments)
+preset_ready = all(path.is_file() and (path.stat().st_mode & 0o777) == 0o600 for path in (preset_dir / 'MMDVM_Bridge.BM.ini', preset_dir / 'MMDVM_Bridge.TGIF.ini'))
+ui_changed = upgrade or (original_count == 1 and added_count == 0)
+if not ui_changed and not backend_changed and preset_ready:
+    print("ALREADY MODIFIED: Select Mode buttons and DMR backend are installed. No files changed."); raise SystemExit(0)
 
 def dmr_section_values(text):
     match = re.search(r'(?ms)^\[DMR Network\]\n(.*?)(?=^\[|\Z)', text)
@@ -262,32 +276,37 @@ def create_dmr_presets():
 
 backup = backup_root / f"install-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 backup.mkdir(parents=True, exist_ok=False)
-shutil.copy2(index, backup / index.name)
-for src, dest in ((helper_src, Path('/usr/local/sbin/dvswitch-dashboard-mode')), (dmr_helper_src, Path('/usr/local/sbin/dvswitch-dashboard-dmr-network')), (php_src, Path('/usr/share/dvswitch/dvswitch-mode.php')), (dmr_php_src, Path('/usr/share/dvswitch/dvswitch-dmr-network.php')), (sudoers_src, Path('/etc/sudoers.d/dvswitch-dashboard-mode'))):
+if ui_changed: shutil.copy2(index, backup / index.name)
+for src, dest, mode in deployments:
+    if dest.is_file() and dest.read_bytes() == src.read_bytes() and (dest.stat().st_mode & 0o777) == mode:
+        continue
     if dest.exists(): shutil.copy2(dest, backup / dest.name)
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_name('.' + dest.name + '.tmp')
     shutil.copy2(src, tmp)
-    mode = 0o755 if dest.name in ('dvswitch-dashboard-mode', 'dvswitch-dashboard-dmr-network') else (0o440 if dest.parent == Path('/etc/sudoers.d') else 0o644)
     os.chmod(tmp, mode)
     os.replace(tmp, dest)
-try:
-    create_dmr_presets()
-except Exception as exc:
-    print(f"ERROR: cannot create protected BM/TGIF presets: {exc}")
-    raise SystemExit(1)
+if not preset_ready:
+    try:
+        create_dmr_presets()
+    except Exception as exc:
+        print(f"ERROR: cannot create protected BM/TGIF presets: {exc}")
+        raise SystemExit(1)
 if upgrade:
     start = data.index(marker)
     end = data.index('</script>', start) + len('</script>')
     changed = data[:start] + added.split('\n', 1)[1] + data[end:]
-else:
+elif ui_changed:
     changed = data.replace(original, added, 1)
-fd, name = tempfile.mkstemp(prefix=f".{index.name}.", dir=str(index.parent)); os.close(fd)
-temp = Path(name)
-try:
-    shutil.copystat(index, temp); temp.write_text(changed); os.replace(temp, index)
-except Exception:
-    temp.unlink(missing_ok=True); raise
+else:
+    changed = data
+if ui_changed:
+    fd, name = tempfile.mkstemp(prefix=f".{index.name}.", dir=str(index.parent)); os.close(fd)
+    temp = Path(name)
+    try:
+        shutil.copystat(index, temp); temp.write_text(changed); os.replace(temp, index)
+    except Exception:
+        temp.unlink(missing_ok=True); raise
 print("PASS: visual Select Mode button rail installed atomically.")
 print(f"Backup: {backup}")
 PY
