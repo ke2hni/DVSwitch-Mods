@@ -134,7 +134,7 @@ added = '''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif
           for (var k = 0; k < buttons.length; k++) buttons[k].classList.remove('dvs-mode-selected');
           button.classList.add('dvs-mode-selected');
           try { window.localStorage.setItem('dvswitch-selected-mode', button.dataset.mode.toUpperCase().replace('-', '')); } catch (e) {}
-          setTimeout(function () { window.location.reload(); }, 3000);
+          window.location.reload();
         })
         .catch(function () { alert('Mode switch failed. The current mode was not changed visually.'); })
         .finally(function () { button.disabled = false; });

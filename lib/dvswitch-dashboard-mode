@@ -2,13 +2,6 @@
 set -eu
 mode="${1-}"
 case "$mode" in
-  P25|YSF|NXDN|DSTAR|STFU)
-    /opt/MMDVM_Bridge/dvswitch.sh mode "$mode"
-    # mode changes restart/reconfigure the bridge asynchronously; do not let
-    # the dashboard reload race the new ABInfo/talkgroup state.
-    sleep 3
-    systemctl is-active --quiet analog_bridge.service
-    systemctl is-active --quiet mmdvm_bridge.service
-    ;;
+  P25|YSF|NXDN|DSTAR|STFU) exec /opt/MMDVM_Bridge/dvswitch.sh mode "$mode" ;;
   *) echo "Unsupported mode" >&2; exit 64 ;;
 esac
