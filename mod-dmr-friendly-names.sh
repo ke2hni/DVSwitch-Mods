@@ -16,6 +16,7 @@ readonly TGIF_LIST="/var/lib/mmdvm/TGList_TGIF.txt"
 readonly STATE_FILE="/var/lib/mmdvm/dvswitch-mods-dmr-state.json"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dmr-friendly-names"
 readonly MOD_MARKER="// DVSwitch-Mods: DMR Master friendly-name display v7"
+readonly NETWORK_STATE_MARKER="// Record the deliberately selected DMR network even when TG9 is blocked."
 
 WORK_DIR=""
 ACTIVE_BACKUP=""
@@ -222,6 +223,7 @@ verify_installed() {
     if ! cmp -s "$WORK_DIR/status.php" "$TARGET"; then printf 'ERROR: installed status.php does not match the validated candidate.\n' >&2; return 1; fi
     if ! php -l "$TARGET" >/dev/null; then printf 'ERROR: installed status.php failed PHP syntax validation.\n' >&2; return 1; fi
     if [[ $(grep -Fc "$MOD_MARKER" "$TARGET") -ne 1 ]]; then printf 'ERROR: installed modification marker is missing or duplicated.\n' >&2; return 1; fi
+    if [[ $(grep -Fc "$NETWORK_STATE_MARKER" "$TARGET") -ne 1 ]]; then printf 'ERROR: DMR network-state update is missing or duplicated.\n' >&2; return 1; fi
     if [[ $(grep -Fc 'dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)' "$TARGET") -ne 1 ]]; then printf 'ERROR: DMR Master display wrapper is missing or duplicated.\n' >&2; return 1; fi
     if [[ $(grep -Fc 'dvsModsDmrMasterHeading($dmrMasterHost, $abinfo)' "$TARGET") -ne 1 ]]; then printf 'ERROR: DMR Master network heading wrapper is missing or duplicated.\n' >&2; return 1; fi
     if [[ $(grep -Fc 'white-space:normal;word-break:normal;overflow-wrap:anywhere;text-align:center;' "$TARGET") -ne 1 ]]; then printf 'ERROR: DMR Master wrapping style is missing or duplicated.\n' >&2; return 1; fi
