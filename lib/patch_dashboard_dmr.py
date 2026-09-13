@@ -315,9 +315,17 @@ elif markers == 1 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 an
                 break
     if end is None:
         raise SystemExit("ERROR: unterminated installed v7 DMR helper")
-    replacement = helper.replace("                $state['current_network'] = $network;\n", '')
-    replacement = replacement.replace("        $state['current_network'] = $network;\n", '')
-    text = text[:start] + replacement.rstrip() + text[end:]
+    installed_helper = text[start:end]
+    already_correct = (
+        "if ($mode === 'STFU')" not in installed_helper.split('function dvsModsDmrMasterDisplay(', 1)[0]
+        and "$network = ($mode === 'STFU') ? 'BM'" not in installed_helper
+        and "$state['current_network'] = $network;" not in installed_helper
+        and "if (!$isDmr && isset($state['current_network'])" not in installed_helper
+    )
+    if not already_correct:
+        replacement = helper.replace("                $state['current_network'] = $network;\n", '')
+        replacement = replacement.replace("        $state['current_network'] = $network;\n", '')
+        text = text[:start] + replacement.rstrip() + text[end:]
     ysf_markers = text.count("// DVSwitch-Mods: YSF dashboard null repair v1")
     if ysf_markers not in (0, 1):
         raise SystemExit("ERROR: unexpected YSF marker in DMR-only dashboard state")
