@@ -302,7 +302,7 @@ elif markers == 1 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 an
     new_heading_network = "        if (isset($state['current_network']) && ($state['current_network'] === 'BM' || $state['current_network'] === 'TGIF')) {"
     old_display_network = "        $network = ($mode === 'STFU') ? 'BM' : dvsModsDmrNetwork($master);"
     new_display_network = "        $network = (isset($state['current_network']) && ($state['current_network'] === 'BM' || $state['current_network'] === 'TGIF')) ? $state['current_network'] : dvsModsDmrNetwork($master);"
-    old_state_assignment = "                // Record the deliberately selected DMR network even when TG9 is blocked.\n                $state['current_network'] = $network;\n"
+    old_state_assignment = "                $state['current_network'] = $network;\n"
     old_non_dmr_fallback = "        if (!$isDmr && isset($state['current_network']) && ($state['current_network'] === 'BM' || $state['current_network'] === 'TGIF')) {\n                $network = $state['current_network'];\n        }\n"
     required_counts = (text.count(old_heading_network), text.count(old_display_network), text.count(old_state_assignment), text.count(old_non_dmr_fallback))
     if required_counts != (1, 1, 1, 1):
@@ -310,6 +310,7 @@ elif markers == 1 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 an
     text = text.replace(old_heading_network, new_heading_network, 1)
     text = text.replace(old_display_network, new_display_network, 1)
     text = text.replace(old_state_assignment, '', 1)
+    text = text.replace("                // Record the deliberately selected DMR network even when TG9 is blocked.\n", '', 1)
     text = text.replace(old_non_dmr_fallback, '', 1)
     ysf_markers = text.count("// DVSwitch-Mods: YSF dashboard null repair v1")
     if ysf_markers not in (0, 1):
