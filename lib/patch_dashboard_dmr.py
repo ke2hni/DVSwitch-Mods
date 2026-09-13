@@ -299,12 +299,12 @@ elif markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 an
 elif markers == 1 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 and v4_markers == 0 and v5_markers == 0 and v6_markers == 0:
     if text.count(new_output) != 1 or text.count(v2_output) != 0 or text.count(old_output) != 0:
         raise SystemExit("ERROR: incomplete or ambiguous DMR friendly-name modification")
-    old_heading_network = re.compile(r"[ \t]*if \(\$mode === 'STFU'\) \{\s*\$network = 'BM';\s*\} else if \(\$mode === 'DMR'\) \{\s*\$network = dvsModsDmrNetwork\(\$master\);\s*\} else if \(isset\(\$state\['current_network'\]\).*?\) \{")
+    old_heading_network = re.compile(r"(?ms)^[ \t]*if \(\$mode === 'STFU'\) \{\r?\n[ \t]*\$network = 'BM';\r?\n[ \t]*\} else if \(\$mode === 'DMR'\) \{\r?\n[ \t]*\$network = dvsModsDmrNetwork\(\$master\);\r?\n[ \t]*\} else if \(isset\(\$state\['current_network'\]\).*?\) \{\r?\n")
     new_heading_network = "        if (isset($state['current_network']) && ($state['current_network'] === 'BM' || $state['current_network'] === 'TGIF')) {"
-    old_display_network = re.compile(r"[ \t]*\$network = \(\$mode === 'STFU'\) \? 'BM' : dvsModsDmrNetwork\(\$master\);\n")
+    old_display_network = re.compile(r"(?m)^[ \t]*\$network = \(\$mode === 'STFU'\) \? 'BM' : dvsModsDmrNetwork\(\$master\);\r?\n")
     new_display_network = "        $network = (isset($state['current_network']) && ($state['current_network'] === 'BM' || $state['current_network'] === 'TGIF')) ? $state['current_network'] : dvsModsDmrNetwork($master);"
-    old_state_assignment = re.compile(r"[ \t]*(?:// Record the deliberately selected DMR network even when TG9 is blocked\.\n[ \t]*)?\$state\['current_network'\] = \$network;\n")
-    old_non_dmr_fallback = re.compile(r"[ \t]*if \(!\$isDmr && isset\(\$state\['current_network'\].*?\n[ \t]*\$network = \$state\['current_network'\];\s*\n[ \t]*\}\n", re.S)
+    old_state_assignment = re.compile(r"(?m)^[ \t]*(?:// Record the deliberately selected DMR network even when TG9 is blocked\.\r?\n[ \t]*)?\$state\['current_network'\] = \$network;\r?\n")
+    old_non_dmr_fallback = re.compile(r"(?ms)^[ \t]*if \(!\$isDmr && isset\(\$state\['current_network'\].*?\r?\n[ \t]*\$network = \$state\['current_network'\];\r?\n[ \t]*\}\r?\n")
     required_counts = (len(old_heading_network.findall(text)), len(old_display_network.findall(text)), len(old_state_assignment.findall(text)), len(old_non_dmr_fallback.findall(text)))
     if required_counts != (1, 1, 1, 1):
         raise SystemExit("ERROR: incomplete or ambiguous installed v7 DMR network logic: " + repr(required_counts))
