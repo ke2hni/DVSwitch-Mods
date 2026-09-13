@@ -10,7 +10,10 @@ python3 - "$TARGET" "${1:---check}" "$BACKUP_ROOT" "$ROOT" <<'PY'
 import os, shutil, sys, tempfile
 from datetime import datetime
 from pathlib import Path
-t, action, backups, root = map(Path, (sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]))
+t = Path(sys.argv[1])
+action = sys.argv[2]
+backups = Path(sys.argv[3])
+root = Path(sys.argv[4])
 factory='<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif;">'
 marker='<div id="dvs-mode-buttons" aria-label="Select Mode">'
 old='''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif;">
