@@ -27,12 +27,12 @@ old='''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif;">
 <button type="button" class="button link dvs-mode-button">D-Star</button>
 </div>
 <style type="text/css">
-#dvs-mode-buttons { position: fixed; z-index: 30; left: max(8px, calc(50% - 740px)); top: 50%; transform: translateY(-50%); width: 112px; text-align: center; }
-#dvs-mode-buttons .dvs-mode-buttons-title { margin: 0 0 8px; color: inherit; font-weight: bold; text-align: center; white-space: nowrap; }
-#dvs-mode-buttons .dvs-mode-button { box-sizing: border-box; display: block; width: 112px; height: 32px; margin: 4px 0; padding: 0; line-height: 32px; text-align: center; vertical-align: middle; }
+#dvs-mode-buttons { display: flex; align-items: center; justify-content: center; gap: 4px; width: 100%; margin: 8px 0; text-align: center; }
+#dvs-mode-buttons .dvs-mode-buttons-title { margin: 0 8px 0 0; color: inherit; font-weight: bold; white-space: nowrap; }
+#dvs-mode-buttons .dvs-mode-button { box-sizing: border-box; display: block; width: 96px; height: 32px; margin: 0; padding: 0; line-height: 32px; text-align: center; vertical-align: middle; }
 #dvs-mode-buttons .dvs-mode-button:hover { background-color: #3a87cd; }
 #dvs-mode-buttons .dvs-mode-button.dvs-mode-selected { background-color: #008000; color: #fff; }
-@media (max-width: 1450px) { #dvs-mode-buttons { display: none; } }
+@media (max-width: 900px) { #dvs-mode-buttons { flex-wrap: wrap; } }
 </style>'''
 new=old.replace('<button type="button" class="button link dvs-mode-button">','<button type="button" class="button link dvs-mode-button" data-mode="',1)
 # Build the functional block from the visual block so its layout remains unchanged.
@@ -65,12 +65,18 @@ new += '''
 }());
 </script>'''
 data=t.read_text(encoding='utf-8')
+header='''<div class="header">
+<center>
+<h2>DVSwitch Dashboard</h2>
+</center>
+</div>'''
 if (data.count(marker)==1 and data.count('<body')==1 and
         data.count("fetch('/dvswitch/dvswitch-mode.php'")==1 and
-        data.count('dvs-mode-selected')==3):
+        data.count('dvs-mode-selected')==3 and
+        data.index(marker) > data.index(header)):
  print('ALREADY MODIFIED: functional Select Mode buttons are installed. No files changed.'); raise SystemExit
 body_matches=list(re.finditer(r'<body\b[^>]*>', data, re.I))
-if len(body_matches) < 1 or data.count(marker) != 1:
+if len(body_matches) < 1 or data.count(marker) > 1:
  print(f'UNSUPPORTED or CUSTOMIZED: body tags={len(body_matches)}, button marker={data.count(marker)}',file=sys.stderr); raise SystemExit(1)
 if action in ('--check','check'):
  print('READY: functional Select Mode button insertion target found. No files changed.'); raise SystemExit
@@ -81,13 +87,20 @@ while b.exists(): n+=1; b=backups/f'install-{stamp}-{n}'
 b.mkdir(mode=0o700); shutil.copy2(t,b/t.name)
 body=body_matches[0]
 start=body.start()
-button_start=data.index(marker)
-script_end=data.find('</script>', button_start)
-style_end=data.find('</style>', button_start)
-end=script_end + len('</script>') if script_end >= 0 else style_end + len('</style>')
-if end <= button_start: print('ERROR: button block end not found', file=sys.stderr); raise SystemExit(1)
 body_tag=body.group(0)
-changed=data[:start] + body_tag + '\n' + new[new.index('\n')+1:] + data[end:]
+if data.count(marker)==1:
+    button_start=data.index(marker)
+    script_end=data.find('</script>', button_start)
+    style_end=data.find('</style>', button_start)
+    end=script_end + len('</script>') if script_end >= 0 else style_end + len('</style>')
+    if end <= button_start: print('ERROR: button block end not found', file=sys.stderr); raise SystemExit(1)
+    clean=data[:start] + body_tag + '\n' + data[end:]
+else:
+    clean=data
+if clean.count(header) != 1:
+    print(f'UNSUPPORTED or CUSTOMIZED: dashboard header={clean.count(header)}', file=sys.stderr); raise SystemExit(1)
+button_block=new[new.index('\n')+1:]
+changed=clean.replace(header, header + '\n' + button_block, 1)
 fd,name=tempfile.mkstemp(prefix=f'.{t.name}.',dir=t.parent); os.close(fd); temp=Path(name)
 try: shutil.copystat(t,temp); temp.write_text(changed,encoding='utf-8'); os.replace(temp,t)
 except Exception: temp.unlink(missing_ok=True); raise
