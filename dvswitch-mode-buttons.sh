@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
+# DVSwitch-Mods mode buttons: placement-safe upgrade v20260914.2
 set -Eeuo pipefail
 TARGET=/usr/share/dvswitch/index.php
 BACKUP_ROOT=/var/backups/dvswitch-mods/mode-buttons
