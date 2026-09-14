@@ -97,16 +97,13 @@ if action not in ('--install','install'):
 backups.mkdir(mode=0o700,parents=True,exist_ok=True); stamp=datetime.now().strftime('%Y%m%d-%H%M%S'); b=backups/f'install-{stamp}'; n=0
 while b.exists(): n+=1; b=backups/f'install-{stamp}-{n}'
 b.mkdir(mode=0o700); shutil.copy2(t,b/t.name)
-body=body_matches[0]
-start=body.start()
-body_tag=body.group(0)
 if data.count(marker)==1:
     button_start=data.index(marker)
     script_end=data.find('</script>', button_start)
     style_end=data.find('</style>', button_start)
     end=script_end + len('</script>') if script_end >= 0 else style_end + len('</style>')
     if end <= button_start: print('ERROR: button block end not found', file=sys.stderr); raise SystemExit(1)
-    clean=data[:start] + body_tag + '\n' + data[end:]
+    clean=data[:button_start] + data[end:]
 else:
     clean=data
 if clean.count(rx_target) != 1:
