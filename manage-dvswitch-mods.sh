@@ -113,6 +113,15 @@ usage() {
 
 require_root() { [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Run this operation with sudo."; }
 require_command() { command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"; }
+ensure_build_dependencies() {
+    local missing=()
+    command -v make >/dev/null 2>&1 || missing+=(make)
+    command -v c++ >/dev/null 2>&1 || missing+=(g++)
+    ((${#missing[@]} == 0)) && return 0
+    require_root; require_command apt-get
+    printf 'Installing missing build dependencies: %s\n' "${missing[*]}"
+    apt-get update && apt-get install -y build-essential
+}
 require_regular() { [[ -f "$1" && ! -L "$1" ]] || die "Required regular file is unavailable: $1"; }
 
 select_component() {
@@ -446,6 +455,7 @@ check_requested() {
 
 install_requested() {
     local requested=$1 component
+    ensure_build_dependencies
     preflight_recorded_backups
     if [[ $requested == all ]]; then
         for component in "${COMPONENTS[@]}"; do

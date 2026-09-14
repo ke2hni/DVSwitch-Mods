@@ -53,6 +53,11 @@ function dvsModsDmrMasterDisplay($master, $abinfo) {
 
 '''
 
+old_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight: bold\\">".$dmrMasterHost."</span></td></tr>\\n";}'''
+new_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;text-align:center;\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
+old_heading = '''echo "<tr><th colspan=\\"2\\">DMR Master</th></tr>\\n";'''
+new_heading = '''echo "<tr><th colspan=\\"2\\">".dvsModsDmrMasterHeading($dmrMasterHost, $abinfo)."</th></tr>\\n";'''
+
 text = path.read_text(encoding="utf-8")
 if text.count(marker) == 1:
     raise SystemExit("ALREADY MODIFIED: DMR friendly-name display is installed.")
