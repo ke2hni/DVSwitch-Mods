@@ -9,7 +9,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.2.0"
+readonly SCRIPT_VERSION="1.2.1"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly STATE_DIR="/var/lib/dvswitch-mods/manager"
 readonly STATE_FILE="$STATE_DIR/active-installs.tsv"
@@ -49,7 +49,6 @@ readonly -a COMPONENTS=(
 
 readonly DARK_MODE_SCRIPT="$SCRIPT_DIR/dvswitch-dark-mode.sh"
 readonly DISPLAY_LAYOUT_SCRIPT="$SCRIPT_DIR/dvswitch-display-layout.sh"
-readonly MODE_BUTTONS_SCRIPT="$SCRIPT_DIR/dvswitch-mode-buttons.sh"
 
 COMPONENT=""
 CHILD_SCRIPT=""
@@ -81,16 +80,14 @@ show_menu() {
         "1) Install all standard DVSwitch repairs and modifications" \
         "2) Install/launch the Dark Mode dashboard installer" \
         "3) Install/launch the Widescreen Display Layout installer" \
-        "4) Install/launch the Dashboard Select Mode buttons installer" \
         "0) Exit" \
         ""
-    printf 'Choose an option [0/1/2/3/4]: '
+    printf 'Choose an option [0/1/2/3]: '
     read -r choice
     case "$choice" in
         1) initialize_state; install_requested all ;;
         2) run_optional_mod_installer "DARK MODE" "$DARK_MODE_SCRIPT" ;;
         3) run_optional_mod_installer "DISPLAY LAYOUT" "$DISPLAY_LAYOUT_SCRIPT" ;;
-        4) run_optional_mod_installer "SELECT MODE BUTTONS" "$MODE_BUTTONS_SCRIPT" ;;
         0) exit 0 ;;
         *) die "Invalid choice" ;;
     esac

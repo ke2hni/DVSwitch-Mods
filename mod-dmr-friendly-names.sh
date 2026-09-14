@@ -8,14 +8,13 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.5.0"
+readonly SCRIPT_VERSION="1.6.0"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly BM_LIST="/var/lib/mmdvm/TGList_BM.txt"
 readonly TGIF_LIST="/var/lib/mmdvm/TGList_TGIF.txt"
-readonly STATE_FILE="/var/lib/mmdvm/dvswitch-mods-dmr-state.json"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dmr-friendly-names"
-readonly MOD_MARKER="// DVSwitch-Mods: DMR Master friendly-name display v7"
+readonly MOD_MARKER="// DVSwitch-Mods: DMR Master friendly-name display v8"
 
 WORK_DIR=""
 ACTIVE_BACKUP=""
@@ -72,47 +71,6 @@ except Exception as exc:
 PY_LIST
 }
 
-validate_state_file() {
-    [[ ! -e "$STATE_FILE" ]] && return 0
-    require_regular_file "$STATE_FILE"
-    DMR_STATE="$STATE_FILE" python3 - <<'PY_STATE'
-import json
-import os
-import sys
-
-try:
-    with open(os.environ["DMR_STATE"], "r", encoding="utf-8") as source:
-        state = json.load(source)
-    if not isinstance(state, dict):
-        raise ValueError("top level is not an object")
-    for key, value in state.items():
-        if key == "current_network":
-            if value not in ("BM", "TGIF"):
-                raise ValueError("invalid current network")
-            continue
-        if key == "observed_mode":
-            if value not in ("DMR", "STFU", "YSF", "YSFN", "YSFW", "P25", "NXDN", "DSTAR", "ASL"):
-                raise ValueError("invalid observed mode")
-            continue
-        if key == "observed_network":
-            if value not in ("BM", "TGIF"):
-                raise ValueError("invalid observed network")
-            continue
-        if key in ("observed_tg", "blocked_tg"):
-            if not isinstance(value, str) or not value.isdigit() or value == "0":
-                raise ValueError("invalid transition talkgroup")
-            continue
-        if key not in ("BM", "TGIF") or not isinstance(value, dict):
-            raise ValueError("invalid network state")
-        tg = str(value.get("tg", ""))
-        if not tg.isdigit() or tg == "0":
-            raise ValueError("invalid saved talkgroup")
-except Exception as exc:
-    print(f"ERROR: DMR state validation failed: {exc}", file=sys.stderr)
-    sys.exit(1)
-PY_STATE
-}
-
 patch_candidate() {
     STATUS_CANDIDATE="$WORK_DIR/status.php" \
         DVS_MOD_MARKER="$MOD_MARKER" \
@@ -138,26 +96,7 @@ begin_backup() {
     while [[ -e "$candidate" ]]; do counter=$((counter + 1)); candidate="$BACKUP_ROOT/install-$timestamp-$counter"; done
     install -d -o root -g root -m 0700 "$candidate"
     cp -a -- "$TARGET" "$candidate/status.php"
-    if [[ -e "$STATE_FILE" ]]; then
-        require_regular_file "$STATE_FILE"
-        cp -a -- "$STATE_FILE" "$candidate/dmr-state.json"
-    else
-        : > "$candidate/state-was-absent"
-    fi
     ACTIVE_BACKUP="$candidate"
-}
-
-prepare_state() {
-    if [[ -e "$STATE_FILE" ]]; then
-        require_regular_file "$STATE_FILE"
-        validate_state_file
-        chown root:www-data "$STATE_FILE"
-        chmod 0664 "$STATE_FILE"
-    else
-        printf '{}\n' > "$STATE_FILE"
-        chown root:www-data "$STATE_FILE"
-        chmod 0664 "$STATE_FILE"
-    fi
 }
 
 atomic_replace() {
@@ -170,20 +109,11 @@ atomic_replace() {
 }
 
 restore_backup_dir() {
-    local directory=$1 temporary state_temporary
+    local directory=$1 temporary
     require_regular_file "$directory/status.php"
     temporary=$(mktemp --tmpdir="$(dirname "$TARGET")" .dvswitch-dmr-friendly-restore.XXXXXX)
     cp -a -- "$directory/status.php" "$temporary"
     mv -fT -- "$temporary" "$TARGET"
-    if [[ -f "$directory/dmr-state.json" && ! -L "$directory/dmr-state.json" ]]; then
-        state_temporary=$(mktemp --tmpdir="$(dirname "$STATE_FILE")" .dvswitch-dmr-state-restore.XXXXXX)
-        cp -a -- "$directory/dmr-state.json" "$state_temporary"
-        mv -fT -- "$state_temporary" "$STATE_FILE"
-    elif [[ -f "$directory/state-was-absent" && ! -L "$directory/state-was-absent" ]]; then
-        rm -f -- "$STATE_FILE"
-    else
-        return 1
-    fi
     php -l "$TARGET" >/dev/null
 }
 
@@ -215,7 +145,6 @@ preflight_install() {
     require_regular_file "$TGIF_LIST"
     validate_tg_list "$BM_LIST" BrandMeister 1000 3100
     validate_tg_list "$TGIF_LIST" TGIF 100 31665
-    validate_state_file
 }
 
 verify_installed() {
@@ -229,9 +158,6 @@ verify_installed() {
     if grep -Fq 'strpos($dmrstatus,' "$TARGET"; then printf 'ERROR: obsolete DMR status variable remains installed.\n' >&2; return 1; fi
     if [[ $(grep -Fc '>Tx TG/Ref</th>' "$TARGET") -ne 2 ]]; then printf 'ERROR: D-Star Tx TG/Ref labels were not preserved.\n' >&2; return 1; fi
     if [[ $(grep -Fc 'formatReflectorLink(' "$TARGET") -ne 2 ]]; then printf 'ERROR: P25/NXDN friendly-name wrappers were not preserved.\n' >&2; return 1; fi
-    if [[ ! -f "$STATE_FILE" || -L "$STATE_FILE" ]]; then printf 'ERROR: DMR state file is missing or unsafe.\n' >&2; return 1; fi
-    [[ $(stat -c '%U:%G:%a' "$STATE_FILE") == root:www-data:664 ]] || { printf 'ERROR: DMR state file metadata is incorrect.\n' >&2; return 1; }
-    if ! validate_state_file; then printf 'ERROR: DMR state file validation failed.\n' >&2; return 1; fi
 }
 
 run_check() {
@@ -255,7 +181,6 @@ run_install() {
     fi
     begin_backup
     INSTALL_ACTIVE=1
-    prepare_state
     atomic_replace
     if ! verify_installed; then
         if restore_backup_dir "$ACTIVE_BACKUP"; then

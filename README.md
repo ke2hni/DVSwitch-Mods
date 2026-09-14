@@ -248,9 +248,10 @@ sudo ./mod-dstar-tx-ref.sh --install
 
 ### 4. DMR friendly names
 
-**What it adds:** Dynamic `DMR BM Master` and `DMR TGIF Master` headings,
-BrandMeister/TGIF/STFU talkgroup names, saved network state, long-name wrapping,
-and protection against stale cross-mode talkgroups. Blank BrandMeister names
+**What it adds:** DMR BM/TGIF Master headings and BrandMeister/TGIF talkgroup
+names with long-name wrapping. This is display-only; it does not add buttons,
+mode switching, network switching, presets, privileged helpers, or saved network
+state. Blank BrandMeister names
 and valid reflector entries are accepted because they are normal records in
 the published list; unnamed entries simply have no friendly name to display.
 
@@ -410,6 +411,10 @@ manager's recorded standard-component order:
 
 14. Dark Mode overlay
 15. Widescreen Display Layout
+
+The removed Select Mode buttons and mode/network-switching project is not part
+of this repository. Its separate reference archive must be retained outside
+the repository for future development.
 
 The menu launches these two installers after the standard installation choice;
 their backups are maintained by the standalone scripts.
