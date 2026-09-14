@@ -74,15 +74,18 @@ new += '''
 }());
 </script>'''
 data=t.read_text(encoding='utf-8')
-header='''<div class="header">
-<center>
-<h2>DVSwitch Dashboard</h2>
-</center>
+rx_target='''<div class="content"><center>
+<div style="margin-top:8px;">
+<?php
+if ( RXMONITOR == "YES" ) {
+echo '<button class="button link" onclick="playAudioToggle(8080, this)"><b>&nbsp;&nbsp;&nbsp;<img src=images/speaker.png alt="" style="vertical-align:middle">&nbsp;&nbsp;RX Monitor&nbsp;&nbsp;&nbsp;</b></button>';}
+?>
+</div></center>
 </div>'''
 if (data.count(marker)==1 and data.count('<body')==1 and
         data.count("fetch(endpoint")==1 and
         data.count('dvs-mode-selected')==3 and
-        data.index(marker) > data.index(header)):
+        data.index(marker) < data.index(rx_target)):
  print('ALREADY MODIFIED: functional Select Mode buttons are installed. No files changed.'); raise SystemExit
 body_matches=list(re.finditer(r'<body\b[^>]*>', data, re.I))
 if len(body_matches) < 1 or data.count(marker) > 1:
@@ -106,10 +109,10 @@ if data.count(marker)==1:
     clean=data[:start] + body_tag + '\n' + data[end:]
 else:
     clean=data
-if clean.count(header) != 1:
-    print(f'UNSUPPORTED or CUSTOMIZED: dashboard header={clean.count(header)}', file=sys.stderr); raise SystemExit(1)
+if clean.count(rx_target) != 1:
+    print(f'UNSUPPORTED or CUSTOMIZED: RX Monitor insertion target={clean.count(rx_target)}', file=sys.stderr); raise SystemExit(1)
 button_block=new[new.index('\n')+1:]
-changed=clean.replace(header, header + '\n' + button_block, 1)
+changed=clean.replace(rx_target, button_block + '\n' + rx_target, 1)
 fd,name=tempfile.mkstemp(prefix=f'.{t.name}.',dir=t.parent); os.close(fd); temp=Path(name)
 try: shutil.copystat(t,temp); temp.write_text(changed,encoding='utf-8'); os.replace(temp,t)
 except Exception: temp.unlink(missing_ok=True); raise
