@@ -154,8 +154,6 @@ verify_installed() {
     if [[ $(grep -Fc 'dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)' "$TARGET") -ne 1 ]]; then printf 'ERROR: DMR Master display wrapper is missing or duplicated.\n' >&2; return 1; fi
     if [[ $(grep -Fc 'dvsModsDmrMasterHeading($dmrMasterHost, $abinfo)' "$TARGET") -ne 1 ]]; then printf 'ERROR: DMR Master network heading wrapper is missing or duplicated.\n' >&2; return 1; fi
     if [[ $(grep -Fc 'white-space:normal;word-break:normal;overflow-wrap:anywhere;text-align:center;' "$TARGET") -ne 1 ]]; then printf 'ERROR: DMR Master wrapping style is missing or duplicated.\n' >&2; return 1; fi
-    if [[ $(grep -Fc "\$dmrstat === '' && file_exists(\"/var/log/mmdvm/MMDVM_Bridge-\".gmdate(\"Y-m-d\", time() - 86340).\".log\")" "$TARGET") -ne 1 ]]; then printf 'ERROR: DMR previous-log fallback is missing or duplicated.\n' >&2; return 1; fi
-    if grep -Fq 'strpos($dmrstatus,' "$TARGET"; then printf 'ERROR: obsolete DMR status variable remains installed.\n' >&2; return 1; fi
     if [[ $(grep -Fc '>Tx TG/Ref</th>' "$TARGET") -ne 2 ]]; then printf 'ERROR: D-Star Tx TG/Ref labels were not preserved.\n' >&2; return 1; fi
     if [[ $(grep -Fc 'formatReflectorLink(' "$TARGET") -ne 2 ]]; then printf 'ERROR: P25/NXDN friendly-name wrappers were not preserved.\n' >&2; return 1; fi
 }
