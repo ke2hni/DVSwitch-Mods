@@ -60,7 +60,8 @@ new_heading = '''echo "<tr><th colspan=\\"2\\">".dvsModsDmrMasterHeading($dmrMas
 
 text = path.read_text(encoding="utf-8")
 if text.count(marker) == 1:
-    raise SystemExit("ALREADY MODIFIED: DMR friendly-name display is installed.")
+    print("ALREADY MODIFIED: DMR friendly-name display is installed.")
+    raise SystemExit(0)
 if text.count(marker) or text.count(include_anchor) != 1 or text.count(old_output) != 1 or text.count(old_heading) != 1:
     raise SystemExit("ERROR: unsupported or ambiguous DMR dashboard anchors")
 text = text.replace(include_anchor, include_anchor + helper, 1)
