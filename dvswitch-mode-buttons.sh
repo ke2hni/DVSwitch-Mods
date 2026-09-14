@@ -18,8 +18,8 @@ marker='<div id="dvs-mode-buttons" aria-label="Select Mode">'
 old='''<body style="background-color: #f8f8f8f8;font: 11pt arial, sans-serif;">
 <div id="dvs-mode-buttons" aria-label="Select Mode">
 <div class="dvs-mode-buttons-title">Select Mode</div>
-<button type="button" class="button link dvs-mode-button">BM</button>
-<button type="button" class="button link dvs-mode-button">TGIF</button>
+<button type="button" class="button link dvs-mode-button" data-network="bm">BM</button>
+<button type="button" class="button link dvs-mode-button" data-network="tgif">TGIF</button>
 <button type="button" class="button link dvs-mode-button">STFU</button>
 <button type="button" class="button link dvs-mode-button">YSF</button>
 <button type="button" class="button link dvs-mode-button">P25</button>
@@ -38,7 +38,8 @@ new=old.replace('<button type="button" class="button link dvs-mode-button">','<b
 # Build the functional block from the visual block so its layout remains unchanged.
 new=old
 for label, mode in [('BM',''),('TGIF',''),('STFU','STFU'),('YSF','YSF'),('P25','P25'),('NXDN','NXDN'),('D-Star','DSTAR')]:
-    new=new.replace(f'<button type="button" class="button link dvs-mode-button">{label}</button>', f'<button type="button" class="button link dvs-mode-button" data-mode="{mode}">{label}</button>')
+    if label not in ('BM', 'TGIF'):
+        new=new.replace(f'<button type="button" class="button link dvs-mode-button">{label}</button>', f'<button type="button" class="button link dvs-mode-button" data-mode="{mode}">{label}</button>')
 new += '''
 <script type="text/javascript">
 (function () {
@@ -51,17 +52,25 @@ new += '''
     }
     for (var j = 0; j < buttons.length; j++) buttons[j].classList.toggle('dvs-mode-selected', buttons[j].dataset.mode === mode && mode !== '');
   }
+  function markDmrNetwork() {
+    fetch('/dvswitch/dvswitch-dmr-network.php?status=1', {credentials: 'same-origin'})
+      .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+      .then(function (r) { for (var i = 0; i < buttons.length; i++) buttons[i].classList.toggle('dvs-mode-selected', buttons[i].dataset.network === r.network.toLowerCase()); })
+      .catch(function () {});
+  }
   for (var i = 0; i < buttons.length; i++) buttons[i].addEventListener('click', function () {
-    var button = this, mode = button.dataset.mode;
-    if (!mode) return;
-    fetch('/dvswitch/dvswitch-mode.php', {method: 'POST', body: new URLSearchParams({mode: mode}), credentials: 'same-origin'})
+    var button = this, mode = button.dataset.mode, network = button.dataset.network;
+    if (!mode && !network) return;
+    var endpoint = network ? '/dvswitch/dvswitch-dmr-network.php' : '/dvswitch/dvswitch-mode.php';
+    var body = new URLSearchParams(network ? {network: network} : {mode: mode});
+    fetch(endpoint, {method: 'POST', body: body, credentials: 'same-origin'})
       .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
       .then(function (r) { if (!r.ok) throw new Error(); button.classList.add('dvs-mode-selected'); })
       .catch(function () { alert('Mode switch failed.'); });
   });
   var modeInfo = document.getElementById('modeInfo');
   if (modeInfo) new MutationObserver(markMode).observe(modeInfo, {childList:true, subtree:true});
-  setInterval(markMode, 1000); markMode();
+  setInterval(markMode, 1000); setInterval(markDmrNetwork, 1000); markMode(); markDmrNetwork();
 }());
 </script>'''
 data=t.read_text(encoding='utf-8')
@@ -71,7 +80,7 @@ header='''<div class="header">
 </center>
 </div>'''
 if (data.count(marker)==1 and data.count('<body')==1 and
-        data.count("fetch('/dvswitch/dvswitch-mode.php'")==1 and
+        data.count("fetch(endpoint")==1 and
         data.count('dvs-mode-selected')==3 and
         data.index(marker) > data.index(header)):
  print('ALREADY MODIFIED: functional Select Mode buttons are installed. No files changed.'); raise SystemExit
@@ -110,6 +119,8 @@ PY
 if [[ ${1:---check} == "--install" || ${1:---check} == "install" ]]; then
   install -o root -g root -m 0755 "$ROOT/lib/dvswitch-dashboard-mode" /usr/local/sbin/dvswitch-dashboard-mode
   install -o root -g root -m 0644 "$ROOT/dvswitch-mode.php" /usr/share/dvswitch/dvswitch-mode.php
+  install -o root -g root -m 0644 "$ROOT/dvswitch-dmr-network.php" /usr/share/dvswitch/dvswitch-dmr-network.php
+  install -o root -g root -m 0755 "$ROOT/lib/dvswitch-dashboard-dmr-network" /usr/local/sbin/dvswitch-dashboard-dmr-network
   install -o root -g root -m 0440 "$ROOT/lib/dvswitch-dashboard-mode.sudoers" /etc/sudoers.d/dvswitch-dashboard-mode
   visudo -c >/dev/null
 fi

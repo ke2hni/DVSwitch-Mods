@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 header('Content-Type: application/json');
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['status'])) {
+    $address = shell_exec("sudo -n /usr/local/sbin/dvswitch-dashboard-dmr-network status 2>/dev/null");
+    $network = stripos((string)$address, 'tgif.network') !== false ? 'TGIF' : 'BM';
+    echo json_encode(['ok'=>true,'network'=>$network]); exit;
+}
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['ok'=>false]); exit; }
 $network = strtolower((string)($_POST['network'] ?? ''));
 if (!in_array($network, ['bm','tgif'], true)) { http_response_code(400); echo json_encode(['ok'=>false]); exit; }
