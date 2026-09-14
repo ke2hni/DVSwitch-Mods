@@ -91,17 +91,19 @@ def digest(value):
 
 dmr_v2_marker = "// DVSwitch-Mods: DMR Master friendly-name display v2"
 dmr_v3_marker = "// DVSwitch-Mods: DMR Master friendly-name display v3"
+dmr_v8_marker = "// DVSwitch-Mods: DMR Master friendly-name display v8"
 dmr_v2_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight: bold\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
 dmr_v3_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;text-align:center;\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
+dmr_v8_output = dmr_v3_output
 
 def supported_base(value):
     if digest(value) in (supported_hash, os.environ["DVS_VIRGIN_STATUS_HASH"], os.environ["DVS_DMR_V7_STATUS_HASH"]):
         return True
-    counts = (value.count(dmr_v2_marker), value.count(dmr_v3_marker), value.count(dmr_v2_output), value.count(dmr_v3_output))
-    if counts != (0, 1, 0, 1):
-        return False
-    v2_value = value.replace(dmr_v3_marker, dmr_v2_marker, 1).replace(dmr_v3_output, dmr_v2_output, 1)
-    return digest(v2_value) == supported_hash
+    counts = (value.count(dmr_v2_marker), value.count(dmr_v3_marker), value.count(dmr_v8_marker), value.count(dmr_v2_output), value.count(dmr_v3_output))
+    if counts == (0, 1, 0, 0, 1):
+        v2_value = value.replace(dmr_v3_marker, dmr_v2_marker, 1).replace(dmr_v3_output, dmr_v2_output, 1)
+        return digest(v2_value) == supported_hash
+    return counts == (0, 0, 1, 0, 1)
 
 text = path.read_text(encoding="utf-8")
 markers = text.count(marker)
@@ -222,7 +224,8 @@ verify_installed() {
     dmr_v5_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v5' "$TARGET" || true)
     dmr_v6_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v6' "$TARGET" || true)
     dmr_v7_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v7' "$TARGET" || true)
-    [[ $((dmr_v2_count + dmr_v3_count + dmr_v4_count + dmr_v5_count + dmr_v6_count + dmr_v7_count)) -eq 1 ]] || return 1
+    dmr_v8_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v8' "$TARGET" || true)
+    [[ $((dmr_v2_count + dmr_v3_count + dmr_v4_count + dmr_v5_count + dmr_v6_count + dmr_v7_count + dmr_v8_count)) -eq 1 ]] || return 1
     [[ $(grep -Fc '>Tx TG/Ref</th>' "$TARGET") -eq 2 ]] || return 1
     [[ $(grep -Fc 'formatReflectorLink(' "$TARGET") -eq 2 ]] || return 1
     dashboard_health
