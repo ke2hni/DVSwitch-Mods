@@ -36,7 +36,7 @@ Every installer checks compatibility before changing anything, creates a
 protected backup, installs atomically, validates the result, and rolls back
 automatically if installation fails.
 
-Tested on Debian 12 Bookworm and ASL 3 with a fresh install of DVSwitch via their Bookworm install.
+Tested on Debian 12 Bookworm and ASL 3 with a fresh install of DVSwitch via their Bookworm install.<br>
 Hardware Raspberry Pi 4.
 
 wget dvswitch.org/bookworm && chmod +x bookworm && sudo ./bookworm && sudo apt update && sudo apt install dvswitch-server
