@@ -9,23 +9,6 @@
 ![Architectures](https://img.shields.io/badge/MMDVM-ARM64%20%7C%20AMD64%20%7C%20i386-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-Tested on Debian 12 Bookworm and ASL 3 with a fresh install of DVSwitch via their Bookworm install. Hardware Raspberry Pi 4.
-
-wget dvswitch.org/bookworm && chmod +x bookworm && sudo ./bookworm && sudo apt update && sudo apt install dvswitch-server
-
-Tested on Debian 13 Trixie and ASL 3 with a fresh install of DVSwitch via their Trixie install. Hardware Raspberry Pi 5.
-
-wget dvswitch.org/trixie && chmod +x trixie && sudo ./trixie && sudo apt update && sudo apt install dvswitch-server
-
-Tested on Debian 13 Trixie and ASL 3 with a fresh install of DVSwitch via their Trixie install. Hardware x86-64 (amd64 / 64-bit x86) computer architecture (Dell Wyse 3040).
-
-wget dvswitch.org/trixie && chmod +x trixie && sudo ./trixie && sudo apt update && sudo apt install dvswitch-server
-
-To get the configuration menu for dvswitch:
-
-cd /usr/local/dvs
-./dvs
-
 </div>
 
 > [!IMPORTANT]
@@ -52,6 +35,23 @@ DVSwitch-Mods provides two types of changes:
 Every installer checks compatibility before changing anything, creates a
 protected backup, installs atomically, validates the result, and rolls back
 automatically if installation fails.
+
+Tested on Debian 12 Bookworm and ASL 3 with a fresh install of DVSwitch via their Bookworm install. Hardware Raspberry Pi 4.
+
+wget dvswitch.org/bookworm && chmod +x bookworm && sudo ./bookworm && sudo apt update && sudo apt install dvswitch-server
+
+Tested on Debian 13 Trixie and ASL 3 with a fresh install of DVSwitch via their Trixie install. Hardware Raspberry Pi 5.
+
+wget dvswitch.org/trixie && chmod +x trixie && sudo ./trixie && sudo apt update && sudo apt install dvswitch-server
+
+Tested on Debian 13 Trixie and ASL 3 with a fresh install of DVSwitch via their Trixie install. Hardware x86-64 (amd64 / 64-bit x86) computer architecture (Dell Wyse 3040).
+
+wget dvswitch.org/trixie && chmod +x trixie && sudo ./trixie && sudo apt update && sudo apt install dvswitch-server
+
+To get the configuration menu for dvswitch:
+
+cd /usr/local/dvs
+./dvs
 
 ---
 
