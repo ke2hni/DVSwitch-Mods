@@ -230,6 +230,9 @@ v5_start = v5_helper.index('function dvsModsDmrForeignTalkgroup(')
 v5_master = v5_helper[v5_start:].rstrip() + "\n"
 
 text = path.read_text(encoding="utf-8")
+if text.count(marker) == 1 and text.count(new_output) == 1 and text.count("function dvsModsDmrForeignTalkgroup(") == 1:
+    print("ALREADY MODIFIED: DMR friendly-name display is installed.")
+    raise SystemExit(0)
 markers = text.count(marker)
 v1_markers = text.count(v1_marker)
 v2_markers = text.count(v2_marker)
