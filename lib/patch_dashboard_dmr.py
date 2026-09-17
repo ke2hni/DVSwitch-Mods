@@ -15,6 +15,7 @@ v3_marker = "// DVSwitch-Mods: DMR Master friendly-name display v3"
 v4_marker = "// DVSwitch-Mods: DMR Master friendly-name display v4"
 v5_marker = "// DVSwitch-Mods: DMR Master friendly-name display v5"
 v6_marker = "// DVSwitch-Mods: DMR Master friendly-name display v6"
+v7_marker = "// DVSwitch-Mods: DMR Master friendly-name display v7"
 
 include_anchor = "include_once dirname(dirname(__FILE__)).'/include/functions.php';\n"
 helper = r'''
@@ -220,6 +221,7 @@ heading_helper = r'''function dvsModsDmrMasterHeading($master, $abinfo) {
 
 '''
 v6_helper = helper.replace(marker, v6_marker, 1).replace(heading_helper, '', 1)
+v7_helper = helper.replace(marker, v7_marker, 1)
 v5_helper = v6_helper.replace(v6_marker, v5_marker, 1).replace(v6_cleanup, '', 1).replace(v6_fallback, v5_fallback, 1)
 v4_helper = v5_helper.replace(v5_marker, v4_marker, 1)
 v6_start = helper.index('function dvsModsDmrForeignTalkgroup(')
@@ -235,6 +237,7 @@ v3_markers = text.count(v3_marker)
 v4_markers = text.count(v4_marker)
 v5_markers = text.count(v5_marker)
 v6_markers = text.count(v6_marker)
+v7_markers = text.count(v7_marker)
 v3_helper = helper.replace(marker, v3_marker, 1).replace(v6_master, v3_master, 1)
 v2_helper = v3_helper.replace(v3_marker, v2_marker, 1)
 
@@ -296,7 +299,11 @@ elif markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 an
     v3_text = reversible_text.replace(v5_marker, v3_marker, 1).replace(v5_master, v3_master, 1)
     v2_text = v3_text.replace(v3_marker, v2_marker, 1).replace(new_output, v2_output, 1)
     text = text.replace(v6_helper, helper, 1)
-elif markers == 1 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 and v4_markers == 0 and v5_markers == 0 and v6_markers == 0:
+elif markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 and v4_markers == 0 and v5_markers == 0 and v6_markers == 0 and v7_markers == 1:
+    if text.count(v7_helper) != 1 or text.count(new_output) != 1 or text.count(old_output) != 0:
+        raise SystemExit("ERROR: incomplete or ambiguous DMR v7 friendly-name modification")
+    text = text.replace(v7_helper, helper, 1)
+elif markers == 1 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 and v4_markers == 0 and v5_markers == 0 and v6_markers == 0 and v7_markers == 0:
     if text.count(new_output) != 1 or text.count(v2_output) != 0 or text.count(old_output) != 0:
         raise SystemExit("ERROR: incomplete or ambiguous DMR friendly-name modification")
     old_heading_network = re.compile(r"(?ms)^[ \t]*if \(\$mode === 'STFU'\) \{\r?\n[ \t]*\$network = 'BM';\r?\n[ \t]*\} else if \(\$mode === 'DMR'\) \{\r?\n[ \t]*\$network = dvsModsDmrNetwork\(\$master\);\r?\n[ \t]*\} else if \(isset\(\$state\['current_network'\]\).*?\) \{\r?\n")
