@@ -252,6 +252,11 @@ new_logic = r'''        $network = ($mode === 'STFU') ? 'BM' : dvsModsDmrNetwork
 old_fallback = "        if ($talkgroup === '' && $mode === 'DMR') { $talkgroup = dvsModsDmrTalkgroup($abinfo); }"
 new_fallback = "        if ($talkgroup === '' && ($mode === 'DMR' || $mode === 'STFU')) { $talkgroup = dvsModsDmrTalkgroup($abinfo); }"
 
+if markers == 0 and text.count(legacy_v7_helper) == 1 and text.count(new_output) == 1:
+    text = text.replace(legacy_v7_helper, helper, 1)
+    print("UPGRADED: legacy v7 DMR friendly-name display to v8.")
+    raise SystemExit(0)
+
 if markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 and v4_markers == 0 and v5_markers == 0 and v6_markers == 0:
     counts = (text.count(include_anchor), text.count(old_output), text.count(v2_output), text.count(new_output))
     if counts != (1, 1, 0, 0):
