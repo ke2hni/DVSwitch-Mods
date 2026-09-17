@@ -425,21 +425,22 @@ The unified manager handles this order automatically:
 2. DVSwitch database updater repair
 3. P25 audio announcement repair for ARM64 or AMD64
 4. P25 dashboard repair
-5. P25/NXDN JSON databases
-6. P25/NXDN friendly names
-7. D-Star Tx TG/Ref display
-8. DMR friendly names
-9. YSF dashboard null repair
-10. Worldwide DMR/FCC names
-11. Dashboard target display
-12. Dashboard cell spacing and Target wrapping
-13. Hostname-prefixed dashboard title
+5. Dashboard duration type repair
+6. P25/NXDN JSON databases
+7. P25/NXDN friendly names
+8. D-Star Tx TG/Ref display
+9. DMR friendly names
+10. YSF dashboard null repair
+11. Worldwide DMR/FCC names
+12. Dashboard target display
+13. Dashboard cell spacing and Target wrapping
+14. Hostname-prefixed dashboard title
 
 The optional standalone dashboard installers are run separately from the
 manager's recorded standard-component order:
 
-14. Dark Mode overlay
-15. Widescreen Display Layout
+15. Dark Mode overlay
+16. Widescreen Display Layout
 
 The removed Select Mode buttons and mode/network-switching project is not part
 of this repository. Its separate reference archive must be retained outside
