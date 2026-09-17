@@ -254,10 +254,12 @@ new_fallback = "        if ($talkgroup === '' && ($mode === 'DMR' || $mode === '
 
 if markers == 0 and text.count(legacy_v7_helper) == 1 and text.count(new_output) == 1:
     text = text.replace(legacy_v7_helper, helper, 1)
+    path.write_text(text, encoding="utf-8")
     print("UPGRADED: legacy v7 DMR friendly-name display to v8.")
     raise SystemExit(0)
 if markers == 0 and v7_markers == 1 and text.count(new_output) == 1 and text.count("function dvsModsDmrForeignTalkgroup(") == 1:
     text = text.replace(v7_marker, marker, 1)
+    path.write_text(text, encoding="utf-8")
     print("UPGRADED: complete v7 DMR friendly-name display marker to v8.")
     raise SystemExit(0)
 
