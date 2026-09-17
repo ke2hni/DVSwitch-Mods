@@ -36,6 +36,7 @@ readonly -a COMPONENTS=(
     dvswitch-txt-updater
     p25-audio-announcement
     p25-dashboard
+    dashboard-duration
     p25-nxdn-json
     p25-nxdn-friendly-names
     dstar-tx-ref
@@ -141,6 +142,7 @@ select_component() {
         dvswitch-txt-updater) CHILD_SCRIPT="$SCRIPT_DIR/repair-dvswitch-txt-updater.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/txt-updater" ;;
         p25-audio-announcement) CHILD_SCRIPT="$SCRIPT_DIR/repair-p25-audio-announcement.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/p25-audio-announcement" ;;
         p25-dashboard) CHILD_SCRIPT="$SCRIPT_DIR/repair-p25-dashboard.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/p25-dashboard" ;;
+        dashboard-duration) CHILD_SCRIPT="$SCRIPT_DIR/repair-dashboard-duration.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-duration" ;;
         p25-nxdn-json) CHILD_SCRIPT="$SCRIPT_DIR/mod-p25-nxdn-json.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/p25-nxdn-json" ;;
         p25-nxdn-friendly-names) CHILD_SCRIPT="$SCRIPT_DIR/mod-p25-nxdn-friendly-names.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/p25-nxdn-friendly-names" ;;
         dstar-tx-ref) CHILD_SCRIPT="$SCRIPT_DIR/mod-dstar-tx-ref.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dstar-tx-ref" ;;
@@ -347,6 +349,7 @@ check_one() {
 dependency_hint() {
     case "$1" in
         p25-nxdn-json) printf 'install dvswitch-txt-updater first' ;;
+        dashboard-duration) printf 'install p25-dashboard first' ;;
         p25-nxdn-friendly-names) printf 'install p25-dashboard and p25-nxdn-json first' ;;
         dstar-tx-ref) printf 'install p25-nxdn-friendly-names first' ;;
         dmr-friendly-names) printf 'install dstar-tx-ref first' ;;
