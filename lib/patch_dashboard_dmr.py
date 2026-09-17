@@ -256,6 +256,10 @@ if markers == 0 and text.count(legacy_v7_helper) == 1 and text.count(new_output)
     text = text.replace(legacy_v7_helper, helper, 1)
     print("UPGRADED: legacy v7 DMR friendly-name display to v8.")
     raise SystemExit(0)
+if markers == 0 and v7_markers == 1 and text.count(new_output) == 1 and text.count("function dvsModsDmrForeignTalkgroup(") == 1:
+    text = text.replace(v7_marker, marker, 1)
+    print("UPGRADED: complete v7 DMR friendly-name display marker to v8.")
+    raise SystemExit(0)
 
 if markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 and v4_markers == 0 and v5_markers == 0 and v6_markers == 0:
     counts = (text.count(include_anchor), text.count(old_output), text.count(v2_output), text.count(new_output))
