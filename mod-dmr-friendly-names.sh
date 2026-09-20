@@ -16,6 +16,7 @@ readonly TGIF_LIST="/var/lib/mmdvm/TGList_TGIF.txt"
 readonly STATE_FILE="/var/lib/mmdvm/dvswitch-mods-dmr-state.json"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dmr-friendly-names"
 readonly MOD_MARKER="// DVSwitch-Mods: DMR Master friendly-name display v8"
+readonly BUTTONS_MARKER="// DVSwitch-Mode-Buttons: standalone DMR Master display v5"
 
 WORK_DIR=""
 ACTIVE_BACKUP=""
@@ -114,6 +115,12 @@ PY_STATE
 }
 
 patch_candidate() {
+    if [[ $(grep -Fc "$BUTTONS_MARKER" "$TARGET" || true) -eq 1 ]] && \
+       [[ $(grep -Fc 'dvsButtonsDmrMasterDisplay($dmrMasterHost, $abinfo)' "$TARGET" || true) -eq 1 ]] && \
+       [[ $(grep -Fc 'dvsButtonsDmrMasterHeading($dmrMasterHost, $abinfo)' "$TARGET" || true) -eq 1 ]]; then
+        cp -- "$TARGET" "$WORK_DIR/status.php"
+        return
+    fi
     STATUS_CANDIDATE="$WORK_DIR/status.php" \
         DVS_MOD_MARKER="$MOD_MARKER" \
         python3 "$SCRIPT_DIR/lib/patch_dashboard_dmr.py"
@@ -219,6 +226,14 @@ preflight_install() {
 }
 
 verify_installed() {
+    if [[ $(grep -Fc "$BUTTONS_MARKER" "$TARGET" || true) -eq 1 ]] && \
+       [[ $(grep -Fc 'dvsButtonsDmrMasterDisplay($dmrMasterHost, $abinfo)' "$TARGET" || true) -eq 1 ]] && \
+       [[ $(grep -Fc 'dvsButtonsDmrMasterHeading($dmrMasterHost, $abinfo)' "$TARGET" || true) -eq 1 ]]; then
+        php -l "$TARGET" >/dev/null || { printf 'ERROR: buttons DMR Master card failed PHP syntax validation.\n' >&2; return 1; }
+        [[ $(grep -Fc '>Tx TG/Ref</th>' "$TARGET") -eq 2 ]] || { printf 'ERROR: D-Star Tx TG/Ref labels were not preserved.\n' >&2; return 1; }
+        [[ $(grep -Fc 'formatReflectorLink(' "$TARGET") -eq 2 ]] || { printf 'ERROR: P25/NXDN friendly-name wrappers were not preserved.\n' >&2; return 1; }
+        return 0
+    fi
     if ! cmp -s "$WORK_DIR/status.php" "$TARGET"; then printf 'ERROR: installed status.php does not match the validated candidate.\n' >&2; return 1; fi
     if ! php -l "$TARGET" >/dev/null; then printf 'ERROR: installed status.php failed PHP syntax validation.\n' >&2; return 1; fi
     if [[ $(grep -Fc "$MOD_MARKER" "$TARGET") -ne 1 ]]; then printf 'ERROR: installed modification marker is missing or duplicated.\n' >&2; return 1; fi
