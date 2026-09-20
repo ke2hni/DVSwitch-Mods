@@ -35,8 +35,13 @@ require(changed.count(patcher.MARKER) == 1, "marker missing")
 require(changed.count(patcher.INCLUDE) == 1, "helper include missing")
 require(changed.count("dvsModsFccFirstName($listElem[2])") == 1, "FCC lookup missing")
 require(changed.count("dvsModsDmrIdCallsign($listElem[2])") == 1, "DMR resolver missing")
+require(changed.count("max-width:10ch") == 1, "Name-cell wrap limit missing")
+require(changed.count("overflow-wrap:anywhere") == 1, "Name-cell overflow wrapping missing")
 require("width:640px" not in changed, "fixture unexpectedly contained layout width")
 require(patcher.patch_text(changed) == changed, "patch is not idempotent")
+
+legacy_name_style = changed.replace(patcher.NAME_CELL_STYLE_NEW, patcher.NAME_CELL_STYLE_OLD, 1)
+require(patcher.patch_text(legacy_name_style) == changed, "installed FCC Name-cell style was not upgraded")
 
 legacy = changed.replace(patcher.MARKER, patcher.LEGACY_MARKER, 1)
 require(patcher.patch_text(legacy) == changed, "legacy marker was not upgraded")
