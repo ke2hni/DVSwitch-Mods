@@ -11,9 +11,9 @@ umask 077
 readonly SCRIPT_VERSION="1.1.0"
 readonly TARGET="/opt/MMDVM_Bridge/dvswitch.sh"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/p25-nxdn-json"
-readonly STAGE2_HASH="59ee01e069ae489ff0e5c7525876f4621e7215e8d54e7f8e726b573f4d937203"
 readonly MOD_MARKER="# DVSwitch-Mods: P25/NXDN JSON updater modification v2"
 readonly LEGACY_MOD_MARKER="# DVSwitch-Mods: P25/NXDN JSON updater modification v1"
+readonly TXT_UPDATER_MARKER="# DVSwitch-Mods: safe TXT database updater repair"
 
 WORK_DIR=""
 ACTIVE_BACKUP=""
@@ -35,10 +35,11 @@ check_platform() {
 }
 
 patch_candidate() {
-    local candidate=$1 current_hash
-    current_hash=$(sha256sum "$TARGET" | awk '{print $1}')
-    if ! grep -Fq "$MOD_MARKER" "$TARGET" && ! grep -Fq "$LEGACY_MOD_MARKER" "$TARGET" && [[ "$current_hash" != "$STAGE2_HASH" ]]; then
-        die "Required TXT updater repair is not installed. Run repair-dvswitch-txt-updater.sh --install first. Expected repaired dvswitch.sh SHA256 $STAGE2_HASH, found $current_hash."
+    local candidate=$1
+    if ! grep -Fq "$TXT_UPDATER_MARKER" "$TARGET" || \
+       [[ $(grep -Fc 'function installValidatedDatabase()' "$TARGET") -ne 1 ]] || \
+       [[ $(grep -Fc 'function downloadAndValidateDatabase()' "$TARGET") -ne 1 ]]; then
+        die "Required TXT updater repair structure is not installed. Run repair-dvswitch-txt-updater.sh --install first."
     fi
 
     DVSWITCH_CANDIDATE="$candidate" python3 - <<'PY_PATCH'
