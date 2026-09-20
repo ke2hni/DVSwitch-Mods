@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-VERSION="1.2.0"
+VERSION="1.2.1"
 ROOT="/usr/share/dvswitch"
 CSS_FILE="${CSS_FILE:-$ROOT/css/css.php}"
 LH_FILE="${LH_FILE:-$ROOT/include/lh.php}"
@@ -17,7 +17,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 css_path, lh_path = map(Path, sys.argv[1:3])
 action = sys.argv[3]
 backup_root = Path(sys.argv[4])
@@ -63,6 +63,7 @@ targets = {
         pair('echo "<td align=\\"left\\">&nbsp;<a href=\\"http://www.qrz.com/db/$listElem[2]\\" target=\\"_blank\\"><b>$listElem[2]</b></a></td>";', 'echo "<td align=\\"left\\"><a href=\\"http://www.qrz.com/db/$listElem[2]\\" target=\\"_blank\\"><b>$listElem[2]</b></a></td>";'),
         pair('echo "<td align=\\"left\\" style=\\"color:#464646;\\"><b>&nbsp;$listElem[2]</b></td>";', 'echo "<td align=\\"left\\" style=\\"color:#464646;\\"><b>$listElem[2]</b></td>";', 1),
         pair('echo \'<td align="left" style="font-weight:bold;color:#464646;">&nbsp;<b>\'.htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").\'</b></td>\';', 'echo \'<td align="left" style="font-weight:bold;color:#464646;"><b>\'.htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").\'</b></td>\';'),
+        pair('echo \'<td align="left" style="font-weight:bold;color:#464646;white-space:normal;overflow-wrap:anywhere;word-break:normal;max-width:10ch;">&nbsp;<b>\'.htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").\'</b></td>\';', 'echo \'<td align="left" style="font-weight:bold;color:#464646;white-space:normal;overflow-wrap:anywhere;word-break:normal;max-width:10ch;"><b>\'.htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").\'</b></td>\';'),
         pair('echo \'<td align="left">&nbsp;<span style="color:#b5651d;font-weight:bold;white-space:normal;">\'.htmlspecialchars($dvsModsTarget, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").\'</span></td>\';', 'echo \'<td align="left"><span style="display:block;color:#b5651d;font-weight:bold;white-space:normal;">\'.htmlspecialchars($dvsModsTarget, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").\'</span></td>\';'),
     ],
 }
