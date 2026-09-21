@@ -8,8 +8,9 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-LEGACY_MARKER = "// DVSwitch-Mods: cleaned activity Target display v1"
-MARKER = "// DVSwitch-Mods: cleaned activity Target display v2"
+LEGACY_MARKER = "// DVSwitch-Mods: cleaned activity Target display v2"
+OLDER_LEGACY_MARKER = "// DVSwitch-Mods: cleaned activity Target display v1"
+MARKER = "// DVSwitch-Mods: cleaned activity Target display v3"
 INCLUDE = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_target_display.php';"
 LEGEND = '''<div style="margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
   <b>Legend:</b> <b>---</b> = no usable worldwide DMR or FCC name data available<br>
@@ -33,14 +34,14 @@ def block(name: str) -> tuple[str, str]:
 \t\t\techo "<td align=\"left\">&nbsp;<span style=\"color:#b5651d;font-weight:bold;\">".str_replace(" ","&nbsp;", $listElem[4])."</span></td>";
 \t\t}
 '''.replace("\\t", "\t")
-        new = '''\t\t$dvsModsTarget = dvsModsTargetDisplay($listElem[1], $listElem[4], $listElem[6]);
+        new = '''\t\t$dvsModsTarget = dvsModsTargetDisplay($listElem[1], $listElem[4], $listElem[6], $listElem[0]);
 \t\techo '<td align="left">&nbsp;<span style="color:#b5651d;font-weight:bold;white-space:normal;">'.htmlspecialchars($dvsModsTarget, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").'</span></td>';
 '''
     elif name == "localtx.php":
         old = r'''\t\t\tif (strlen($listElem[4]) == 1) { $listElem[4] = str_pad($listElem[4], 8, " ", STR_PAD_LEFT); }
 \t\t\techo"<td align=\"left\">&nbsp;<span style=\"color:#b5651d;font-weight:bold;\">".str_replace(" ","&nbsp;", $listElem[4])."</span></td>";
 '''.replace("\\t", "\t")
-        new = '''\t\t\t$dvsModsTarget = dvsModsTargetDisplay($listElem[1], $listElem[4], $listElem[6]);
+        new = '''\t\t\t$dvsModsTarget = dvsModsTargetDisplay($listElem[1], $listElem[4], $listElem[6], $listElem[0]);
 \t\t\techo '<td align="left">&nbsp;<span style="color:#b5651d;font-weight:bold;white-space:normal;">'.htmlspecialchars($dvsModsTarget, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").'</span></td>';
 '''
     else:
@@ -51,11 +52,11 @@ def block(name: str) -> tuple[str, str]:
 def cell_padding_block(name: str) -> str:
     """Return the equivalent Target block after the later cell-padding mod."""
     if name == "lh.php":
-        return '''\t\t$dvsModsTarget = dvsModsTargetDisplay($listElem[1], $listElem[4], $listElem[6]);
+        return '''\t\t$dvsModsTarget = dvsModsTargetDisplay($listElem[1], $listElem[4], $listElem[6], $listElem[0]);
 \t\techo '<td align="left"><span style="display:block;color:#b5651d;font-weight:bold;white-space:normal;">'.htmlspecialchars($dvsModsTarget, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").'</span></td>';
 '''
     if name == "localtx.php":
-        return '''\t\t\t$dvsModsTarget = dvsModsTargetDisplay($listElem[1], $listElem[4], $listElem[6]);
+        return '''\t\t\t$dvsModsTarget = dvsModsTargetDisplay($listElem[1], $listElem[4], $listElem[6], $listElem[0]);
 \t\t\techo '<td align="left"><span style="display:block;color:#b5651d;font-weight:bold;white-space:normal;">'.htmlspecialchars($dvsModsTarget, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").'</span></td>';
 '''
     raise PatchError(f"unsupported dashboard file: {name}")
@@ -71,12 +72,16 @@ def once(text: str, old: str, new: str, description: str) -> str:
 def patch_text(text: str, name: str) -> str:
     old, new = block(name)
     post_cell_padding = cell_padding_block(name)
-    marker_count = text.count(MARKER) + text.count(LEGACY_MARKER)
+    marker_count = text.count(MARKER) + text.count(LEGACY_MARKER) + text.count(OLDER_LEGACY_MARKER)
     if marker_count > 1:
         raise PatchError(f"duplicate Target markers in {name}")
     if marker_count == 1:
-        if text.count(INCLUDE) != 1 or (text.count(new) + text.count(post_cell_padding)) != 1:
+        old_new = new.replace(", $listElem[0]", "")
+        old_post = post_cell_padding.replace(", $listElem[0]", "")
+        if text.count(INCLUDE) != 1 or (text.count(new) + text.count(post_cell_padding) + text.count(old_new) + text.count(old_post)) != 1:
             raise PatchError(f"incomplete Target modification in {name}")
+        if text.count(old_new) == 1: text = text.replace(old_new, new, 1)
+        if text.count(old_post) == 1: text = text.replace(old_post, post_cell_padding, 1)
         if name == "localtx.php":
             legend_count = text.count(LEGEND)
             if legend_count > 1:
@@ -89,7 +94,7 @@ def patch_text(text: str, name: str) -> str:
                     raise PatchError("ambiguous Local Activity Target legend spacing")
             else:
                 text = once(text, "</div>\n<br>", "</div>\n<br>\n" + LEGEND + "<br>", "older Local Activity Target legend anchor")
-        return text.replace(LEGACY_MARKER, MARKER, 1)
+        return text.replace(LEGACY_MARKER, MARKER, 1).replace(OLDER_LEGACY_MARKER, MARKER, 1)
     if MARKER in text or LEGACY_MARKER in text or INCLUDE in text or "dvsModsTargetDisplay(" in text:
         raise PatchError(f"partial Target modification in {name}")
     if text.count(old) != 1:

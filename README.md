@@ -334,9 +334,9 @@ sudo ./mod-dashboard-fcc-first-names.sh --update
 routes, Group Call, General Call, GPS/Data labels, and a compact legend with
 separation from the Local Activity grid. Talkgroup modes display friendly
 names followed by `(TG ###)`. Reflector or room modes display the friendly
-name followed by `(Ref ###)` when the received target contains a usable
-reference value. History rows remain tied to the destination recorded when
-each reception occurred.
+name followed by `(Ref ###)`. YSF room references are resolved from the
+YSFGateway link history using each activity row's timestamp, so historical
+rows retain the room that was active when the reception occurred.
 
 **Required first:** `mod-dashboard-fcc-first-names.sh`; valid P25/NXDN JSON and
 BrandMeister/TGIF lists provide the friendly names.

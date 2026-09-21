@@ -65,16 +65,43 @@ function dvsModsTargetRefValue($target) {
     return '';
 }
 
-function dvsModsTargetDisplay($mode, $rawTarget, $activityType = '') {
+function dvsModsTargetYsfRef($timestamp) {
+    $eventTime = strtotime((string)$timestamp);
+    if ($eventTime === false) { return ''; }
+    $linked = '';
+    $linkedTime = -1;
+    foreach ((array)glob('/var/log/mmdvm/YSFGateway-*.log') as $path) {
+        if (!is_readable($path)) { continue; }
+        foreach ((array)file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+            if (!preg_match('/^\S+:\s+(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+) Linked to (.+?)\s*$/', $line, $matches)) { continue; }
+            $lineTime = strtotime($matches[1]);
+            if ($lineTime !== false && $lineTime <= $eventTime && $lineTime >= $linkedTime) {
+                $linked = trim($matches[2]);
+                $linkedTime = $lineTime;
+            }
+        }
+    }
+    if ($linked === '') { return ''; }
+    $hosts = dvsModsTargetDataPath('YSFHosts.txt');
+    if (!is_readable($hosts)) { return ''; }
+    foreach ((array)file($hosts, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $fields = explode(';', $line);
+        if (count($fields) >= 2 && strcasecmp(trim($fields[1]), $linked) === 0) { return trim($fields[0]); }
+    }
+    return '';
+}
+
+function dvsModsTargetDisplay($mode, $rawTarget, $activityType = '', $timestamp = '') {
     static $cache = array();
     $mode = trim((string)$mode);
     $target = dvsModsTargetCleanLabel($rawTarget);
     $activityType = trim((string)$activityType);
-    $key = $mode."\0".$target."\0".$activityType;
+    $key = $mode."\0".$target."\0".$activityType."\0".(string)$timestamp;
     if (isset($cache[$key])) { return $cache[$key]; }
 
     if ($mode === 'YSF') {
-        $ref = dvsModsTargetRefValue($target);
+        $ref = dvsModsTargetYsfRef($timestamp);
+        if ($ref === '') { $ref = dvsModsTargetRefValue($target); }
         if (strcasecmp($activityType, 'GPS') === 0 || preg_match('/^\*+/D', $target)) {
             return $cache[$key] = dvsModsTargetWithType('GPS/Data', 'Ref', $ref);
         }
