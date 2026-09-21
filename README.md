@@ -32,9 +32,11 @@ DVSwitch-Mods provides two types of changes:
   and talkgroup names, D-Star reflector details, FCC first names, and cleaner
   activity targets.
 
-Every installer checks compatibility before changing anything, creates a
-protected backup, installs atomically, validates the result, and rolls back
-automatically if installation fails.
+Standard component installers check compatibility before changing anything,
+create protected backups, install atomically, validate the result, and roll
+back automatically if installation fails. The standalone Dark Mode and
+Widescreen Display Layout installers maintain protected and per-run backups
+and provide explicit restore commands.
 
 ## 📡 What this repository was tested on
 
@@ -446,7 +448,7 @@ The removed Select Mode buttons and mode/network-switching project is not part
 of this repository. Its separate reference archive must be retained outside
 the repository for future development.
 
-The menu launches these two installers after the standard installation choice;
+The menu provides separate options to launch these two standalone installers;
 their backups are maintained by the standalone scripts.
 
 > [!NOTE]
