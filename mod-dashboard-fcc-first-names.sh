@@ -138,7 +138,16 @@ updater_release_state() {
         done
         systemctl is-enabled --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not enabled."
         systemctl is-active --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not active."
-        printf 'upgradeable'
+        if cmp -s "$UPDATER_SOURCE" "$UPDATER_TARGET" &&
+           cmp -s "$PATCHER" "$PATCHER_TARGET" &&
+           cmp -s "$BUILDER" "$BUILDER_TARGET" &&
+           cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" &&
+           cmp -s "$SERVICE_SOURCE" "$SERVICE_TARGET" &&
+           cmp -s "$TIMER_SOURCE" "$TIMER_TARGET"; then
+            printf 'current'
+        else
+            printf 'upgradeable'
+        fi
         return
     fi
     cmp -s "$UPDATER_SOURCE" "$UPDATER_TARGET" || die "Installed FCC updater does not match this release."
