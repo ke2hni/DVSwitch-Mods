@@ -25,21 +25,6 @@ readonly TRANSACTION_TARGET="$INSTALLED_LIBRARY_DIR/transaction.sh"
 readonly SERVICE_TARGET="/etc/systemd/system/dvswitch-fcc-first-names-update.service"
 readonly TIMER_TARGET="/etc/systemd/system/dvswitch-fcc-first-names-update.timer"
 readonly TIMER_UNIT="dvswitch-fcc-first-names-update.timer"
-readonly PREVIOUS_TIMER_SHA256_V110="5624772150bd1d71f231417b23cd0e48eccd624591523e7f1c0ef9ffae1dea99"
-readonly PREVIOUS_TIMER_SHA256_V112="5d929156ef445c6e3d0c7ee32609f8c2e9cf29042c4cd13b161cae7215f76974"
-readonly PREVIOUS_UPDATER_SHA256_V113="cccb47f9f0dec56556f239372fc722dd83623ab8b65f679da1c1eaa685a738bc"
-readonly PREVIOUS_UPDATER_SHA256_V120="ff766bf6ed68e81b52e48bd7f6efd1df230ce986ae4e6573dcf98599eb6ed4f5"
-readonly PREVIOUS_PATCHER_SHA256_V120="aff53f3636f25a0ba45c9240958b6654fa95468ab81db28802ff727986c564fd"
-readonly PREVIOUS_UPDATER_SHA256_V121="ff2c45c1e0258a13ed1b819dae6cbc9a99e0be2b7d8d7fb73aa13faeaba426dd"
-readonly PREVIOUS_UPDATER_SHA256_V122="c22227aa1fc83e7e4a50072d7fc61743872ac8a88911174d7ef93969055f8983"
-readonly PREVIOUS_PATCHER_SHA256_V121="80ba8c7e998a596ef43a138ab678457b1a5afce61cb1a2396099fac735ef9a4d"
-readonly PREVIOUS_PATCHER_SHA256_V122="c106ff14a42c7e635e6d36f881b9f2394d37ae0373ebcfd28fb4dc453ec5be79"
-readonly PREVIOUS_PATCHER_SHA256_V123="857826078e15cbf0dc01256f9ca676101d99e97dfa33f15f16bb0996c6604b85"
-readonly CURRENT_PATCHER_SHA256="350c53569658480d61e30d78c16d542bac4d6c3658329edef4398f7bc51aed3e"
-readonly BUILDER_SHA256_V113="d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2"
-readonly TRANSACTION_SHA256_V113="13d743d6065f88888725a1aefe98c8d4ad957974ec5cd991a52ff20ac44a6532"
-readonly SERVICE_SHA256_V113="78c0b1da92560f27aae8db1faa3630498055c3e48663f709f9217463c7eb0267"
-readonly TIMER_SHA256_V113="28e8ec01752c230132848f5891a504194b1dadd6035580b355ad49dee5d05cf3"
 readonly WORK_ROOT="/var/lib/mmdvm"
 readonly FCC_URL="https://data.fcc.gov/download/pub/uls/complete/l_amat.zip"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"
@@ -120,21 +105,19 @@ updater_state() {
     else die "FCC updater installation is incomplete ($present present, $missing missing)."; fi
 }
 
+patcher_structure_supported() {
+    local target=$1
+    grep -Fq 'FCC first-name activity columns' "$target" &&
+    grep -Fq 'dvsModsFccFirstName($listElem[2])' "$target" &&
+    grep -Fq 'dvsModsDmrIdCallsign($listElem[2])' "$target" &&
+    grep -Fq '<th>Name</th>' "$target"
+}
+
 updater_release_state() {
     local state
     state=$(updater_state)
     [[ "$state" != absent ]] || { printf 'absent'; return; }
     if [[ "$state" == legacy ]]; then
-        [[ "$(file_hash "$UPDATER_TARGET")" == "$PREVIOUS_UPDATER_SHA256_V113" ]] || die "Installed legacy FCC updater has an unsupported checksum."
-        [[ "$(file_hash "$BUILDER_TARGET")" == "$BUILDER_SHA256_V113" ]] || die "Installed legacy FCC builder has an unsupported checksum."
-        [[ "$(file_hash "$TRANSACTION_TARGET")" == "$TRANSACTION_SHA256_V113" ]] || die "Installed legacy FCC transaction helper has an unsupported checksum."
-        [[ "$(file_hash "$SERVICE_TARGET")" == "$SERVICE_SHA256_V113" ]] || die "Installed legacy FCC service has an unsupported checksum."
-        local legacy_timer_hash
-        legacy_timer_hash=$(file_hash "$TIMER_TARGET")
-        case "$legacy_timer_hash" in
-            "$PREVIOUS_TIMER_SHA256_V110"|"$PREVIOUS_TIMER_SHA256_V112"|"$TIMER_SHA256_V113") ;;
-            *) die "Installed legacy FCC timer has an unsupported checksum." ;;
-        esac
         [[ "$(stat -c '%U:%G:%a' "$UPDATER_TARGET")" == root:root:755 ]] || die "Incorrect legacy updater ownership or mode."
         for target in "$BUILDER_TARGET" "$TRANSACTION_TARGET" "$SERVICE_TARGET" "$TIMER_TARGET"; do
             [[ "$(stat -c '%U:%G:%a' "$target")" == root:root:644 ]] || die "Incorrect ownership or mode: $target"
@@ -144,11 +127,7 @@ updater_release_state() {
         printf 'upgradeable'
         return
     fi
-    if { [[ "$(file_hash "$UPDATER_TARGET")" == "$PREVIOUS_UPDATER_SHA256_V120" && "$(file_hash "$PATCHER_TARGET")" == "$PREVIOUS_PATCHER_SHA256_V120" ]] ||
-         [[ "$(file_hash "$UPDATER_TARGET")" == "$PREVIOUS_UPDATER_SHA256_V121" && "$(file_hash "$PATCHER_TARGET")" == "$PREVIOUS_PATCHER_SHA256_V121" ]] ||
-         [[ "$(file_hash "$UPDATER_TARGET")" == "$PREVIOUS_UPDATER_SHA256_V122" && "$(file_hash "$PATCHER_TARGET")" == "$CURRENT_PATCHER_SHA256" ]] ||
-         [[ "$(file_hash "$UPDATER_TARGET")" == "$(file_hash "$UPDATER_SOURCE")" && "$(file_hash "$PATCHER_TARGET")" == "$PREVIOUS_PATCHER_SHA256_V122" ]] ||
-         [[ "$(file_hash "$UPDATER_TARGET")" == "$(file_hash "$UPDATER_SOURCE")" && "$(file_hash "$PATCHER_TARGET")" == "$PREVIOUS_PATCHER_SHA256_V123" ]]; }; then
+    if patcher_structure_supported "$PATCHER_TARGET"; then
         cmp -s "$BUILDER" "$BUILDER_TARGET" || die "Installed FCC builder does not match the supported previous release."
         cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die "Installed FCC transaction helper does not match the supported previous release."
         cmp -s "$SERVICE_SOURCE" "$SERVICE_TARGET" || die "Installed FCC systemd service does not match the supported previous release."
@@ -173,15 +152,10 @@ updater_release_state() {
     done
     systemctl is-enabled --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not enabled."
     systemctl is-active --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not active."
-    if cmp -s "$TIMER_SOURCE" "$TIMER_TARGET"; then
+    if cmp -s "$UPDATER_SOURCE" "$UPDATER_TARGET" && cmp -s "$PATCHER" "$PATCHER_TARGET" && cmp -s "$BUILDER" "$BUILDER_TARGET" && cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" && cmp -s "$SERVICE_SOURCE" "$SERVICE_TARGET" && cmp -s "$TIMER_SOURCE" "$TIMER_TARGET"; then
         printf 'current'
     else
-        local timer_hash
-        timer_hash=$(file_hash "$TIMER_TARGET")
-        case "$timer_hash" in
-            "$PREVIOUS_TIMER_SHA256_V110"|"$PREVIOUS_TIMER_SHA256_V112") printf 'upgradeable' ;;
-            *) die "Installed FCC systemd timer has an unsupported checksum: $timer_hash" ;;
-        esac
+        printf 'upgradeable'
     fi
 }
 
@@ -376,7 +350,7 @@ run_restore() {
     . "$TRANSACTION_LIBRARY"
     systemctl disable --now "$TIMER_UNIT" >/dev/null 2>&1 || true
     dvsm_restore_backup_set "$directory"
-    if [[ -f "$UPDATER_TARGET" && ! -L "$UPDATER_TARGET" && "$(file_hash "$UPDATER_TARGET")" == "$PREVIOUS_UPDATER_SHA256_V113" ]] && ! awk -F '\t' -v wanted="$PATCHER_TARGET" '$2 == wanted { found=1 } END { exit(found ? 0 : 1) }' "$directory/MANIFEST"; then
+    if [[ -f "$UPDATER_TARGET" && ! -L "$UPDATER_TARGET" ]] && ! awk -F '\t' -v wanted="$PATCHER_TARGET" '$2 == wanted { found=1 } END { exit(found ? 0 : 1) }' "$directory/MANIFEST"; then
         rm -f -- "$PATCHER_TARGET"
     fi
     php -l "$LH_TARGET" >/dev/null
