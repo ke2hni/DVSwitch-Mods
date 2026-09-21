@@ -48,6 +48,23 @@ function dvsModsTargetDmrNames($number) {
     return array_values($names);
 }
 
+function dvsModsTargetWithType($label, $type = '', $value = '') {
+    $label = dvsModsTargetCleanLabel($label);
+    $value = dvsModsTargetCleanLabel($value);
+    if ($type !== '' && $value !== '') { return ($label === '' ? 'Unknown' : $label).' ('.$type.' '.$value.')'; }
+    return $label === '' ? 'Unknown' : $label;
+}
+
+function dvsModsTargetRefValue($target) {
+    if (preg_match('/\b(?:REF|DCS|XRF|YSF)[-_ ]?([0-9]{3,5})\b/i', $target, $matches)) {
+        return $matches[1];
+    }
+    if (preg_match('/\b([0-9]{3,5})\b/D', $target, $matches)) {
+        return $matches[1];
+    }
+    return '';
+}
+
 function dvsModsTargetDisplay($mode, $rawTarget, $activityType = '') {
     static $cache = array();
     $mode = trim((string)$mode);
@@ -57,17 +74,21 @@ function dvsModsTargetDisplay($mode, $rawTarget, $activityType = '') {
     if (isset($cache[$key])) { return $cache[$key]; }
 
     if ($mode === 'YSF') {
+        $ref = dvsModsTargetRefValue($target);
         if (strcasecmp($activityType, 'GPS') === 0 || preg_match('/^\*+/D', $target)) {
-            return $cache[$key] = 'GPS/Data';
+            return $cache[$key] = dvsModsTargetWithType('GPS/Data', 'Ref', $ref);
         }
-        return $cache[$key] = 'Group Call';
+        return $cache[$key] = dvsModsTargetWithType('Group Call', 'Ref', $ref);
     }
 
     if ($mode === 'D-Star') {
         if (preg_match('/^CQCQCQ(?:\s+via\s+([A-Z0-9]+)\s+([A-Z]))?$/iD', $target, $matches)) {
-            return $cache[$key] = isset($matches[1]) ? strtoupper($matches[1].' '.$matches[2]) : 'General Call';
+            $label = isset($matches[1]) ? strtoupper($matches[1].' '.$matches[2]) : '';
+            $ref = $label === '' ? '' : dvsModsTargetRefValue($label);
+            return $cache[$key] = dvsModsTargetWithType($label === '' ? 'General Call' : $label, 'Ref', $ref);
         }
-        return $cache[$key] = ($target !== '' ? $target : 'Unknown');
+        $ref = dvsModsTargetRefValue($target);
+        return $cache[$key] = dvsModsTargetWithType($target, 'Ref', $ref);
     }
 
     if (preg_match('/^TG\s+([0-9]+)$/iD', $target, $matches)) {
@@ -79,9 +100,9 @@ function dvsModsTargetDisplay($mode, $rawTarget, $activityType = '') {
             $names = dvsModsTargetDmrNames($number);
             if (count($names) === 1) { $label = $names[0]; }
         }
-        return $cache[$key] = ($label === '' ? 'TG '.$number : $label.' (TG '.$number.')');
+        return $cache[$key] = dvsModsTargetWithType($label === '' ? 'TG '.$number : $label, 'TG', $number);
     }
 
-    return $cache[$key] = ($target !== '' ? $target : 'Unknown');
+    return $cache[$key] = dvsModsTargetWithType($target);
 }
 ?>

@@ -332,8 +332,11 @@ sudo ./mod-dashboard-fcc-first-names.sh --update
 
 **What it adds:** Row-specific friendly talkgroup and reflector names, D-Star
 routes, Group Call, General Call, GPS/Data labels, and a compact legend with
-separation from the Local Activity grid. History rows remain tied to the
-destination recorded when each reception occurred.
+separation from the Local Activity grid. Talkgroup modes display friendly
+names followed by `(TG ###)`. Reflector or room modes display the friendly
+name followed by `(Ref ###)` when the received target contains a usable
+reference value. History rows remain tied to the destination recorded when
+each reception occurred.
 
 **Required first:** `mod-dashboard-fcc-first-names.sh`; valid P25/NXDN JSON and
 BrandMeister/TGIF lists provide the friendly names.
