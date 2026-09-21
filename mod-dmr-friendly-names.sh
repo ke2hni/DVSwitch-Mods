@@ -114,12 +114,21 @@ except Exception as exc:
 PY_STATE
 }
 
+buttons_card_is_compatible() {
+    [[ $(grep -Fc "$BUTTONS_MARKER" "$TARGET" || true) -eq 1 ]] &&
+    [[ $(grep -Fc 'dvsButtonsDmrMasterDisplay($dmrMasterHost, $abinfo)' "$TARGET" || true) -eq 1 ]] &&
+    [[ $(grep -Fc 'dvsButtonsDmrMasterHeading($dmrMasterHost, $abinfo)' "$TARGET" || true) -eq 1 ]] &&
+    [[ $(grep -Fc "if (\$liveMode === 'DMR')" "$TARGET" || true) -ge 2 ]] &&
+    [[ $(grep -Fc "if (\$liveMode === 'STFU')" "$TARGET" || true) -ge 2 ]]
+}
+
 patch_candidate() {
-    if [[ $(grep -Fc "$BUTTONS_MARKER" "$TARGET" || true) -eq 1 ]] && \
-       [[ $(grep -Fc 'dvsButtonsDmrMasterDisplay($dmrMasterHost, $abinfo)' "$TARGET" || true) -eq 1 ]] && \
-       [[ $(grep -Fc 'dvsButtonsDmrMasterHeading($dmrMasterHost, $abinfo)' "$TARGET" || true) -eq 1 ]]; then
+    if buttons_card_is_compatible; then
         cp -- "$TARGET" "$WORK_DIR/status.php"
         return
+    fi
+    if [[ $(grep -Fc "$BUTTONS_MARKER" "$TARGET" || true) -eq 1 ]]; then
+        die "Installed DVSwitch-Mode-Buttons DMR card is not the supported live-mode-aware version; upgrade DVSwitch-Mode-Buttons first."
     fi
     STATUS_CANDIDATE="$WORK_DIR/status.php" \
         DVS_MOD_MARKER="$MOD_MARKER" \
@@ -226,9 +235,7 @@ preflight_install() {
 }
 
 verify_installed() {
-    if [[ $(grep -Fc "$BUTTONS_MARKER" "$TARGET" || true) -eq 1 ]] && \
-       [[ $(grep -Fc 'dvsButtonsDmrMasterDisplay($dmrMasterHost, $abinfo)' "$TARGET" || true) -eq 1 ]] && \
-       [[ $(grep -Fc 'dvsButtonsDmrMasterHeading($dmrMasterHost, $abinfo)' "$TARGET" || true) -eq 1 ]]; then
+    if buttons_card_is_compatible; then
         php -l "$TARGET" >/dev/null || { printf 'ERROR: buttons DMR Master card failed PHP syntax validation.\n' >&2; return 1; }
         [[ $(grep -Fc '>Tx TG/Ref</th>' "$TARGET") -eq 2 ]] || { printf 'ERROR: D-Star Tx TG/Ref labels were not preserved.\n' >&2; return 1; }
         [[ $(grep -Fc 'formatReflectorLink(' "$TARGET") -eq 2 ]] || { printf 'ERROR: P25/NXDN friendly-name wrappers were not preserved.\n' >&2; return 1; }
