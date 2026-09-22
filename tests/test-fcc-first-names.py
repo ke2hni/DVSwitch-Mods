@@ -43,6 +43,9 @@ require(patcher.patch_text(changed) == changed, "patch is not idempotent")
 legacy_name_style = changed.replace(patcher.NAME_CELL_STYLE_NEW, patcher.NAME_CELL_STYLE_OLD, 1)
 require(patcher.patch_text(legacy_name_style) == changed, "installed FCC Name-cell style was not upgraded")
 
+legacy_width_style = changed.replace(patcher.NAME_CELL_STYLE_NEW, patcher.NAME_CELL_STYLE_LEGACY_WIDTH, 1)
+require(patcher.patch_text(legacy_width_style) == changed, "installed 10ch FCC Name-cell style was not upgraded")
+
 legacy = changed.replace(patcher.MARKER, patcher.LEGACY_MARKER, 1)
 require(patcher.patch_text(legacy) == changed, "legacy marker was not upgraded")
 

@@ -13,6 +13,7 @@ MARKER = "// DVSwitch-Mods: FCC first-name activity columns v2"
 INCLUDE = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_fcc_first_names.php';"
 NAME_CELL_STYLE_OLD = 'style="font-weight:bold;color:#464646;"'
 NAME_CELL_STYLE_PREVIOUS = 'style="font-weight:bold;color:#464646;white-space:normal;overflow-wrap:anywhere;word-break:normal;max-width:10ch;"'
+NAME_CELL_STYLE_LEGACY_WIDTH = 'style="font-weight:bold;color:#464646;white-space:normal;overflow-wrap:anywhere;word-break:normal;width:10ch;min-width:10ch;max-width:10ch;"'
 NAME_CELL_STYLE_NEW = 'style="font-weight:bold;color:#464646;white-space:normal;overflow-wrap:anywhere;word-break:normal;width:12ch;min-width:12ch;max-width:12ch;"'
 
 
@@ -37,6 +38,8 @@ def patch_text(text: str) -> str:
             return text
         if text.count(NAME_CELL_STYLE_PREVIOUS) == 1:
             return text.replace(NAME_CELL_STYLE_PREVIOUS, NAME_CELL_STYLE_NEW, 1)
+        if text.count(NAME_CELL_STYLE_LEGACY_WIDTH) == 1:
+            return text.replace(NAME_CELL_STYLE_LEGACY_WIDTH, NAME_CELL_STYLE_NEW, 1)
         if text.count(NAME_CELL_STYLE_OLD) == 1:
             return text.replace(NAME_CELL_STYLE_OLD, NAME_CELL_STYLE_NEW, 1)
         raise PatchError("unsupported or ambiguous FCC Name-cell style")
