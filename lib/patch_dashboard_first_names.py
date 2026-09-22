@@ -13,7 +13,7 @@ MARKER = "// DVSwitch-Mods: FCC first-name activity columns v2"
 INCLUDE = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_fcc_first_names.php';"
 NAME_CELL_STYLE_OLD = 'style="font-weight:bold;color:#464646;"'
 NAME_CELL_STYLE_PREVIOUS = 'style="font-weight:bold;color:#464646;white-space:normal;overflow-wrap:anywhere;word-break:normal;max-width:10ch;"'
-NAME_CELL_STYLE_NEW = 'style="font-weight:bold;color:#464646;white-space:normal;overflow-wrap:anywhere;word-break:normal;width:10ch;min-width:10ch;max-width:10ch;"'
+NAME_CELL_STYLE_NEW = 'style="font-weight:bold;color:#464646;white-space:normal;overflow-wrap:anywhere;word-break:normal;width:12ch;min-width:12ch;max-width:12ch;"'
 
 
 class PatchError(RuntimeError):
@@ -73,7 +73,7 @@ def patch_text(text: str) -> str:
     if start >= end:
         raise PatchError("invalid Gateway Activity name-block order")
     replacement = '''                $dvsModsFirstName = dvsModsFccFirstName($listElem[2]);
-                echo '<td align="left" style="font-weight:bold;color:#464646;white-space:normal;overflow-wrap:anywhere;word-break:normal;width:10ch;min-width:10ch;max-width:10ch;">&nbsp;<b>'.htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").'</b></td>';
+                echo '<td align="left" style="font-weight:bold;color:#464646;white-space:normal;overflow-wrap:anywhere;word-break:normal;width:12ch;min-width:12ch;max-width:12ch;">&nbsp;<b>'.htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").'</b></td>';
 '''
     text = text[:start] + replacement + text[end:]
     token = 'if ((is_numeric($listElem[2]) || strpos($listElem[2], "openSPOT") !== FALSE)'
