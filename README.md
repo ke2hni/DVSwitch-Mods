@@ -333,7 +333,7 @@ sudo ./mod-dashboard-fcc-first-names.sh --update
 **What it adds:** Row-specific friendly talkgroup and reflector names, D-Star
 routes, and a compact legend with separation from the Local Activity grid.
 Talkgroup modes display friendly names followed by `(TG ###)`. Reflector or
-room modes display the friendly name followed by `(Ref ###)`. YSF room
+room modes display the friendly name followed by `(TG ###)`. YSF room
 references are resolved from the YSFGateway link history using each activity
 row's timestamp and then matched against `YSFHosts.txt`, so historical rows
 retain the room that was active when the reception occurred. YSF Group Call

@@ -117,7 +117,7 @@ function dvsModsTargetDisplay($mode, $rawTarget, $activityType = '', $timestamp 
         $ref = dvsModsTargetYsfRef($timestamp);
         if ($ref === '') { $ref = dvsModsTargetRefValue($target); }
         $name = dvsModsTargetYsfName($ref);
-        return $cache[$key] = dvsModsTargetWithType($name === '' ? $target : $name, 'Ref', $ref);
+        return $cache[$key] = dvsModsTargetWithType($name === '' ? $target : $name, 'TG', $ref);
     }
 
     if ($mode === 'D-Star') {
