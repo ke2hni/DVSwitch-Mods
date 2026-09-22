@@ -13,10 +13,7 @@ OLDER_LEGACY_MARKER = "// DVSwitch-Mods: cleaned activity Target display v1"
 MARKER = "// DVSwitch-Mods: cleaned activity Target display v3"
 INCLUDE = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_target_display.php';"
 LEGEND = '''<div style="margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
-  <b>Legend:</b> <b>---</b> = no usable worldwide DMR or FCC name data available<br>
-  <b>Talkgroups:</b> <b>Name (TG #)</b> = destination and talkgroup number<br>
-  <b>YSF:</b> <b>Group Call</b> = call to ALL (room not recorded); <b>GPS/Data</b> = data transmission<br>
-  <b>D-Star:</b> <b>General Call</b> = CQCQCQ (reflector not recorded)
+  <b>Legend:</b> <b>---</b> = no usable worldwide DMR or FCC name data available
 </div>
 '''
 

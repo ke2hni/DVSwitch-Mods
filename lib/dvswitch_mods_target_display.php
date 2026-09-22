@@ -1,7 +1,7 @@
 <?php
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Jeff Milne, KE2HNI
-// DVSwitch-Mods: activity Target display helper v2
+// DVSwitch-Mods: activity Target display helper v3
 
 function dvsModsTargetCleanLabel($value) {
     $value = preg_replace('/\s+/u', ' ', str_replace('_', ' ', trim((string)$value)));
@@ -91,6 +91,20 @@ function dvsModsTargetYsfRef($timestamp) {
     return '';
 }
 
+function dvsModsTargetYsfName($ref) {
+    $ref = trim((string)$ref);
+    if ($ref === '') { return ''; }
+    $hosts = dvsModsTargetDataPath('YSFHosts.txt');
+    if (!is_readable($hosts)) { return ''; }
+    foreach ((array)file($hosts, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $fields = explode(';', $line);
+        if (count($fields) < 2 || trim($fields[0]) !== $ref) { continue; }
+        $name = dvsModsTargetCleanLabel($fields[1]);
+        if ($name !== '') { return $name; }
+    }
+    return '';
+}
+
 function dvsModsTargetDisplay($mode, $rawTarget, $activityType = '', $timestamp = '') {
     static $cache = array();
     $mode = trim((string)$mode);
@@ -102,10 +116,8 @@ function dvsModsTargetDisplay($mode, $rawTarget, $activityType = '', $timestamp 
     if ($mode === 'YSF') {
         $ref = dvsModsTargetYsfRef($timestamp);
         if ($ref === '') { $ref = dvsModsTargetRefValue($target); }
-        if (strcasecmp($activityType, 'GPS') === 0 || preg_match('/^\*+/D', $target)) {
-            return $cache[$key] = dvsModsTargetWithType('GPS/Data', 'Ref', $ref);
-        }
-        return $cache[$key] = dvsModsTargetWithType('Group Call', 'Ref', $ref);
+        $name = dvsModsTargetYsfName($ref);
+        return $cache[$key] = dvsModsTargetWithType($name === '' ? $target : $name, 'Ref', $ref);
     }
 
     if ($mode === 'D-Star') {

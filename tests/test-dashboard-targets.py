@@ -59,6 +59,7 @@ with tempfile.TemporaryDirectory() as directory:
     (data / "NXDNHosts.json").write_text('{"reflectors":[{"designator":65000,"name":"World Wide","sponsor":"Place holder"}]}')
     (data / "TGList_BM.txt").write_text("9;0;Local;TG9\n3100;0;USA_Bridge;TG3100\n999;0;BM Name;TG999\n")
     (data / "TGList_TGIF.txt").write_text("43389;0;SouthEast Link;TG43389\n999;0;Different Name;TG999\n")
+    (data / "YSFHosts.txt").write_text("02034;XX-Alabama Link;host.example;42000\n44444;America-Link;host.example;42000\n")
     cases = [
         ("P25", "TG 10200", "", "P25 North America (TG 10200)"),
         ("P25", "TG 43389", "", "Lookout Mountain Amateur Radio Community (TG 43389)"),
@@ -66,10 +67,10 @@ with tempfile.TemporaryDirectory() as directory:
         ("DMR Slot 2", "TG 3100", "", "USA Bridge (TG 3100)"),
         ("DMR", "TG 43389", "", "SouthEast Link (TG 43389)"),
         ("DMR", "TG 999", "", "TG 999"),
-        ("YSF", "ALL at KU0S", "98.7", "Group Call"),
-        ("YSF", "*****BE6w0 at N5YX", "15.1", "GPS/Data"),
-        ("YSF", "ALL at N8IQT", "GPS", "GPS/Data"),
-        ("YSF", "America-Link 44444", "", "Group Call (Ref 44444)"),
+        ("YSF", "ALL at KU0S", "98.7", "ALL at KU0S"),
+        ("YSF", "*****BE6w0 at N5YX", "15.1", "*****BE6w0 at N5YX"),
+        ("YSF", "ALL at N8IQT", "GPS", "ALL at N8IQT"),
+        ("YSF", "America-Link 44444", "", "America-Link (Ref 44444)"),
         ("D-Star", "CQCQCQ via REF058 C", "7.0", "REF058 C (Ref 058)"),
         ("D-Star", "CQCQCQ", "1.0", "General Call"),
         ("P25", "private 123", "", "private 123"),
@@ -88,7 +89,7 @@ echo "PASS: Target display helper cases\\n";
     php = shutil.which("php")
     if php is None:
         helper_text = HELPER.read_text()
-        for token in ("dvsModsTargetDisplay", "dvsModsTargetJsonName", "dvsModsTargetDmrNames", "GPS/Data", "Group Call", "General Call"):
+        for token in ("dvsModsTargetDisplay", "dvsModsTargetJsonName", "dvsModsTargetDmrNames", "dvsModsTargetYsfName", "General Call"):
             require(token in helper_text, "helper structure missing " + token)
         print("SKIP: PHP helper runtime cases (php unavailable)")
     else:

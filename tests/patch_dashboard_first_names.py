@@ -18,7 +18,6 @@ TARGET_INCLUDE = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mod
 TARGET_PREVIOUS_LEGEND = '''<div style="width:640px;margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
   <b>Legend:</b> <b>---</b> = no FCC first name available; callsign may be non-U.S./international or absent from FCC data<br>
   <b>Talkgroups:</b> <b>Name (TG #)</b> = destination and talkgroup number<br>
-  <b>YSF:</b> <b>Group Call</b> = call to ALL (room not recorded); <b>GPS/Data</b> = data transmission<br>
   <b>D-Star:</b> <b>General Call</b> = CQCQCQ (reflector not recorded)
 </div>
 '''
@@ -32,6 +31,10 @@ TARGET_WIDE_PREVIOUS_LEGEND = TARGET_PREVIOUS_LEGEND.replace(
 TARGET_WIDE_LEGEND = TARGET_LEGEND.replace(
     'width:640px;', 'width:min(95%,1400px);'
 )
+TARGET_CURRENT_LEGEND = '''<div style="margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
+  <b>Legend:</b> <b>---</b> = no usable worldwide DMR or FCC name data available
+</div>
+'''
 SUPPORTED = {
     "lh.php": {
         "f8e6c9801c2613796f070921cee442943ed2dfdd4ec2466a266a6df369a8dc70",
@@ -95,7 +98,7 @@ def without_target_modification(text: str, name: str) -> str:
         text.count(TARGET_MARKER),
         text.count(TARGET_INCLUDE),
         text.count("dvsModsTargetDisplay("),
-        text.count(TARGET_LEGEND) + text.count(TARGET_PREVIOUS_LEGEND) + text.count(TARGET_WIDE_LEGEND) + text.count(TARGET_WIDE_PREVIOUS_LEGEND),
+        text.count(TARGET_CURRENT_LEGEND) + text.count(TARGET_LEGEND) + text.count(TARGET_PREVIOUS_LEGEND) + text.count(TARGET_WIDE_LEGEND) + text.count(TARGET_WIDE_PREVIOUS_LEGEND),
     )
     if counts == (0, 0, 0, 0):
         return text
@@ -109,7 +112,7 @@ def without_target_modification(text: str, name: str) -> str:
     recovered = recovered.replace(TARGET_INCLUDE + "\n", "", 1)
     recovered = recovered.replace(modified, original, 1)
     if name == "localtx.php":
-        for legend in (TARGET_LEGEND, TARGET_PREVIOUS_LEGEND, TARGET_WIDE_LEGEND, TARGET_WIDE_PREVIOUS_LEGEND):
+        for legend in (TARGET_CURRENT_LEGEND, TARGET_LEGEND, TARGET_PREVIOUS_LEGEND, TARGET_WIDE_LEGEND, TARGET_WIDE_PREVIOUS_LEGEND):
             if legend in recovered:
                 recovered = recovered.replace(legend, "", 1)
                 break
