@@ -16,6 +16,22 @@ LEGEND = '''<div style="margin:3px auto 0 auto;font-size:10px;line-height:1.3;te
   <b>Legend:</b> <b>---</b> = no usable worldwide DMR or FCC name data available
 </div>
 '''
+LEGACY_LEGENDS = (
+    '''<div style="margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
+  <b>Legend:</b> <b>---</b> = no usable worldwide DMR or FCC name data available<br>
+  <b>Talkgroups:</b> <b>Name (TG #)</b> = destination and talkgroup number<br>
+  <b>YSF:</b> <b>Group Call</b> = call to ALL (room not recorded); <b>GPS/Data</b> = data transmission<br>
+  <b>D-Star:</b> <b>General Call</b> = CQCQCQ (reflector not recorded)
+</div>
+''',
+    '''<div style="width:640px;margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
+  <b>Legend:</b> <b>---</b> = no usable worldwide DMR or FCC name data available<br>
+  <b>Talkgroups:</b> <b>Name (TG #)</b> = destination and talkgroup number<br>
+  <b>YSF:</b> <b>Group Call</b> = call to ALL (room not recorded); <b>GPS/Data</b> = data transmission<br>
+  <b>D-Star:</b> <b>General Call</b> = CQCQCQ (reflector not recorded)
+</div>
+''',
+)
 
 
 class PatchError(RuntimeError):
@@ -90,7 +106,13 @@ def patch_text(text: str, name: str) -> str:
                 elif text.count(spaced_legend) != 1:
                     raise PatchError("ambiguous Local Activity Target legend spacing")
             else:
-                text = once(text, "</div>\n<br>", "</div>\n<br>\n" + LEGEND + "<br>", "older Local Activity Target legend anchor")
+                legacy_matches = [legacy for legacy in LEGACY_LEGENDS if text.count(legacy) == 1]
+                if len(legacy_matches) > 1:
+                    raise PatchError("duplicate legacy Local Activity Target legends")
+                if len(legacy_matches) == 1:
+                    text = text.replace(legacy_matches[0], LEGEND, 1)
+                else:
+                    text = once(text, "</div>\n<br>", "</div>\n<br>\n" + LEGEND + "<br>", "older Local Activity Target legend anchor")
         return text.replace(LEGACY_MARKER, MARKER, 1).replace(OLDER_LEGACY_MARKER, MARKER, 1)
     if MARKER in text or LEGACY_MARKER in text or INCLUDE in text or "dvsModsTargetDisplay(" in text:
         raise PatchError(f"partial Target modification in {name}")

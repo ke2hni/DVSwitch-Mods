@@ -50,6 +50,9 @@ for name, original in (("lh.php", lh), ("localtx.php", localtx)):
     require(patcher.patch_text(changed, name) == changed, name + " patch not idempotent")
     legacy = changed.replace(patcher.MARKER, patcher.LEGACY_MARKER, 1)
     require(patcher.patch_text(legacy, name) == changed, name + " v1 upgrade failed")
+    if name == "localtx.php":
+        old_legend = changed.replace(patcher.LEGEND, patcher.LEGACY_LEGENDS[0], 1)
+        require(patcher.patch_text(old_legend, name) == changed, name + " legacy legend upgrade failed")
     altered = changed + "<!-- user customization -->\n"
     require(patcher.patch_text(altered, name) == altered, name + " user customization was not preserved")
 
