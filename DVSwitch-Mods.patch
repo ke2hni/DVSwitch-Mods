@@ -60,11 +60,11 @@ index 7680f78..088fb93 100755
          printf 'MODIFICATION READY:\nBefore functions.php: %s\nAfter functions.php:  %s\nBefore status.php:    %s\nAfter status.php:     %s\n' "$(file_hash "$FUNCTIONS_TARGET")" "$(file_hash "$WORK_DIR/functions.php")" "$(file_hash "$STATUS_TARGET")" "$(file_hash "$WORK_DIR/status.php")"
      fi
      printf 'PASS: supported dashboard and JSON structure. No files changed.\n'
-diff --git a/tests/test-p25-nxdn-partial-recovery.py b/tests/test-p25-nxdn-partial-recovery.py
+diff --git atests/test-p25-nxdn-partial-recovery.py btests/test-p25-nxdn-partial-recovery.py
 new file mode 100644
 index 0000000..b66aaba
 --- /dev/null
-+++ b/tests/test-p25-nxdn-partial-recovery.py
++++ btests/test-p25-nxdn-partial-recovery.py
 @@ -0,0 +1,55 @@
 +#!/usr/bin/env python3
 +"""Regression coverage for recovery after one shared dashboard file rollback."""
