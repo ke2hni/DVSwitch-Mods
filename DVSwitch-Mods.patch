@@ -1,0 +1,123 @@
+diff --git a/README.md b/README.md
+index 8e51933..a8156ad 100644
+--- a/README.md
++++ b/README.md
+@@ -260,6 +260,12 @@ fallbacks on the dashboard.
+ **Required first:** `repair-p25-dashboard.sh`, `mod-p25-nxdn-json.sh`, and valid
+ P25/NXDN JSON files.
+ 
++The structural check recognizes the recoverable state where the friendly-name
++helper is already in `functions.php` but a whole-file rollback removed the two
++`status.php` wrappers. It restores only those wrappers and leaves the helper and
++other dashboard changes untouched. Other incomplete or ambiguous states are
++reported as errors and are not modified.
++
+ ```bash
+ sudo ./mod-p25-nxdn-friendly-names.sh --check
+ sudo ./mod-p25-nxdn-friendly-names.sh --install
+diff --git a/lib/patch_dashboard_p25_nxdn.py b/lib/patch_dashboard_p25_nxdn.py
+index 39b7398..edfda97 100644
+--- a/lib/patch_dashboard_p25_nxdn.py
++++ b/lib/patch_dashboard_p25_nxdn.py
+@@ -60,6 +60,15 @@ def patch_text(functions: str, status: str) -> tuple[str, str]:
+         functions = once(functions, FUNCTION_ANCHOR, PHP_FUNCTION + FUNCTION_ANCHOR, "functions insertion anchor")
+         status = once(status, P25_PLAIN, P25_WRAPPED, "P25 status call")
+         status = once(status, NXDN_PLAIN, NXDN_WRAPPED, "NXDN status call")
++    elif fm == 1 and wrappers == 0:
++        # A previous whole-file restore can roll status.php back while leaving
++        # functions.php patched. Recover that recognizable split state by
++        # adding only the two missing wrappers; preserve every other status.php
++        # customization. Reject incomplete/ambiguous helper or call structures.
++        if functions.count(PHP_FUNCTION) != 1 or functions.count("function formatReflectorLink(") != 1:
++            raise PatchError("partial P25/NXDN modification: helper function is missing or ambiguous")
++        status = once(status, P25_PLAIN, P25_WRAPPED, "P25 status call after partial rollback")
++        status = once(status, NXDN_PLAIN, NXDN_WRAPPED, "NXDN status call after partial rollback")
+     elif fm == 1 and wrappers == 2:
+         if functions.count(PHP_FUNCTION) != 1 or status.count(P25_WRAPPED) != 1 or status.count(NXDN_WRAPPED) != 1:
+             raise PatchError("incomplete P25/NXDN modification")
+diff --git a/mod-p25-nxdn-friendly-names.sh b/mod-p25-nxdn-friendly-names.sh
+index 7680f78..088fb93 100755
+--- a/mod-p25-nxdn-friendly-names.sh
++++ b/mod-p25-nxdn-friendly-names.sh
+@@ -8,7 +8,7 @@
+ set -Eeuo pipefail
+ umask 077
+ 
+-readonly SCRIPT_VERSION="1.1.5"
++readonly SCRIPT_VERSION="1.1.6"
+ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ readonly FUNCTIONS_TARGET="/usr/share/dvswitch/include/functions.php"
+ readonly STATUS_TARGET="/usr/share/dvswitch/include/status.php"
+@@ -174,6 +174,11 @@ run_check() {
+     if cmp -s "$FUNCTIONS_TARGET" "$WORK_DIR/functions.php" && cmp -s "$STATUS_TARGET" "$WORK_DIR/status.php"; then
+         printf 'ALREADY MODIFIED: P25/NXDN dashboard friendly names are installed.\n'
+     else
++        if [[ $(grep -Fc "$MOD_MARKER" "$FUNCTIONS_TARGET" || true) -eq 1 ]] && \
++            [[ $(grep -Fc 'formatReflectorLink(' "$STATUS_TARGET" || true) -eq 0 ]]; then
++            printf 'RECOVERABLE STATE: helper remains in functions.php; status.php calls were rolled back.\n'
++            printf 'The validated candidate restores only the two P25/NXDN status wrappers.\n'
++        fi
+         printf 'MODIFICATION READY:\nBefore functions.php: %s\nAfter functions.php:  %s\nBefore status.php:    %s\nAfter status.php:     %s\n' "$(file_hash "$FUNCTIONS_TARGET")" "$(file_hash "$WORK_DIR/functions.php")" "$(file_hash "$STATUS_TARGET")" "$(file_hash "$WORK_DIR/status.php")"
+     fi
+     printf 'PASS: supported dashboard and JSON structure. No files changed.\n'
+diff --git a/tests/test-p25-nxdn-partial-recovery.py b/tests/test-p25-nxdn-partial-recovery.py
+new file mode 100644
+index 0000000..b66aaba
+--- /dev/null
++++ b/tests/test-p25-nxdn-partial-recovery.py
+@@ -0,0 +1,55 @@
++#!/usr/bin/env python3
++"""Regression coverage for recovery after one shared dashboard file rollback."""
++
++from __future__ import annotations
++
++import importlib.util
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[1]
++PATCHER = ROOT / "lib" / "patch_dashboard_p25_nxdn.py"
++SPEC = importlib.util.spec_from_file_location("patch_dashboard_p25_nxdn", PATCHER)
++assert SPEC and SPEC.loader
++PATCH = importlib.util.module_from_spec(SPEC)
++SPEC.loader.exec_module(PATCH)
++
++
++class PartialRecoveryTests(unittest.TestCase):
++    def test_repairs_only_status_calls_when_helper_is_already_installed(self) -> None:
++        functions = "<?php\n" + PATCH.PHP_FUNCTION + PATCH.FUNCTION_ANCHOR + " {}\n"
++        status = (
++            "<?php\n// Preserve unrelated dashboard customizations\n"
++            + PATCH.P25_PLAIN
++            + ";\n"
++            + PATCH.NXDN_PLAIN
++            + ";\n"
++        )
++
++        repaired_functions, repaired_status = PATCH.patch_text(functions, status)
++
++        self.assertEqual(repaired_functions, functions)
++        self.assertIn("// Preserve unrelated dashboard customizations", repaired_status)
++        self.assertEqual(repaired_status.count(PATCH.P25_WRAPPED), 1)
++        self.assertEqual(repaired_status.count(PATCH.NXDN_WRAPPED), 1)
++
++    def test_ambiguous_partial_state_is_rejected(self) -> None:
++        functions = "<?php\n" + PATCH.PHP_FUNCTION + PATCH.FUNCTION_ANCHOR + " {}\n"
++        status = "<?php\n" + PATCH.P25_PLAIN + ";\n"
++
++        with self.assertRaisesRegex(PATCH.PatchError, "ambiguous"):
++            PATCH.patch_text(functions, status)
++
++    def test_complete_install_remains_idempotent(self) -> None:
++        functions = "<?php\n" + PATCH.FUNCTION_ANCHOR + " {}\n"
++        status = "<?php\n" + PATCH.P25_PLAIN + ";\n" + PATCH.NXDN_PLAIN + ";\n"
++
++        installed_functions, installed_status = PATCH.patch_text(functions, status)
++        self.assertEqual(
++            PATCH.patch_text(installed_functions, installed_status),
++            (installed_functions, installed_status),
++        )
++
++
++if __name__ == "__main__":
++    unittest.main()
