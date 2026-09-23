@@ -260,6 +260,12 @@ fallbacks on the dashboard.
 **Required first:** `repair-p25-dashboard.sh`, `mod-p25-nxdn-json.sh`, and valid
 P25/NXDN JSON files.
 
+The structural check recognizes the recoverable state where the friendly-name
+helper is already in `functions.php` but a whole-file rollback removed the two
+`status.php` wrappers. It restores only those wrappers and leaves the helper and
+other dashboard changes untouched. Other incomplete or ambiguous states are
+reported as errors and are not modified.
+
 ```bash
 sudo ./mod-p25-nxdn-friendly-names.sh --check
 sudo ./mod-p25-nxdn-friendly-names.sh --install

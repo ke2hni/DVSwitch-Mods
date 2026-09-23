@@ -8,7 +8,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.1.5"
+readonly SCRIPT_VERSION="1.1.6"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly FUNCTIONS_TARGET="/usr/share/dvswitch/include/functions.php"
 readonly STATUS_TARGET="/usr/share/dvswitch/include/status.php"
@@ -174,6 +174,11 @@ run_check() {
     if cmp -s "$FUNCTIONS_TARGET" "$WORK_DIR/functions.php" && cmp -s "$STATUS_TARGET" "$WORK_DIR/status.php"; then
         printf 'ALREADY MODIFIED: P25/NXDN dashboard friendly names are installed.\n'
     else
+        if [[ $(grep -Fc "$MOD_MARKER" "$FUNCTIONS_TARGET" || true) -eq 1 ]] && \
+            [[ $(grep -Fc 'formatReflectorLink(' "$STATUS_TARGET" || true) -eq 0 ]]; then
+            printf 'RECOVERABLE STATE: helper remains in functions.php; status.php calls were rolled back.\n'
+            printf 'The validated candidate restores only the two P25/NXDN status wrappers.\n'
+        fi
         printf 'MODIFICATION READY:\nBefore functions.php: %s\nAfter functions.php:  %s\nBefore status.php:    %s\nAfter status.php:     %s\n' "$(file_hash "$FUNCTIONS_TARGET")" "$(file_hash "$WORK_DIR/functions.php")" "$(file_hash "$STATUS_TARGET")" "$(file_hash "$WORK_DIR/status.php")"
     fi
     printf 'PASS: supported dashboard and JSON structure. No files changed.\n'

@@ -60,6 +60,15 @@ def patch_text(functions: str, status: str) -> tuple[str, str]:
         functions = once(functions, FUNCTION_ANCHOR, PHP_FUNCTION + FUNCTION_ANCHOR, "functions insertion anchor")
         status = once(status, P25_PLAIN, P25_WRAPPED, "P25 status call")
         status = once(status, NXDN_PLAIN, NXDN_WRAPPED, "NXDN status call")
+    elif fm == 1 and wrappers == 0:
+        # A previous whole-file restore can roll status.php back while leaving
+        # functions.php patched. Recover that recognizable split state by
+        # adding only the two missing wrappers; preserve every other status.php
+        # customization. Reject incomplete/ambiguous helper or call structures.
+        if functions.count(PHP_FUNCTION) != 1 or functions.count("function formatReflectorLink(") != 1:
+            raise PatchError("partial P25/NXDN modification: helper function is missing or ambiguous")
+        status = once(status, P25_PLAIN, P25_WRAPPED, "P25 status call after partial rollback")
+        status = once(status, NXDN_PLAIN, NXDN_WRAPPED, "NXDN status call after partial rollback")
     elif fm == 1 and wrappers == 2:
         if functions.count(PHP_FUNCTION) != 1 or status.count(P25_WRAPPED) != 1 or status.count(NXDN_WRAPPED) != 1:
             raise PatchError("incomplete P25/NXDN modification")
