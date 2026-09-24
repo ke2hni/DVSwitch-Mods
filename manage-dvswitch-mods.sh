@@ -55,8 +55,18 @@ COMPONENT=""
 CHILD_SCRIPT=""
 BACKUP_ROOT=""
 UNINSTALL_ACTION="--restore"
+MANAGER_PHASE="starting"
 
 die() { printf 'ERROR: %s\n' "$1" >&2; exit 1; }
+
+report_unexpected_failure() {
+    local line=$1 status=$2
+    trap - ERR
+    printf 'ERROR: DVSwitch-Mods stopped unexpectedly during %s (line %s, status %s). Installation is incomplete; review the output above, then rerun option 1 to resume safely.\n' \
+        "$MANAGER_PHASE" "$line" "$status" >&2
+    exit "$status"
+}
+trap 'report_unexpected_failure "$LINENO" "$?"' ERR
 
 require_executable_script() {
     local script=$1
@@ -268,9 +278,11 @@ record_install() {
 install_one() {
     local requested=$1 before after additions backup count
     select_component "$requested"
+    MANAGER_PHASE="checking $COMPONENT"
     printf '\n=== CHECK: %s ===\n' "$COMPONENT"
     "$CHILD_SCRIPT" --check
     before=$(snapshot_backups "$BACKUP_ROOT")
+    MANAGER_PHASE="installing $COMPONENT"
     printf '\n=== INSTALL: %s ===\n' "$COMPONENT"
     "$CHILD_SCRIPT" --install
     after=$(snapshot_backups "$BACKUP_ROOT")
@@ -285,6 +297,7 @@ install_one() {
     [[ -d "$BACKUP_ROOT/$backup" && ! -L "$BACKUP_ROOT/$backup" ]] || die "New protected backup is unavailable: $BACKUP_ROOT/$backup"
     record_install "$COMPONENT" "$(basename "$CHILD_SCRIPT")" "$BACKUP_ROOT" "$backup" "$UNINSTALL_ACTION"
     printf 'PASS: recorded reversible installation of %s using %s.\n' "$COMPONENT" "$backup"
+    MANAGER_PHASE="post-install check for $COMPONENT"
     printf '\n=== POST-INSTALL CHECK: %s ===\n' "$COMPONENT"
     "$CHILD_SCRIPT" --check
 }
@@ -308,7 +321,8 @@ databases_ready() {
 }
 
 ensure_databases() {
-    local database modified newest=0 now age remaining temporary
+    local database modified newest=0 now age remaining temporary updater_status=0 tee_status=0 optional_feed_errors=0 updater_log
+    local -a pipeline_status=()
     if databases_ready; then
         printf '\n=== DATABASE UPDATE ===\nAll required P25, NXDN, DMR, and YSF data files are already present; no download was requested.\n'
         return
@@ -333,11 +347,29 @@ ensure_databases() {
     chown root:root "$temporary"
     chmod 0600 "$temporary"
     mv -fT -- "$temporary" "$DATABASE_UPDATE_STAMP"
-    "$DVSWITCH_COMMAND" update
+    updater_log=$(mktemp --tmpdir="$STATE_DIR" .database-update-output.XXXXXX)
+    MANAGER_PHASE="updating dashboard databases"
+    set +e
+    "$DVSWITCH_COMMAND" update 2>&1 | tee "$updater_log"
+    pipeline_status=("${PIPESTATUS[@]}")
+    set -e
+    updater_status=${pipeline_status[0]:-1}
+    tee_status=${pipeline_status[1]:-1}
+    ((tee_status == 0)) || die "Could not capture the DVSwitch updater output; stopping so its result is not lost."
+
+    if grep -Eq '^(Warning|Error), (downloaded )?(DCS_Hosts|DPlus_Hosts|DExtra_Hosts)\.txt .*keeping existing' "$updater_log"; then
+        optional_feed_errors=1
+    fi
     for database in "${REQUIRED_DATABASES[@]}"; do
         [[ -f "$database" && ! -L "$database" && -s "$database" ]] || die "Database update did not produce a valid regular nonempty file: $database"
     done
     printf 'PASS: all required P25, NXDN, DMR, and YSF data files are present.\n'
+    if ((optional_feed_errors)); then
+        printf 'NOTICE: optional D-Star feeds (DCS/DPlus/DExtra) reported download or validation errors; the updater kept existing files and all required dashboard databases are present, so installation will continue.\n'
+    elif ((updater_status != 0)); then
+        die "DVSwitch database updater exited with status $updater_status without a recognized optional-feed warning; stopping because the update result is uncertain."
+    fi
+    rm -f -- "$updater_log"
 }
 
 check_one() {
@@ -458,6 +490,7 @@ check_requested() {
 
 install_requested() {
     local requested=$1 component
+    MANAGER_PHASE="checking build dependencies and recorded backups"
     ensure_build_dependencies
     preflight_recorded_backups
     if [[ $requested == all ]]; then
@@ -469,9 +502,11 @@ install_requested() {
             install_one "$component"
             if [[ $component == p25-nxdn-json ]]; then ensure_databases; fi
         done
+        printf '\nPASS: all applicable DVSwitch-Mods components completed successfully.\n'
     else
         install_one "$requested"
         if [[ $requested == p25-nxdn-json ]]; then ensure_databases; fi
+        printf '\nPASS: DVSwitch-Mods component %s completed successfully.\n' "$requested"
     fi
 }
 
