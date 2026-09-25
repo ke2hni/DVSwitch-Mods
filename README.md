@@ -377,6 +377,9 @@ sudo ./mod-dashboard-hostname-title.sh --install
 **Dark** modes. Auto follows the browser or operating-system color preference.
 The theme is applied to the dashboard without changing DVSwitch's live status
 colors.
+When DVSwitch-Mode-Buttons supplies the standalone DMR card, the dark theme
+also recolors its `Room` label for contrast. The stylesheet supports both the
+updated semantic label and the prior installed markup during upgrades.
 
 **Required first:** None. This is a standalone dashboard overlay and is also
 available as option 2 in the manager menu. It may be run after the standard

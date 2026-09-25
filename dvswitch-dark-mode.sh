@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-VERSION="1.0"
+VERSION="1.1"
 ROOT="/usr/share/dvswitch"
 ORIGINAL_BACKUP_DIR="$ROOT/.dvs-dashboard-original-backup"
 CSS_FILE="$ROOT/css/dvs-theme.css"
@@ -78,7 +78,7 @@ write_theme_files(){
   cat > "$CSS_FILE" <<'CSS'
 /*
  * DVSwitch Dashboard Theme Overlay
- * v0.25-test
+ * v0.26
  *
  * Modes:
  *   Auto  = follows browser/system prefers-color-scheme
@@ -233,6 +233,15 @@ body.theme-auto.dvs-prefers-dark th {
   background-color: #111827 !important;
   color: #f9fafb !important;
   border-color: #374151 !important;
+}
+
+/* Keep the Buttons DMR Room label readable over the dark DMR card. The
+ * second selector covers older installed markup until Buttons is upgraded. */
+body.theme-dark .dvs-dmr-room-label,
+body.theme-auto.dvs-prefers-dark .dvs-dmr-room-label,
+body.theme-dark td[style*="background: #ffffed"] > span[style*="color:#b5651d"] > span[style*="color:#000000"],
+body.theme-auto.dvs-prefers-dark td[style*="background: #ffffed"] > span[style*="color:#b5651d"] > span[style*="color:#000000"] {
+  color: #e5e7eb !important;
 }
 
 body.theme-dark table,
