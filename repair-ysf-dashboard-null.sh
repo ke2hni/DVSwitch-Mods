@@ -9,7 +9,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.0.5"
+readonly SCRIPT_VERSION="1.0.6"
 readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly HOSTS_FILE="/var/lib/mmdvm/YSFHosts.txt"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/ysf-dashboard-null"
@@ -230,7 +230,15 @@ verify_installed() {
     dmr_v7_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v7' "$TARGET" || true)
     dmr_v8_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v8' "$TARGET" || true)
     buttons_v5_count=$(grep -Fc '// DVSwitch-Mode-Buttons: standalone DMR Master display v5' "$TARGET" || true)
-    [[ $((dmr_v2_count + dmr_v3_count + dmr_v4_count + dmr_v5_count + dmr_v6_count + dmr_v7_count + dmr_v8_count + buttons_v5_count)) -eq 1 ]] || return 1
+    local dvswitch_mods_marker_count
+    dvswitch_mods_marker_count=$((dmr_v2_count + dmr_v3_count + dmr_v4_count + dmr_v5_count + dmr_v6_count + dmr_v7_count + dmr_v8_count))
+    if [[ $dvswitch_mods_marker_count -eq 1 && $buttons_v5_count -eq 0 ]]; then
+        :
+    elif [[ $dmr_v2_count -eq 0 && $dmr_v3_count -eq 0 && $dmr_v4_count -eq 0 && $dmr_v5_count -eq 0 && $dmr_v6_count -eq 0 && $dmr_v7_count -eq 0 && $dmr_v8_count -eq 1 && $buttons_v5_count -eq 1 ]]; then
+        :
+    else
+        return 1
+    fi
     [[ $(grep -Fc '>Tx TG/Ref</th>' "$TARGET") -eq 2 ]] || return 1
     [[ $(grep -Fc 'formatReflectorLink(' "$TARGET") -eq 2 ]] || return 1
     dashboard_health
