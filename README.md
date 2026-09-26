@@ -98,7 +98,7 @@ Run the manager without arguments:
 sudo ./manage-dvswitch-mods.sh
 ```
 
-The menu provides four installation choices:
+The menu provides three installation choices:
 
 1. **Standard DVSwitch repairs and modifications** — runs the complete
    dependency-ordered installation and records its reversible backups.
@@ -107,22 +107,17 @@ The menu provides four installation choices:
    backups.
 3. **Widescreen Display Layout** — launches the standalone responsive-layout
    installer. It creates its own protected and per-run backups.
-4. **STFU status cards** — adds STFU and STFU Net to the dashboard's Modes and
-   Networks strip. The manager records its protected backup and can restore it
-   in reverse installation order.
 
-The Dark Mode, Display Layout, and STFU status installers do not require the
-standard component chain. For a complete dashboard setup, run option 1 first,
-then options 2 and 3 as desired. STFU status can be installed separately.
-Option 0 exits without changing anything.
+The Dark Mode and Display Layout installers do not require the standard
+component chain. STFU status and RX Monitor position are included at the end of
+the standard component installation and uninstall order. Option 0 exits without
+changing anything.
 
 The standalone installers can also be run directly:
 
 ```bash
 sudo ./dvswitch-dark-mode.sh apply
 sudo ./dvswitch-display-layout.sh apply
-sudo ./mod-dashboard-stfu-status.sh --check
-sudo ./mod-dashboard-stfu-status.sh --install
 ```
 
 ### 3. Check the complete standard installation
@@ -401,8 +396,9 @@ sudo ./dvswitch-dark-mode.sh apply
 Modes and Networks status strip. Both cells show green while the STFU process
 is running and red while it is stopped. The update modifies only
 `/usr/share/dvswitch/include/system.php`, validates PHP syntax, creates a
-protected backup, and writes atomically. The manager offers this as menu
-option 4 and records the backup for ordered uninstallation.
+protected backup, and writes atomically. The manager installs it at the end of
+the standard component sequence and records its backup for ordered
+uninstallation.
 
 ```bash
 sudo ./mod-dashboard-stfu-status.sh --check
@@ -413,6 +409,28 @@ Restore a named backup created by the standalone installer:
 
 ```bash
 sudo ./mod-dashboard-stfu-status.sh --uninstall install-YYYYMMDD-HHMMSS
+```
+
+### 10. RX Monitor position
+
+**What it changes:** Moves the existing RX Monitor button from the centered
+area below the mode buttons to the left status column above the Status panel.
+It preserves the existing `RXMONITOR` configuration check and audio-toggle
+behavior, leaving the former centered position available for another dashboard
+modification. Only `index.php` is changed. The installer checks PHP syntax,
+creates a protected backup, and writes atomically. The manager installs it at
+the end of the standard component sequence and tracks named backups for
+reverse-order uninstallation when installed through the manager.
+
+```bash
+sudo ./mod-dashboard-rx-monitor-left.sh --check
+sudo ./mod-dashboard-rx-monitor-left.sh --install
+```
+
+Restore a named backup created by the standalone installer:
+
+```bash
+sudo ./mod-dashboard-rx-monitor-left.sh --uninstall install-YYYYMMDD-HHMMSS
 ```
 
 The generated web assets are installed as readable Apache files with

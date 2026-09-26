@@ -9,7 +9,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.2.2"
+readonly SCRIPT_VERSION="1.2.3"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly STATE_DIR="/var/lib/dvswitch-mods/manager"
 readonly STATE_FILE="$STATE_DIR/active-installs.tsv"
@@ -47,6 +47,7 @@ readonly -a COMPONENTS=(
     dashboard-cell-padding
     dashboard-hostname-title
     dashboard-stfu-status
+    dashboard-rx-monitor-left
 )
 
 readonly DARK_MODE_SCRIPT="$SCRIPT_DIR/dvswitch-dark-mode.sh"
@@ -92,16 +93,14 @@ show_menu() {
         "1) Install all standard DVSwitch repairs and modifications" \
         "2) Install/launch the Dark Mode dashboard installer" \
         "3) Install/launch the Widescreen Display Layout installer" \
-        "4) Install STFU status cards in Modes and Networks" \
         "0) Exit" \
         ""
-    printf 'Choose an option [0/1/2/3/4]: '
+    printf 'Choose an option [0/1/2/3]: '
     read -r choice
     case "$choice" in
         1) initialize_state; install_requested all ;;
         2) run_optional_mod_installer "DARK MODE" "$DARK_MODE_SCRIPT" ;;
         3) run_optional_mod_installer "DISPLAY LAYOUT" "$DISPLAY_LAYOUT_SCRIPT" ;;
-        4) initialize_state; install_requested dashboard-stfu-status ;;
         0) exit 0 ;;
         *) die "Invalid choice" ;;
     esac
@@ -118,8 +117,8 @@ usage() {
         "       sudo $(basename "$0") --uninstall COMPONENT|all" \
         "       sudo $(basename "$0") --reset-after-reinstall" \
         "" \
-        "With no arguments, choose the standard install, Dark Mode, Widescreen" \
-        "Display Layout, or STFU status cards from the interactive menu." \
+        "With no arguments, choose the standard install, Dark Mode, or" \
+        "Widescreen Display Layout from the interactive menu." \
         "Only standard installations performed and recorded by this manager can be" \
         "uninstalled through it. Uninstall operations run in strict reverse" \
         "installation order so overlapping DVSwitch files remain consistent."
@@ -166,6 +165,7 @@ select_component() {
         dashboard-cell-padding) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-cell-padding.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-cell-padding" ;;
         dashboard-hostname-title) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-hostname-title.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-hostname-title" ;;
         dashboard-stfu-status) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-stfu-status.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-stfu-status"; UNINSTALL_ACTION="--uninstall" ;;
+        dashboard-rx-monitor-left) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-rx-monitor-left.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-rx-monitor-left"; UNINSTALL_ACTION="--uninstall" ;;
         *) die "Unknown component: $COMPONENT" ;;
     esac
     require_regular "$CHILD_SCRIPT"
