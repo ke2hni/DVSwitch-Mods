@@ -98,7 +98,7 @@ Run the manager without arguments:
 sudo ./manage-dvswitch-mods.sh
 ```
 
-The menu provides three installation choices:
+The menu provides four installation choices:
 
 1. **Standard DVSwitch repairs and modifications** — runs the complete
    dependency-ordered installation and records its reversible backups.
@@ -107,16 +107,22 @@ The menu provides three installation choices:
    backups.
 3. **Widescreen Display Layout** — launches the standalone responsive-layout
    installer. It creates its own protected and per-run backups.
+4. **STFU status cards** — adds STFU and STFU Net to the dashboard's Modes and
+   Networks strip. The manager records its protected backup and can restore it
+   in reverse installation order.
 
-The Dark Mode and Display Layout installers do not require the standard
-component chain. For a complete dashboard setup, run option 1 first, then
-option 2, then option 3. Option 0 exits without changing anything.
+The Dark Mode, Display Layout, and STFU status installers do not require the
+standard component chain. For a complete dashboard setup, run option 1 first,
+then options 2 and 3 as desired. STFU status can be installed separately.
+Option 0 exits without changing anything.
 
 The standalone installers can also be run directly:
 
 ```bash
 sudo ./dvswitch-dark-mode.sh apply
 sudo ./dvswitch-display-layout.sh apply
+sudo ./mod-dashboard-stfu-status.sh --check
+sudo ./mod-dashboard-stfu-status.sh --install
 ```
 
 ### 3. Check the complete standard installation
@@ -387,6 +393,26 @@ installation and before the display-layout installer.
 
 ```bash
 sudo ./dvswitch-dark-mode.sh apply
+```
+
+### 9. STFU status cards
+
+**What it adds:** STFU and STFU Net cells to the dashboard's existing green
+Modes and Networks status strip. Both cells show green while the STFU process
+is running and red while it is stopped. The update modifies only
+`/usr/share/dvswitch/include/system.php`, validates PHP syntax, creates a
+protected backup, and writes atomically. The manager offers this as menu
+option 4 and records the backup for ordered uninstallation.
+
+```bash
+sudo ./mod-dashboard-stfu-status.sh --check
+sudo ./mod-dashboard-stfu-status.sh --install
+```
+
+Restore a named backup created by the standalone installer:
+
+```bash
+sudo ./mod-dashboard-stfu-status.sh --uninstall install-YYYYMMDD-HHMMSS
 ```
 
 The generated web assets are installed as readable Apache files with
