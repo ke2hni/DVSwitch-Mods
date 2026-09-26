@@ -8,7 +8,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.6.0"
+readonly SCRIPT_VERSION="1.6.1"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly BM_LIST="/var/lib/mmdvm/TGList_BM.txt"
@@ -16,7 +16,7 @@ readonly TGIF_LIST="/var/lib/mmdvm/TGList_TGIF.txt"
 readonly STATE_FILE="/var/lib/mmdvm/dvswitch-mods-dmr-state.json"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dmr-friendly-names"
 readonly MOD_MARKER="// DVSwitch-Mods: DMR Master friendly-name display v8"
-readonly BUTTONS_MARKER="// DVSwitch-Mode-Buttons: standalone DMR Master display v5"
+readonly BUTTONS_MARKER="// DVSwitch-Mode-Buttons: standalone DMR Master display v6"
 
 WORK_DIR=""
 ACTIVE_BACKUP=""
