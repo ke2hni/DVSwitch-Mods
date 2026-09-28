@@ -16,7 +16,7 @@ readonly TGIF_LIST="/var/lib/mmdvm/TGList_TGIF.txt"
 readonly STATE_FILE="/var/lib/mmdvm/dvswitch-mods-dmr-state.json"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dmr-friendly-names"
 readonly MOD_MARKER="// DVSwitch-Mods: DMR Master friendly-name display v8"
-readonly BUTTONS_MARKER="// DVSwitch-Mode-Buttons: standalone DMR Master display v6"
+readonly BUTTONS_MARKER="// DVSwitch-Mode-Buttons: standalone DMR Master display v7"
 
 WORK_DIR=""
 ACTIVE_BACKUP=""

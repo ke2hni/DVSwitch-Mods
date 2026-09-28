@@ -17,15 +17,17 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> None:
-    current_marker = "// DVSwitch-Mode-Buttons: standalone DMR Master display v6"
+    current_marker = "// DVSwitch-Mode-Buttons: standalone DMR Master display v7"
     require(f'BUTTONS_MARKER="{current_marker}"' in DMR,
-            "DMR friendly-name check does not recognize the Mode Buttons v6 card")
-    require("buttons_markers = tuple(" in YSF and "range(1, 7)" in YSF,
+            "DMR friendly-name check does not recognize the Mode Buttons v7 card")
+    require("buttons_markers = tuple(" in YSF and "range(1, 8)" in YSF,
             "YSF dashboard repair does not recognize supported Mode Buttons DMR card markers")
     require("dvsButtonsDmrMasterDisplay($dmrMasterHost, $abinfo)" in DMR and
             "dvsButtonsDmrMasterHeading($dmrMasterHost, $abinfo)" in DMR,
             "DMR friendly-name check does not validate the shared card entry points")
-    print("PASS: DVSwitch-Mods accepts the standalone Mode Buttons v6 DMR card")
+    require("standalone DMR Master display v[1-7]" in YSF,
+            "YSF installed-state check does not recognize the Mode Buttons v7 card")
+    print("PASS: DVSwitch-Mods accepts the standalone Mode Buttons v7 DMR card")
 
 
 if __name__ == "__main__":
