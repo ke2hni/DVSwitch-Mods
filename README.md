@@ -38,35 +38,6 @@ back automatically if installation fails. The standalone Dark Mode and
 Widescreen Display Layout installers maintain protected and per-run backups
 and provide explicit restore commands.
 
-## 📡 What this repository was tested on
-
-Tested on Debian 12 Bookworm and ASL 3 with a fresh install of DVSwitch via their Bookworm install.<br>
-Hardware Raspberry Pi 4.
-
-```bash
-wget dvswitch.org/bookworm && chmod +x bookworm && sudo ./bookworm && sudo apt update && sudo apt install dvswitch-server
-```
-
-Tested on Debian 13 Trixie and ASL 3 with a fresh install of DVSwitch via their Trixie install.<br>
-Hardware Raspberry Pi 5.
-
-```bash
-wget dvswitch.org/trixie && chmod +x trixie && sudo ./trixie && sudo apt update && sudo apt install dvswitch-server
-```
-
-Tested on Debian 13 Trixie and ASL 3 with a fresh install of DVSwitch via their Trixie install.<br>
-Hardware x86-64 (amd64 / 64-bit x86) computer architecture (Dell Wyse 3040).
-
-```bash
-wget dvswitch.org/trixie && chmod +x trixie && sudo ./trixie && sudo apt update && sudo apt install dvswitch-server
-```
-
-To get the configuration menu for dvswitch:
-
-cd /usr/local/dvs
-
-./dvs
-
 ---
 
 ## 🚀 Quick start — install everything
@@ -703,6 +674,37 @@ the new P25Gateway and YSFGateway log entries before marking it completed.
 - `tests/` contains compatibility and safety tests.
 - `LICENSE` covers repository-authored code.
 - `THIRD_PARTY_NOTICES.md` describes upstream ownership and license boundaries.
+
+---
+
+## 📡 What this repository was tested on
+
+Tested on Debian 12 Bookworm and ASL 3 with a fresh install of DVSwitch via their Bookworm install.<br>
+Hardware Raspberry Pi 4.
+
+```bash
+wget dvswitch.org/bookworm && chmod +x bookworm && sudo ./bookworm && sudo apt update && sudo apt install dvswitch-server
+```
+
+Tested on Debian 13 Trixie and ASL 3 with a fresh install of DVSwitch via their Trixie install.<br>
+Hardware Raspberry Pi 5.
+
+```bash
+wget dvswitch.org/trixie && chmod +x trixie && sudo ./trixie && sudo apt update && sudo apt install dvswitch-server
+```
+
+Tested on Debian 13 Trixie and ASL 3 with a fresh install of DVSwitch via their Trixie install.<br>
+Hardware x86-64 (amd64 / 64-bit x86) computer architecture (Dell Wyse 3040).
+
+```bash
+wget dvswitch.org/trixie && chmod +x trixie && sudo ./trixie && sudo apt update && sudo apt install dvswitch-server
+```
+
+To get the configuration menu for dvswitch:
+
+cd /usr/local/dvs
+
+./dvs
 
 ---
 
