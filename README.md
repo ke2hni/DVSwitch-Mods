@@ -1,5 +1,7 @@
 <div align="center">
 
+Not required but highly suggested to install my DVSwitch Mode Buttons Repository after installing this repository. [https://github.com/ke2hni/DVSwitch-Mods](https://github.com/ke2hni/DVSwitch-Mode-Buttons)
+
 # 🛠️ DVSwitch-Mods
 
 ### Tested repairs and optional dashboard improvements for DVSwitch
