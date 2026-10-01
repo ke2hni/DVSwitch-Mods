@@ -16,6 +16,7 @@ import os
 ROOT = Path(__file__).resolve().parents[1]
 PATCHER_PATH = ROOT / "lib/patch_dashboard_activity_modes.py"
 HELPER = ROOT / "lib/dvswitch_mods_activity_mode.php"
+HISTORY_RECORDER = ROOT / "lib/dvswitch_mods_activity_mode_history.py"
 INSTALLER = ROOT / "mod-dashboard-activity-modes.sh"
 MANAGER = ROOT / "manage-dvswitch-mods.sh"
 
@@ -91,6 +92,17 @@ with tempfile.TemporaryDirectory() as directory:
     os.utime(state, (epoch - 10, epoch - 10))
     cases.append(("DMR", event_time, "DMR"))
 
+    history = Path(directory) / "activity-mode-history.tsv"
+    history.write_text(f"{epoch - 40}\tTGIF\n{epoch - 30}\tBM\n{epoch - 20}\tYSF\n{epoch - 10}\tTGIF\n")
+    historical_cases = [
+        ("DMR", "2026-09-30 21:59:20", "TGIF"),
+        ("DMR Slot 2", "2026-09-30 21:59:30", "BM"),
+        ("DMR Slot 1", "2026-09-30 21:59:40", "DMR Slot 1"),
+        ("DMR", "2026-09-30 21:59:49", "TGIF"),
+        ("DMR", event_time, "DMR"),
+        ("YSF", "2026-09-30 21:59:50", "YSF"),
+    ]
+
     program = f'''<?php
 require {str(HELPER)!r};
 $cases = {json.dumps(cases)};
@@ -98,6 +110,12 @@ $state = {str(state)!r};
 foreach ($cases as $case) {{
     $actual = dvsModsActivityModeLabel($case[0], $case[1], $state);
     if ($actual !== $case[2]) {{ fwrite(STDERR, "FAIL: ".json_encode($case)." => ".$actual."\\n"); exit(1); }}
+}}
+$historicalCases = {json.dumps(historical_cases)};
+$history = {str(history)!r};
+foreach ($historicalCases as $case) {{
+    $actual = dvsModsActivityModeLabel($case[0], $case[1], $state, $history);
+    if ($actual !== $case[2]) {{ fwrite(STDERR, "FAIL: history ".json_encode($case)." => ".$actual."\\n"); exit(1); }}
 }}
 echo "PASS: selected-network activity label cases\\n";
 ?>'''
@@ -109,10 +127,39 @@ echo "PASS: selected-network activity label cases\\n";
     else:
         print("SKIP: PHP runtime helper cases (php unavailable)")
 
+with tempfile.TemporaryDirectory() as directory:
+    directory_path = Path(directory)
+    state = directory_path / "current-mode"
+    last_dmr = directory_path / "last-dmr-network"
+    history = directory_path / "history.tsv"
+    lock = directory_path / "history.lock"
+    environment = os.environ.copy()
+    environment.update({
+        "DVS_ACTIVITY_MODE_STATE": str(state),
+        "DVS_ACTIVITY_LAST_DMR": str(last_dmr),
+        "DVS_ACTIVITY_MODE_HISTORY": str(history),
+        "DVS_ACTIVITY_MODE_LOCK": str(lock),
+    })
+    last_dmr.write_text("TGIF\n")
+    os.utime(last_dmr, (epoch - 40, epoch - 40))
+    state.write_text("YSF\n")
+    os.utime(state, (epoch - 20, epoch - 20))
+    subprocess.run(["python3", str(HISTORY_RECORDER)], env=environment, check=True)
+    require(history.read_text() == f"{epoch - 40}\tTGIF\n{epoch - 20}\tYSF\n",
+            "history recorder did not seed last DMR network and current mode")
+    state.write_text("BM\n")
+    os.utime(state, (epoch - 10, epoch - 10))
+    subprocess.run(["python3", str(HISTORY_RECORDER)], env=environment, check=True)
+    require(history.read_text().endswith(f"{epoch - 10}\tBM\n"),
+            "history recorder did not record a selected DMR network transition")
+    require(history.read_text().count("\n") == 3, "history recorder duplicated a seeded mode transition")
+
 installer = INSTALLER.read_text()
 manager = MANAGER.read_text()
 require("--check" in installer and "--install" in installer and "--restore" in installer,
         "standalone installer check/install/restore interface missing")
+require("dvswitch-mods-activity-mode-history.path" in installer and "activity-mode-history.tsv" in installer,
+        "installer does not install and initialize persistent transition tracking")
 require("dashboard-activity-modes) CHILD_SCRIPT=\"$SCRIPT_DIR/mod-dashboard-activity-modes.sh\"" in manager,
         "manager does not register the standalone activity-label installer")
 require("dashboard-activity-modes" in manager.split("readonly -a COMPONENTS=(", 1)[1].split(")", 1)[0],

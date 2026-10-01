@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch DVSwitch mode state for dashboard activity history
+
+[Path]
+PathChanged=/var/lib/dvswitch-mode-buttons/current-mode
+Unit=dvswitch-mods-activity-mode-history.service
+
+[Install]
+WantedBy=multi-user.target
