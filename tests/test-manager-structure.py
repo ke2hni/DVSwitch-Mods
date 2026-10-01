@@ -35,6 +35,7 @@ def main() -> None:
         "mod-dashboard-fcc-first-names.sh",
         "mod-dashboard-targets.sh",
         "mod-dashboard-cell-padding.sh",
+        "mod-dashboard-activity-modes.sh",
     )
     for name in children:
         path = ROOT / name

@@ -328,7 +328,26 @@ sudo ./mod-dashboard-targets.sh --check
 sudo ./mod-dashboard-targets.sh --install
 ```
 
-### 7. Hostname-prefixed dashboard title
+### 7. Activity mode labels
+
+**What it adds:** Displays the selected **BM**, **TGIF**, or **STFU** label in
+Gateway Activity and Local Activity for DMR-protocol rows logged at or after
+the latest Mode Buttons selection. Older DMR rows retain their protocol label,
+so changing modes does not relabel prior activity. Other protocol labels and
+the underlying DVSwitch traffic remain unchanged. If the Mode Buttons state
+file is absent or does not identify one of those modes, the dashboard keeps
+its original DMR label.
+
+This is a standalone modification and is also included in the standard
+`manage-dvswitch-mods.sh` installation. It preserves the original mode value
+while the existing Target display formats the row.
+
+```bash
+sudo ./mod-dashboard-activity-modes.sh --check
+sudo ./mod-dashboard-activity-modes.sh --install
+```
+
+### 8. Hostname-prefixed dashboard title
 
 **What it adds:** The detected system hostname before the existing dashboard
 heading and browser-tab title. For example, a host named `pi4test` displays
@@ -345,7 +364,7 @@ sudo ./mod-dashboard-hostname-title.sh --check
 sudo ./mod-dashboard-hostname-title.sh --install
 ```
 
-### 8. Dashboard Dark Mode
+### 9. Dashboard Dark Mode
 
 **What it adds:** A dashboard theme selector with **Auto**, **Light**, and
 **Dark** modes. Auto follows the browser or operating-system color preference.
