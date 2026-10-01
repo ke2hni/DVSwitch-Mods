@@ -68,29 +68,27 @@ for filename in ("lh.php", "localtx.php"):
             filename + " helper include was not placed after existing dashboard helpers")
 
 with tempfile.TemporaryDirectory() as directory:
-    state = Path(directory) / "current-mode"
+    state_tgif = Path(directory) / "current-mode-tgif"
+    state_bm = Path(directory) / "current-mode-bm"
+    state_stfu = Path(directory) / "current-mode-stfu"
+    state_ysf = Path(directory) / "current-mode-ysf"
     event_time = "2026-09-30 22:00:00"
     epoch = 1790805600  # 2026-09-30 22:00:00 UTC
-    cases = []
-    state.write_text("TGIF\n")
-    os.utime(state, (epoch - 10, epoch - 10))
-    cases.extend([
-        ("DMR", event_time, "TGIF"),
-        ("DMR Slot 2", event_time, "TGIF"),
-        ("DMR Slot 1", "2026-09-30 21:59:59", "DMR Slot 1"),
-        ("YSF", event_time, "YSF"),
-        ("DMR Slot 3", event_time, "DMR Slot 3"),
-        ("DMR", "not-a-log-time", "DMR"),
-    ])
-    state.write_text("BM\n")
-    os.utime(state, (epoch - 10, epoch - 10))
-    cases.append(("DMR", event_time, "BM"))
-    state.write_text("STFU\n")
-    os.utime(state, (epoch - 10, epoch - 10))
-    cases.append(("DMR", event_time, "STFU"))
-    state.write_text("YSF\n")
-    os.utime(state, (epoch - 10, epoch - 10))
-    cases.append(("DMR", event_time, "DMR"))
+    for state, mode in ((state_tgif, "TGIF"), (state_bm, "BM"), (state_stfu, "STFU"), (state_ysf, "YSF")):
+        state.write_text(mode + "\n")
+        os.utime(state, (epoch - 10, epoch - 10))
+    no_history = Path(directory) / "no-history.tsv"
+    cases = [
+        ("DMR", event_time, "TGIF", str(state_tgif)),
+        ("DMR Slot 2", event_time, "TGIF", str(state_tgif)),
+        ("DMR Slot 1", "2026-09-30 21:59:40", "DMR Slot 1", str(state_tgif)),
+        ("YSF", event_time, "YSF", str(state_tgif)),
+        ("DMR Slot 3", event_time, "DMR Slot 3", str(state_tgif)),
+        ("DMR", "not-a-log-time", "DMR", str(state_tgif)),
+        ("DMR", event_time, "BM", str(state_bm)),
+        ("DMR", event_time, "STFU", str(state_stfu)),
+        ("DMR", event_time, "DMR", str(state_ysf)),
+    ]
 
     history = Path(directory) / "activity-mode-history.tsv"
     history.write_text(f"{epoch - 40}\tTGIF\n{epoch - 30}\tBM\n{epoch - 20}\tYSF\n{epoch - 10}\tTGIF\n")
@@ -105,18 +103,23 @@ with tempfile.TemporaryDirectory() as directory:
 
     program = f'''<?php
 require {str(HELPER)!r};
+function dvsModsTestFail($message) {{ file_put_contents('php://stderr', $message."\\n"); exit(1); }}
 $cases = {json.dumps(cases)};
-$state = {str(state)!r};
 foreach ($cases as $case) {{
-    $actual = dvsModsActivityModeLabel($case[0], $case[1], $state);
-    if ($actual !== $case[2]) {{ fwrite(STDERR, "FAIL: ".json_encode($case)." => ".$actual."\\n"); exit(1); }}
+    $actual = dvsModsActivityModeLabel($case[0], $case[1], $case[3], {str(no_history)!r});
+    if ($actual !== $case[2]) {{ dvsModsTestFail("FAIL: ".json_encode($case)." => ".$actual); }}
 }}
 $historicalCases = {json.dumps(historical_cases)};
 $history = {str(history)!r};
 foreach ($historicalCases as $case) {{
-    $actual = dvsModsActivityModeLabel($case[0], $case[1], $state, $history);
-    if ($actual !== $case[2]) {{ fwrite(STDERR, "FAIL: history ".json_encode($case)." => ".$actual."\\n"); exit(1); }}
+    $actual = dvsModsActivityModeLabel($case[0], $case[1], {str(state_ysf)!r}, $history);
+    if ($actual !== $case[2]) {{ dvsModsTestFail("FAIL: history ".json_encode($case)." => ".$actual); }}
 }}
+$laterDmrState = {str(Path(directory) / 'later-current-mode')!r};
+file_put_contents($laterDmrState, "TGIF\\n");
+touch($laterDmrState, {epoch + 10});
+$nonDmrRx = dvsModsActivityModeLabel("DMR Slot 2", "2026-09-30 21:59:40", $laterDmrState, $history);
+if ($nonDmrRx !== "DMR Slot 2") {{ dvsModsTestFail("FAIL: earlier DMR RX row was relabeled after later TGIF selection => ".$nonDmrRx); }}
 echo "PASS: selected-network activity label cases\\n";
 ?>'''
     php = shutil.which("php")
