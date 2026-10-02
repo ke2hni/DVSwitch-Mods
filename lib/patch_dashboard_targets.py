@@ -18,7 +18,7 @@ LEGEND = '''<div style="margin:3px 0 0 14px;font-size:10px;line-height:1.3;text-
 '''
 LEGACY_LEGENDS = (
     '''<div style="margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
-  <b>Legend:</b> <b>---</b> = No usable worldwide DMR ID or FCC name data available, Maybe an International Callsign.
+  <b>Legend:</b> <b>---</b> = no usable worldwide DMR ID or FCC name data available, Maybe an International Callsign.
 </div>
 ''',
     '''<div style="margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
