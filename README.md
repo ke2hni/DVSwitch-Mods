@@ -320,6 +320,8 @@ retain the room that was active when the reception occurred. YSF Group Call
 and GPS/Data activity therefore display the resolved room name instead of a
 generic activity label. D-Star `CQCQCQ via REF030 C` rows display as `REF030 C`
 without a redundant `(Ref 030)` suffix; a bare `CQCQCQ` remains `General Call`.
+If no friendly DMR talkgroup name is available, the target displays as `TG ###`
+without repeating the same number in parentheses.
 
 **Required first:** `mod-dashboard-fcc-first-names.sh`; valid P25/NXDN JSON and
 BrandMeister/TGIF lists provide the friendly names.

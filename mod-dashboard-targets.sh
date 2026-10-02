@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Jeff Milne, KE2HNI
 # Clean the DVSwitch Gateway and Local Activity Target columns.
-# v1.1.8: preserves historical YSF room references and cleans D-Star reflector labels.
+# v1.1.9: avoids duplicating unnamed talkgroup numbers in Target labels.
 
 set -euo pipefail
 
-readonly SCRIPT_VERSION="1.1.8"
+readonly SCRIPT_VERSION="1.1.9"
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly LH_TARGET="/usr/share/dvswitch/include/lh.php"
 readonly LOCALTX_TARGET="/usr/share/dvswitch/include/localtx.php"

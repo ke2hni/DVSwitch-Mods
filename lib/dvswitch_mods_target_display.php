@@ -137,7 +137,7 @@ function dvsModsTargetDisplay($mode, $rawTarget, $activityType = '', $timestamp 
             $names = dvsModsTargetDmrNames($number);
             if (count($names) === 1) { $label = $names[0]; }
         }
-        return $cache[$key] = dvsModsTargetWithType($label === '' ? 'TG '.$number : $label, 'TG', $number);
+        return $cache[$key] = ($label === '' ? 'TG '.$number : dvsModsTargetWithType($label, 'TG', $number));
     }
 
     return $cache[$key] = dvsModsTargetWithType($target);
