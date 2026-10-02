@@ -321,7 +321,10 @@ and GPS/Data activity therefore display the resolved room name instead of a
 generic activity label. D-Star `CQCQCQ via REF030 C` rows display as `REF030 C`
 without a redundant `(Ref 030)` suffix; a bare `CQCQCQ` remains `General Call`.
 If no friendly DMR talkgroup name is available, the target displays as `TG ###`
-without repeating the same number in parentheses.
+without repeating the same number in parentheses. For D-Star rows with a bare
+`CQCQCQ` target, the reflector is resolved from ircDDBGateway link history at
+the activity event time, so older rows keep the reflector linked when they
+were received. Rows with no linked reflector remain `General Call`.
 
 **Required first:** `mod-dashboard-fcc-first-names.sh`; valid P25/NXDN JSON and
 BrandMeister/TGIF lists provide the friendly names.

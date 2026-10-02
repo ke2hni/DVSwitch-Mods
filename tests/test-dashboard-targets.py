@@ -63,6 +63,14 @@ with tempfile.TemporaryDirectory() as directory:
     (data / "TGList_BM.txt").write_text("9;0;Local;TG9\n3100;0;USA_Bridge;TG3100\n999;0;BM Name;TG999\n")
     (data / "TGList_TGIF.txt").write_text("43389;0;SouthEast Link;TG43389\n999;0;Different Name;TG999\n")
     (data / "YSFHosts.txt").write_text("02034;XX-Alabama Link;host.example;42000\n44444;America-Link;host.example;42000\n")
+    (data / "ircDDBGateway-2026-10-02.log").write_text(
+        "M: 2026-10-02 04:07:21: Linking KE2HNI Z at startup to REF030 C\n"
+        "M: 2026-10-02 04:07:22: D-Plus link to REF030 C established\n"
+        "M: 2026-10-02 18:00:00: Linking KE2HNI Z to REF090 B\n"
+        "M: 2026-10-02 18:00:03: D-Plus link to REF090 B established\n"
+        "M: 2026-10-02 18:03:00: Remote control user has linked \"KE2HNI Z\" to \"U       \" with reconnect 4\n"
+        "M: 2026-10-02 18:03:01: Removing outgoing D-Plus link KE2HNI Z, REF090 B\n"
+    )
     cases = [
         ("P25", "TG 10200", "", "P25 North America (TG 10200)"),
         ("P25", "TG 43389", "", "Lookout Mountain Amateur Radio Community (TG 43389)"),
@@ -82,12 +90,23 @@ with tempfile.TemporaryDirectory() as directory:
     ]
     php_cases = json.dumps(cases)
     program = f'''<?php
-$dvsModsTargetDataDirectory = {str(directory)!r};
+    $dvsModsTargetDataDirectory = {str(directory)!r};
+date_default_timezone_set("UTC");
+$dvsModsTargetIrcDdbLogDirectory = {str(directory)!r};
 require {str(HELPER)!r};
 $cases = {php_cases};
 foreach ($cases as $case) {{
     $actual = dvsModsTargetDisplay($case[0], $case[1], $case[2]);
     if ($actual !== $case[3]) {{ file_put_contents("php://stderr", "FAIL: ".$case[0]." / ".$case[1]." => ".$actual." expected ".$case[3]."\\n"); exit(1); }}
+}}
+$dstarHistoryCases = [
+    ["2026-10-02 18:01:00", "REF090 B"],
+    ["2026-10-02 17:42:01", "REF030 C"],
+    ["2026-10-02 18:04:00", "General Call"],
+];
+foreach ($dstarHistoryCases as $case) {{
+    $actual = dvsModsTargetDisplay("D-Star", "CQCQCQ", "", $case[0]);
+    if ($actual !== $case[1]) {{ file_put_contents("php://stderr", "FAIL: D-Star event-time history at ".$case[0]." => ".$actual." expected ".$case[1]."\\n"); exit(1); }}
 }}
 echo "PASS: Target display helper cases\\n";
 ?>'''
