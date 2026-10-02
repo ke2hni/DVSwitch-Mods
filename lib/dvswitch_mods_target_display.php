@@ -1,7 +1,7 @@
 <?php
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Jeff Milne, KE2HNI
-// DVSwitch-Mods: activity Target display helper v4
+// DVSwitch-Mods: activity Target display helper v3
 
 function dvsModsTargetCleanLabel($value) {
     $value = preg_replace('/\s+/u', ' ', str_replace('_', ' ', trim((string)$value)));
@@ -65,60 +65,6 @@ function dvsModsTargetRefValue($target) {
     return '';
 }
 
-/** Return the D-Star reflector linked at the timestamp of an activity row. */
-function dvsModsTargetDstarRef($timestamp) {
-    $eventTime = strtotime((string)$timestamp);
-    if ($eventTime === false) { return ''; }
-    static $historyCache = array();
-    global $dvsModsTargetIrcDdbLogDirectory;
-    $directory = isset($dvsModsTargetIrcDdbLogDirectory) ? rtrim((string)$dvsModsTargetIrcDdbLogDirectory, '/') : '/var/log/ircddbgateway';
-    if (!isset($historyCache[$directory])) {
-        $events = array();
-        $sequence = 0;
-        foreach ((array)glob($directory.'/ircDDBGateway-*.log') as $path) {
-            if (!is_readable($path)) { continue; }
-            foreach ((array)file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
-                if (!preg_match('/^M:\\s+(\\d{4}-\\d\\d-\\d\\d \\d\\d:\\d\\d:\\d\\d):\\s+(.+?)\\s*$/', $line, $matches)) { continue; }
-                $lineTime = strtotime($matches[1]);
-                if ($lineTime === false) { continue; }
-                $message = $matches[2];
-                $target = null;
-                $clearedTarget = '';
-                if (preg_match('/^Remote control user has linked "[^"]+" to "([^"]+)"(?: with reconnect \\d+)?$/i', $message, $state)) {
-                    $target = trim($state[1]);
-                } else if (preg_match('/^Linking .+? to (.+?)\\s*$/i', $message, $state)) {
-                    $target = trim($state[1]);
-                } else if (preg_match('/^D-(?:Plus|Extra|CS) link to (.+?) established$/i', $message, $state)) {
-                    $target = trim($state[1]);
-                } else if (preg_match('/^Removing outgoing D-(?:Plus|Extra|CS) link .+?, (.+?)\\s*$/i', $message, $state)) {
-                    $clearedTarget = trim($state[1]);
-                } else if (preg_match('/^D-(?:Plus|Extra|CS) disconnect acknowledgement received from (.+?)\\s*$/i', $message, $state)) {
-                    $clearedTarget = trim($state[1]);
-                } else if (preg_match('/^D-(?:Plus|Extra|CS) link to (.+?) has failed$/i', $message, $state)) {
-                    $clearedTarget = trim($state[1]);
-                }
-                if ($target !== null || $clearedTarget !== '') { $events[] = array($lineTime, $sequence++, $target, $clearedTarget); }
-            }
-        }
-        usort($events, function ($left, $right) {
-            if ($left[0] === $right[0]) { return $left[1] <=> $right[1]; }
-            return $left[0] <=> $right[0];
-        });
-        $historyCache[$directory] = $events;
-    }
-    $linked = '';
-    foreach ($historyCache[$directory] as $event) {
-        if ($event[0] > $eventTime) { break; }
-        if ($event[2] !== null) {
-            $target = dvsModsTargetCleanLabel($event[2]);
-            $linked = preg_match('/^(?:REF|DCS|XRF|XLX)[A-Z0-9]*\\s+[A-Z]$/iD', $target) ? strtoupper($target) : '';
-        } else if ($linked !== '' && strcasecmp(dvsModsTargetCleanLabel($event[3]), $linked) === 0) {
-            $linked = '';
-        }
-    }
-    return $linked;
-}
-
 function dvsModsTargetYsfRef($timestamp) {
     $eventTime = strtotime((string)$timestamp);
     if ($eventTime === false) { return ''; }
@@ -177,7 +123,6 @@ function dvsModsTargetDisplay($mode, $rawTarget, $activityType = '', $timestamp 
     if ($mode === 'D-Star') {
         if (preg_match('/^CQCQCQ(?:\s+via\s+([A-Z0-9]+)\s+([A-Z]))?$/iD', $target, $matches)) {
             $label = isset($matches[1]) ? strtoupper($matches[1].' '.$matches[2]) : '';
-            if ($label === '') { $label = dvsModsTargetDstarRef($timestamp); }
             return $cache[$key] = ($label === '' ? 'General Call' : $label);
         }
         return $cache[$key] = $target;
@@ -192,7 +137,7 @@ function dvsModsTargetDisplay($mode, $rawTarget, $activityType = '', $timestamp 
             $names = dvsModsTargetDmrNames($number);
             if (count($names) === 1) { $label = $names[0]; }
         }
-        return $cache[$key] = ($label === '' ? 'TG '.$number : dvsModsTargetWithType($label, 'TG', $number));
+        return $cache[$key] = dvsModsTargetWithType($label === '' ? 'TG '.$number : $label, 'TG', $number);
     }
 
     return $cache[$key] = dvsModsTargetWithType($target);
