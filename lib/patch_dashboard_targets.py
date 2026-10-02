@@ -18,6 +18,10 @@ LEGEND = '''<div style="margin:3px auto 0 auto;font-size:10px;line-height:1.3;te
 '''
 LEGACY_LEGENDS = (
     '''<div style="margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
+  <b>Legend:</b> <b>---</b> = no usable worldwide DMR or FCC name data available
+</div>
+''',
+    '''<div style="margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
   <b>Legend:</b> <b>---</b> = no usable worldwide DMR or FCC name data available<br>
   <b>Talkgroups:</b> <b>Name (TG #)</b> = destination and talkgroup number<br>
   <b>YSF:</b> <b>Group Call</b> = call to ALL (room not recorded); <b>GPS/Data</b> = data transmission<br>
