@@ -318,7 +318,8 @@ references are resolved from the YSFGateway link history using each activity
 row's timestamp and then matched against `YSFHosts.txt`, so historical rows
 retain the room that was active when the reception occurred. YSF Group Call
 and GPS/Data activity therefore display the resolved room name instead of a
-generic activity label.
+generic activity label. D-Star `CQCQCQ via REF030 C` rows display as `REF030 C`
+without a redundant `(Ref 030)` suffix; a bare `CQCQCQ` remains `General Call`.
 
 **Required first:** `mod-dashboard-fcc-first-names.sh`; valid P25/NXDN JSON and
 BrandMeister/TGIF lists provide the friendly names.

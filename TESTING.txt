@@ -1,0 +1,21 @@
+DVSwitch-Mods existing dashboard-targets component update
+
+This package contains only the four changed repository files, kept at their existing repository paths:
+- README.md
+- mod-dashboard-targets.sh
+- lib/dvswitch_mods_target_display.php
+- tests/test-dashboard-targets.py
+
+Apply these files over the matching paths in ~/DVSwitch-Mods on pi4test. Then run:
+
+cd ~/DVSwitch-Mods && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-dashboard-targets.py && sudo ./mod-dashboard-targets.sh --check
+
+If --check passes, run:
+
+sudo ./mod-dashboard-targets.sh --install
+
+Then verify:
+
+sudo php -l /usr/share/dvswitch/include/dvswitch_mods_target_display.php
+
+Expected display: D-Star reflector rows show REF030 C (without the redundant Ref suffix); bare CQCQCQ remains General Call. Test in established order: pi4test, pi5test, then node3040. Do not install on production node68425 without explicit authorization.

@@ -74,7 +74,9 @@ with tempfile.TemporaryDirectory() as directory:
         ("YSF", "*****BE6w0 at N5YX", "15.1", "*****BE6w0 at N5YX"),
         ("YSF", "ALL at N8IQT", "GPS", "ALL at N8IQT"),
         ("YSF", "America-Link 44444", "", "America-Link (TG 44444)"),
-        ("D-Star", "CQCQCQ via REF058 C", "7.0", "REF058 C (Ref 058)"),
+        ("D-Star", "CQCQCQ via REF058 C", "7.0", "REF058 C"),
+        ("D-Star", "CQCQCQ   via REF030 C", "7.0", "REF030 C"),
+        ("D-Star", "REF030 C", "7.0", "REF030 C"),
         ("D-Star", "CQCQCQ", "1.0", "General Call"),
         ("P25", "private 123", "", "private 123"),
     ]
