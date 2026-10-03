@@ -24,9 +24,9 @@ readonly FCC_URL="https://data.fcc.gov/download/pub/uls/complete/l_amat.zip"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"
 readonly LOCK_FILE="/run/lock/dvswitch-fcc-first-names-update.lock"
 readonly BUILDER_SHA256="d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2"
-readonly PATCHER_SHA256="f53500cb3f9de67525946d3ff0b2e149cef4260588cb77132d751703f38d0ffe"
+readonly PATCHER_SHA256="b373b714b80cb4b067e3fcfcb4ae1dbdba7cf0efa3c7dd87d3a8f2b9f83adcd5"
 readonly TRANSACTION_SHA256="13d743d6065f88888725a1aefe98c8d4ad957974ec5cd991a52ff20ac44a6532"
-readonly HELPER_SHA256="94f2b480fe6a67f550799864dd1e63ca395d09a5cc27275d9d61e46f1419bc1a"
+readonly HELPER_SHA256="754493cb70436d3fe423e414d2f0a85b5a2374c197501f49a8f53c3a896928e7"
 
 WORK_DIR=""
 INSTALL_ACTIVE=0
@@ -154,7 +154,6 @@ run_update() {
         printf 'WARNING: CTY.DAT refresh failed validation or download; keeping the last known good file.\n' >&2
         [[ -f "$CTY_DATABASE_TARGET" ]] && validate_cty "$CTY_DATABASE_TARGET" && printf 'CTY.DAT: last known good copy remains available.\n' || printf 'CTY.DAT: no valid cached copy is available yet.\n' >&2
     fi
-    preflight
     local archive="$WORK_DIR/l_amat.zip" candidate="$WORK_DIR/fcc-first-names.dat"
     printf 'FCC archive: downloading weekly Amateur Radio Service file...\n'
     curl --fail --location --silent --show-error --connect-timeout 30 --max-time 900 --retry 2 --output "$archive" "$FCC_URL"

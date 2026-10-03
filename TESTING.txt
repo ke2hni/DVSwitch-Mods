@@ -28,3 +28,17 @@ production node68425 until test nodes pass and you explicitly authorize it.
 
 Package contents use the repository's canonical helper path:
 lib/dvswitch_mods_target_display.php.
+
+FCC first names and country fallback: run these checks on pi4test before other nodes.
+
+cd ~/DVSwitch-Mods && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-fcc-first-names.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-fcc-installed-updater-fixed.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-fcc-installed-updater.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-cty-fallback-structure.py && php tests/test-fcc-country-lookup.php && sudo ./mod-dashboard-fcc-first-names.sh --check
+
+If checks pass, install and compare the deployed sources:
+
+sudo ./mod-dashboard-fcc-first-names.sh --install && sudo cmp -s lib/dvswitch_mods_fcc_first_names.php /usr/share/dvswitch/include/dvswitch_mods_fcc_first_names.php && sudo cmp -s lib/dvswitch_fcc_first_names_update.sh /usr/local/sbin/dvswitch-fcc-first-names-update && echo 'PASS: deployed FCC helper and updater match package sources'
+
+Then run the updater to download and validate CTY.DAT and the FCC database:
+
+sudo /usr/local/sbin/dvswitch-fcc-first-names-update && sudo ls -l /var/lib/mmdvm/dvswitch-mods-cty.dat
+
+After pi4test passes, repeat the same checks on pi5test and node3040. Install on node68425 only after test nodes pass and Jeff explicitly authorizes it.

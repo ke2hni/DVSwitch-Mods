@@ -152,7 +152,9 @@ function dvsModsFccCountry($rawCallsign) {
     if (!preg_match('/^[A-Z0-9]{3,10}(?:\/[A-Z0-9]{1,10})*$/D', $callsign)) { return ''; }
     $callsign = preg_replace('/\/[A-Z]$/', '', $callsign);
     if (isset($cache[$callsign])) { return $cache[$callsign]; }
-    $path = '/var/lib/mmdvm/dvswitch-mods-cty.dat';
+    global $dvsModsFccCountryDatabasePath;
+    $path = isset($dvsModsFccCountryDatabasePath) && is_string($dvsModsFccCountryDatabasePath)
+        ? $dvsModsFccCountryDatabasePath : '/var/lib/mmdvm/dvswitch-mods-cty.dat';
     if (!is_readable($path)) { return $cache[$callsign] = ''; }
     if ($prefixes === null) {
         $prefixes = array();
@@ -162,7 +164,7 @@ function dvsModsFccCountry($rawCallsign) {
         foreach (preg_split('/\r?\n/', $contents) as $line) {
             if (strpos($line, ':') !== false && preg_match('/^([^:;]+):/', $line, $header)) {
                 $current = trim($header[1]);
-                continue;
+                $line = substr($line, strlen($header[0]));
             }
             if ($current === '') { continue; }
             $line = strtoupper(trim(preg_replace('/\\s*#.*/', '', $line)));
@@ -178,20 +180,37 @@ function dvsModsFccCountry($rawCallsign) {
                 $rangePattern = '';
                 if (preg_match('/^([A-Z0-9]+)\\[([A-Z0-9]*)\\]$/', $entry, $range)) {
                     $entry = $range[1];
-                    $rangePattern = '^'.preg_quote($range[1], '/').'[A-Z0-9]{0,'.strlen($range[2]).'}$';
+                    $letters = preg_split('//', $range[2], -1, PREG_SPLIT_NO_EMPTY);
+                    $rangePattern = '^'.preg_quote($range[1], '/').'(?:['.preg_quote(implode('', $letters), '/').']|(?=[0-9]))';
+                } elseif (preg_match('/^([A-Z0-9]+)-([A-Z0-9]+)$/', $entry, $range)) {
+                    $left = $range[1];
+                    $right = $range[2];
+                    $common = 0;
+                    $limit = min(strlen($left), strlen($right));
+                    while ($common < $limit && $left[$common] === $right[$common]) { $common++; }
+                    if ($common > 0 && strlen($left) === $common + 1 && strlen($right) === $common + 1 && ord($left[$common]) <= ord($right[$common])) {
+                        $entry = substr($left, 0, $common);
+                        $rangePattern = '^'.preg_quote($entry, '/').'['.$left[$common].'-'.$right[$common].']';
+                    }
                 }
                 if (!preg_match('/^[A-Z0-9]+$/', $entry)) { continue; }
-                $prefixes[] = array($exact ? 'exact' : ($rangePattern !== '' ? 'range' : 'prefix'), $exact ? $entry : ($rangePattern !== '' ? $rangePattern : $entry), $current);
+                $type = $exact ? 'exact' : ($rangePattern !== '' ? 'range' : 'prefix');
+                $value = $exact ? $entry : ($rangePattern !== '' ? $rangePattern : $entry);
+                $prefixes[] = array($type, $value, $current, strlen($entry));
             }
         }
-        usort($prefixes, function ($a, $b) { return strlen($b[1]) <=> strlen($a[1]); });
+        usort($prefixes, function ($a, $b) {
+            if ($a[3] !== $b[3]) { return $b[3] <=> $a[3]; }
+            $priority = array('exact' => 3, 'range' => 2, 'prefix' => 1);
+            return $priority[$b[0]] <=> $priority[$a[0]];
+        });
     }
     if (!$prefixes) { return $cache[$callsign] = ''; }
     $candidates = explode('/', $callsign);
     foreach (array_reverse($candidates) as $candidate) {
         foreach ($prefixes as $entry) {
             if ($entry[0] === 'exact' && $candidate === $entry[1]) { return $cache[$callsign] = $entry[2]; }
-            if ($entry[0] === 'range' && preg_match('/'.$entry[1].'/D', $candidate)) { return $cache[$callsign] = $entry[2]; }
+            if ($entry[0] === 'range' && preg_match('/'.$entry[1].'/', $candidate)) { return $cache[$callsign] = $entry[2]; }
             if ($entry[0] === 'prefix' && strpos($candidate, $entry[1]) === 0) { return $cache[$callsign] = $entry[2]; }
         }
     }

@@ -505,6 +505,10 @@ install_requested() {
                 printf '\n=== SKIP: %s is not supported on this host ===\n' "$component"
                 continue
             fi
+            if component_is_recorded "$component"; then
+                printf '\n=== SKIP: %s ===\nThis installation is already recorded by the manager; continuing from the next unrecorded component.\n' "$component"
+                continue
+            fi
             install_one "$component"
             if [[ $component == p25-nxdn-json ]]; then ensure_databases; fi
         done

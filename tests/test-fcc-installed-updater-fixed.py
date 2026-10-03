@@ -96,12 +96,13 @@ with tempfile.TemporaryDirectory(prefix=".fcc-updater-test-", dir=ROOT.parent) a
         'readonly HELPER_TARGET="/usr/share/dvswitch/include/dvswitch_mods_fcc_first_names.php"': f'readonly HELPER_TARGET="{helper}"',
         'readonly DATABASE_TARGET="/var/lib/mmdvm/dvswitch-mods-fcc-first-names.dat"': f'readonly DATABASE_TARGET="{database}"',
         'readonly WORK_ROOT="/var/lib/mmdvm"': f'readonly WORK_ROOT="{state}"',
+        'readonly CTY_DATABASE_TARGET="/var/lib/mmdvm/dvswitch-mods-cty.dat"': f'readonly CTY_DATABASE_TARGET="{state / "dvswitch-mods-cty.dat"}"',
         'readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"': f'readonly BACKUP_ROOT="{root / "backups"}"',
         'readonly LOCK_FILE="/run/lock/dvswitch-fcc-first-names-update.lock"': f'readonly LOCK_FILE="{root / "update.lock"}"',
         'readonly BUILDER_SHA256="d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2"': f'readonly BUILDER_SHA256="{digest(builder)}"',
         'readonly PATCHER_SHA256="b373b714b80cb4b067e3fcfcb4ae1dbdba7cf0efa3c7dd87d3a8f2b9f83adcd5"': f'readonly PATCHER_SHA256="{digest(patcher)}"',
         'readonly TRANSACTION_SHA256="13d743d6065f88888725a1aefe98c8d4ad957974ec5cd991a52ff20ac44a6532"': f'readonly TRANSACTION_SHA256="{digest(transaction)}"',
-        'readonly HELPER_SHA256="e1df873513201853a184da9748a026f46a2591ffcc9605a0a5b0fc9480dc0eac"': f'readonly HELPER_SHA256="{digest(helper)}"',
+        'readonly HELPER_SHA256="754493cb70436d3fe423e414d2f0a85b5a2374c197501f49a8f53c3a896928e7"': f'readonly HELPER_SHA256="{digest(helper)}"',
         '    . /etc/os-release': '    ID=debian; VERSION_ID=12',
         '    [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Run this updater with sudo."': '    : # Root requirement bypassed only in isolated regression copy.',
         '    [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Run this utility with sudo."': '    : # Root requirement bypassed only in isolated regression copy.',
@@ -117,7 +118,7 @@ with tempfile.TemporaryDirectory(prefix=".fcc-updater-test-", dir=ROOT.parent) a
     updater.chmod(0o755)
 
     curl = commands / "curl"
-    curl.write_text('#!/bin/bash\nset -eu\nout=""\nwhile [[ $# -gt 0 ]]; do if [[ "$1" == --output ]]; then out=$2; shift 2; else shift; fi; done\ncp -- "$FCC_TEST_ARCHIVE" "$out"\n', encoding="utf-8")
+    curl.write_text('#!/bin/bash\nset -eu\nif [[ "${!#}" == *country-files.com* ]]; then exit 22; fi\nout=""\nwhile [[ $# -gt 0 ]]; do if [[ "$1" == --output ]]; then out=$2; shift 2; else shift; fi; done\ncp -- "$FCC_TEST_ARCHIVE" "$out"\n', encoding="utf-8")
     curl.chmod(0o755)
     systemctl = commands / "systemctl"
     systemctl.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
