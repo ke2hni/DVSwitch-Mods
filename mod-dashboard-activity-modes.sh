@@ -7,7 +7,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.1.1"
+readonly SCRIPT_VERSION="1.1.2"
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly LH_TARGET="/usr/share/dvswitch/include/lh.php"
 readonly LOCALTX_TARGET="/usr/share/dvswitch/include/localtx.php"
@@ -25,7 +25,8 @@ readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-activity-modes"
 
 WORK_DIR=""
 INSTALL_ACTIVE=0
-TRACKER_WAS_ENABLED=0
+TRACKER_PATH_WAS_ENABLED=0
+TRACKER_SERVICE_WAS_ENABLED=0
 
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 cleanup() { [[ -z "$WORK_DIR" || ! -d "$WORK_DIR" ]] || rm -rf -- "$WORK_DIR"; }
@@ -33,11 +34,14 @@ rollback() {
     local status=$?
     if (( INSTALL_ACTIVE )); then
         systemctl disable --now dvswitch-mods-activity-mode-history.path >/dev/null 2>&1 || true
+        systemctl disable dvswitch-mods-activity-mode-history.service >/dev/null 2>&1 || true
         systemctl stop dvswitch-mods-activity-mode-history.service >/dev/null 2>&1 || true
         systemctl daemon-reload >/dev/null 2>&1 || true
         dvsm_transaction_rollback || true
         systemctl daemon-reload >/dev/null 2>&1 || true
-        if (( TRACKER_WAS_ENABLED )); then systemctl enable --now dvswitch-mods-activity-mode-history.path >/dev/null 2>&1 || true; fi
+        systemctl reset-failed dvswitch-mods-activity-mode-history.path dvswitch-mods-activity-mode-history.service >/dev/null 2>&1 || true
+        if (( TRACKER_PATH_WAS_ENABLED )); then systemctl enable --now dvswitch-mods-activity-mode-history.path >/dev/null 2>&1 || true; fi
+        if (( TRACKER_SERVICE_WAS_ENABLED )); then systemctl enable dvswitch-mods-activity-mode-history.service >/dev/null 2>&1 || true; fi
     fi
     cleanup
     exit "$status"
@@ -99,7 +103,7 @@ run_install() {
     [[ -r /var/lib/dvswitch-mode-buttons/current-mode ]] || die 'DVSwitch-Mode-Buttons current-mode state is missing; install and select a mode before installing this modification.'
     prepare_candidates
     show_result
-    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$HISTORY_CAPTURE_TARGET" ]] && cmp -s "$HISTORY_CAPTURE_SOURCE" "$HISTORY_CAPTURE_TARGET" && [[ -f "$HISTORY_SERVICE_TARGET" ]] && cmp -s "$HISTORY_SERVICE_SOURCE" "$HISTORY_SERVICE_TARGET" && [[ -f "$HISTORY_PATH_TARGET" ]] && cmp -s "$HISTORY_PATH_SOURCE" "$HISTORY_PATH_TARGET" && systemctl is-enabled --quiet dvswitch-mods-activity-mode-history.path && systemctl is-active --quiet dvswitch-mods-activity-mode-history.path; then
+    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$HISTORY_CAPTURE_TARGET" ]] && cmp -s "$HISTORY_CAPTURE_SOURCE" "$HISTORY_CAPTURE_TARGET" && [[ -f "$HISTORY_SERVICE_TARGET" ]] && cmp -s "$HISTORY_SERVICE_SOURCE" "$HISTORY_SERVICE_TARGET" && [[ -f "$HISTORY_PATH_TARGET" ]] && cmp -s "$HISTORY_PATH_SOURCE" "$HISTORY_PATH_TARGET" && systemctl is-enabled --quiet dvswitch-mods-activity-mode-history.service && systemctl is-enabled --quiet dvswitch-mods-activity-mode-history.path && systemctl is-active --quiet dvswitch-mods-activity-mode-history.path; then
         printf 'PASS: activity mode labels and transition tracking are already installed. No files changed.\n'
         return
     fi
@@ -112,7 +116,8 @@ run_install() {
     . "$TRANSACTION_LIBRARY"
     dvsm_transaction_begin "$BACKUP_ROOT"
     INSTALL_ACTIVE=1
-    systemctl is-enabled --quiet dvswitch-mods-activity-mode-history.path && TRACKER_WAS_ENABLED=1 || true
+    systemctl is-enabled --quiet dvswitch-mods-activity-mode-history.path && TRACKER_PATH_WAS_ENABLED=1 || true
+    systemctl is-enabled --quiet dvswitch-mods-activity-mode-history.service && TRACKER_SERVICE_WAS_ENABLED=1 || true
     if ! cmp -s "$LH_TARGET" "$WORK_DIR/lh.php"; then
         dvsm_backup_file "$LH_TARGET"
         dvsm_install_candidate "$WORK_DIR/lh.php" "$LH_TARGET"
@@ -139,6 +144,8 @@ run_install() {
     php -l "$HELPER_TARGET" >/dev/null
     systemctl is-active --quiet apache2 || die 'apache2 is not active.'
     systemctl daemon-reload
+    systemctl reset-failed dvswitch-mods-activity-mode-history.path dvswitch-mods-activity-mode-history.service
+    systemctl enable dvswitch-mods-activity-mode-history.service
     systemctl enable --now dvswitch-mods-activity-mode-history.path
     systemctl start dvswitch-mods-activity-mode-history.service
     systemctl is-active --quiet dvswitch-mods-activity-mode-history.path || die 'Activity mode history watcher is not active.'
@@ -173,10 +180,15 @@ run_restore() {
     ' "$directory/MANIFEST" || die 'Backup manifest is not a supported activity-mode-label backup.'
     . "$TRANSACTION_LIBRARY"
     systemctl disable --now dvswitch-mods-activity-mode-history.path >/dev/null 2>&1 || true
+    systemctl disable dvswitch-mods-activity-mode-history.service >/dev/null 2>&1 || true
     systemctl stop dvswitch-mods-activity-mode-history.service >/dev/null 2>&1 || true
     dvsm_restore_backup_set "$directory"
     systemctl daemon-reload
     if [[ -f "$HISTORY_PATH_TARGET" ]]; then
+        systemctl reset-failed dvswitch-mods-activity-mode-history.path dvswitch-mods-activity-mode-history.service
+        if grep -q '^WantedBy=multi-user.target$' "$HISTORY_SERVICE_TARGET"; then
+            systemctl enable dvswitch-mods-activity-mode-history.service
+        fi
         systemctl enable --now dvswitch-mods-activity-mode-history.path
         systemctl start dvswitch-mods-activity-mode-history.service
     fi

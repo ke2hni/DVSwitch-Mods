@@ -217,12 +217,18 @@ require("--check" in installer and "--install" in installer and "--restore" in i
         "standalone installer check/install/restore interface missing")
 require("dvswitch-mods-activity-mode-history.path" in installer and "activity-mode-history.tsv" in installer,
         "installer does not install and initialize persistent transition tracking")
+require("systemctl reset-failed dvswitch-mods-activity-mode-history.path dvswitch-mods-activity-mode-history.service" in installer,
+        "installer does not clear the prior systemd start-limit state before enabling the repaired tracker")
+require("systemctl enable dvswitch-mods-activity-mode-history.service" in installer,
+        "installer does not enable the single boot reconciliation service")
 path_unit = (ROOT / "systemd/dvswitch-mods-activity-mode-history.path").read_text()
 service_unit = (ROOT / "systemd/dvswitch-mods-activity-mode-history.service").read_text()
-require("PathExists=/var/lib/dvswitch-mode-buttons/current-mode" in path_unit,
-        "mode-history tracker is not scheduled when persistent mode state already exists at boot")
+require("PathExists=" not in path_unit and "PathChanged=/var/lib/dvswitch-mode-buttons/current-mode" in path_unit,
+        "mode-history path watcher must react only to mode-file changes, not continuously trigger on file existence")
 require("After=local-fs.target analog_bridge.service mmdvm_bridge.service" in service_unit,
         "boot history reconciliation is not ordered after live bridge state is available")
+require("WantedBy=multi-user.target" in service_unit,
+        "mode-history service is not enabled for a single ordered boot reconciliation")
 require("dashboard-activity-modes) CHILD_SCRIPT=\"$SCRIPT_DIR/mod-dashboard-activity-modes.sh\"" in manager,
         "manager does not register the standalone activity-label installer")
 require("dashboard-activity-modes" in manager.split("readonly -a COMPONENTS=(", 1)[1].split(")", 1)[0],

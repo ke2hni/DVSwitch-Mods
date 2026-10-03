@@ -2,7 +2,6 @@
 Description=Watch DVSwitch mode state for dashboard activity history
 
 [Path]
-PathExists=/var/lib/dvswitch-mode-buttons/current-mode
 PathChanged=/var/lib/dvswitch-mode-buttons/current-mode
 Unit=dvswitch-mods-activity-mode-history.service
 
