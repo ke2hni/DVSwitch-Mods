@@ -1,9 +1,9 @@
 <?php
-// DVSwitch-Mods: dashboard activity network labels helper v2
+// DVSwitch-Mods: dashboard activity network labels helper v3
 // SPDX-License-Identifier: MIT
 
-/** Return the selected mode that was active when a UTC activity row was logged. */
-function dvsModsActivityModeAt($utcTimestamp, $historyFile)
+/** Return the latest mode transition at or before a UTC activity timestamp. */
+function dvsModsActivityTransitionAt($utcTimestamp, $historyFile)
 {
     $utcTimestamp = (string)$utcTimestamp;
     $event = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $utcTimestamp, new DateTimeZone('UTC'));
@@ -11,7 +11,7 @@ function dvsModsActivityModeAt($utcTimestamp, $historyFile)
     $eventAt = $event->getTimestamp();
     if (!is_file($historyFile) || !is_readable($historyFile)) { return null; }
 
-    $activeMode = null;
+    $active = null;
     $activeAt = null;
     $lines = @file($historyFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     if (!is_array($lines)) { return null; }
@@ -22,11 +22,18 @@ function dvsModsActivityModeAt($utcTimestamp, $historyFile)
         if (!in_array($historyMode, array('BM', 'TGIF', 'STFU', 'YSF', 'P25', 'NXDN', 'DSTAR'), true)) { continue; }
         $transitionAt = (int)$fields[0];
         if ($transitionAt <= $eventAt && ($activeAt === null || $transitionAt >= $activeAt)) {
-            $activeMode = $historyMode;
+            $active = array('at' => $transitionAt, 'mode' => $historyMode);
             $activeAt = $transitionAt;
         }
     }
-    return $activeMode;
+    return $active;
+}
+
+/** Return only the mode for callers that do not need the transition time. */
+function dvsModsActivityModeAt($utcTimestamp, $historyFile)
+{
+    $transition = dvsModsActivityTransitionAt($utcTimestamp, $historyFile);
+    return $transition === null ? null : $transition['mode'];
 }
 
 /**
@@ -43,19 +50,27 @@ function dvsModsActivityModeLabel($mode, $utcTimestamp, $stateFile = null, $hist
     if ($historyFile === null) {
         $historyFile = '/var/lib/dvswitch-mods/activity-mode-history.tsv';
     }
-    // Use the live state for the newest interval, including the short window
-    // before systemd has finished recording a just-written mode transition.
+    $event = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', (string)$utcTimestamp, new DateTimeZone('UTC'));
+    if ($event === false || $event->format('Y-m-d H:i:s') !== (string)$utcTimestamp) { return $mode; }
+    $eventAt = $event->getTimestamp();
+    $transition = dvsModsActivityTransitionAt($utcTimestamp, $historyFile);
+
+    // Use live state for the short interval before systemd records a recent
+    // button selection. A later boot-reconciliation entry in history takes
+    // precedence over stale current-mode state left from before reboot.
     if ($stateFile === null) { $stateFile = '/var/lib/dvswitch-mode-buttons/current-mode'; }
     if (is_file($stateFile) && is_readable($stateFile)) {
         $selectedMode = strtoupper(trim((string)file_get_contents($stateFile)));
         $selectedAt = @filemtime($stateFile);
-        $event = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', (string)$utcTimestamp, new DateTimeZone('UTC'));
-        if ($selectedAt !== false && $event !== false && $event->getTimestamp() >= $selectedAt) {
+        if ($selectedAt !== false && $eventAt >= $selectedAt) {
+            if ($transition !== null && $transition['at'] > $selectedAt) {
+                return in_array($transition['mode'], array('BM', 'TGIF', 'STFU'), true) ? $transition['mode'] : $mode;
+            }
             return in_array($selectedMode, array('BM', 'TGIF', 'STFU'), true) ? $selectedMode : $mode;
         }
     }
 
-    $modeAtEvent = dvsModsActivityModeAt($utcTimestamp, $historyFile);
+    $modeAtEvent = $transition === null ? null : $transition['mode'];
     if (in_array($modeAtEvent, array('BM', 'TGIF', 'STFU'), true)) { return $modeAtEvent; }
 
     return $mode;

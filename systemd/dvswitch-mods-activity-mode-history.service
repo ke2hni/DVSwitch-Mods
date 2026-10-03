@@ -1,6 +1,6 @@
 [Unit]
 Description=Record DVSwitch mode transitions for dashboard activity labels
-After=local-fs.target
+After=local-fs.target analog_bridge.service mmdvm_bridge.service
 
 [Service]
 Type=oneshot

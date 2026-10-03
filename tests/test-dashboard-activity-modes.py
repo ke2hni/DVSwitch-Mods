@@ -120,6 +120,13 @@ file_put_contents($laterDmrState, "TGIF\\n");
 touch($laterDmrState, {epoch + 10});
 $nonDmrRx = dvsModsActivityModeLabel("DMR Slot 2", "2026-09-30 21:59:40", $laterDmrState, $history);
 if ($nonDmrRx !== "DMR Slot 2") {{ dvsModsTestFail("FAIL: earlier DMR RX row was relabeled after later TGIF selection => ".$nonDmrRx); }}
+$staleDmrState = {str(Path(directory) / 'stale-current-mode')!r};
+file_put_contents($staleDmrState, "DSTAR\\n");
+touch($staleDmrState, {epoch - 30});
+$afterBootSync = dvsModsActivityModeLabel("DMR Slot 2", "2026-09-30 21:59:55", $staleDmrState, $history);
+if ($afterBootSync !== "TGIF") {{ dvsModsTestFail("FAIL: boot TGIF transition did not override stale DSTAR state => ".$afterBootSync); }}
+$beforeBootSync = dvsModsActivityModeLabel("DMR Slot 2", "2026-09-30 21:59:15", $staleDmrState, $history);
+if ($beforeBootSync !== "DMR Slot 2") {{ dvsModsTestFail("FAIL: pre-sync row was relabeled => ".$beforeBootSync); }}
 echo "PASS: selected-network activity label cases\\n";
 ?>'''
     php = shutil.which("php")
@@ -142,6 +149,8 @@ with tempfile.TemporaryDirectory() as directory:
         "DVS_ACTIVITY_LAST_DMR": str(last_dmr),
         "DVS_ACTIVITY_MODE_HISTORY": str(history),
         "DVS_ACTIVITY_MODE_LOCK": str(lock),
+        "DVS_ACTIVITY_ABINFO_GLOB": str(directory_path / "ABInfo_*.json"),
+        "DVS_ACTIVITY_BRIDGE_INI": str(directory_path / "MMDVM_Bridge.ini"),
     })
     last_dmr.write_text("TGIF\n")
     os.utime(last_dmr, (epoch - 40, epoch - 40))
@@ -157,12 +166,63 @@ with tempfile.TemporaryDirectory() as directory:
             "history recorder did not record a selected DMR network transition")
     require(history.read_text().count("\n") == 3, "history recorder duplicated a seeded mode transition")
 
+with tempfile.TemporaryDirectory() as directory:
+    directory_path = Path(directory)
+    state = directory_path / "current-mode"
+    last_dmr = directory_path / "last-dmr-network"
+    history = directory_path / "history.tsv"
+    lock = directory_path / "history.lock"
+    bridge_ini = directory_path / "MMDVM_Bridge.ini"
+    abinfo = directory_path / "ABInfo_31001.json"
+    stale_at = epoch - 60
+    live_at = epoch - 20
+    state.write_text("DSTAR\n")
+    last_dmr.write_text("TGIF\n")
+    history.write_text(f"{stale_at}\tDSTAR\n")
+    bridge_ini.write_text("[DMR Network]\nAddress=tgif.network\nPort=62030\n")
+    abinfo.write_text('{"tlv":{"ambe_mode":"DMR"}}')
+    os.utime(state, (stale_at, stale_at))
+    os.utime(abinfo, (live_at, live_at))
+    environment = os.environ.copy()
+    environment.update({
+        "DVS_ACTIVITY_MODE_STATE": str(state),
+        "DVS_ACTIVITY_LAST_DMR": str(last_dmr),
+        "DVS_ACTIVITY_MODE_HISTORY": str(history),
+        "DVS_ACTIVITY_MODE_LOCK": str(lock),
+        "DVS_ACTIVITY_ABINFO_GLOB": str(directory_path / "ABInfo_*.json"),
+        "DVS_ACTIVITY_BRIDGE_INI": str(bridge_ini),
+    })
+    subprocess.run(["python3", str(HISTORY_RECORDER)], env=environment, check=True)
+    rows = [line.split("\t") for line in history.read_text().splitlines()]
+    require(rows[-1][1] == "TGIF" and int(rows[-1][0]) > stale_at,
+            "fresh DMR/TGIF runtime state did not supersede stale DSTAR boot state")
+    require(state.read_text() == "DSTAR\n", "history startup sync unexpectedly changed Buttons-owned current-mode state")
+    initial_row_count = len(rows)
+    subprocess.run(["python3", str(HISTORY_RECORDER)], env=environment, check=True)
+    require(len(history.read_text().splitlines()) == initial_row_count,
+            "repeated boot/path capture appended a duplicate unchanged mode")
+
+    # A live non-DMR mode remains authoritative when its ABInfo is newer.
+    state.write_text("TGIF\n")
+    os.utime(state, (live_at - 10, live_at - 10))
+    abinfo.write_text('{"tlv":{"ambe_mode":"DSTAR"}}')
+    os.utime(abinfo, (live_at + 10, live_at + 10))
+    subprocess.run(["python3", str(HISTORY_RECORDER)], env=environment, check=True)
+    require(history.read_text().splitlines()[-1].endswith("\tDSTAR"),
+            "fresh non-DMR ABInfo mode was not recorded")
+
 installer = INSTALLER.read_text()
 manager = MANAGER.read_text()
 require("--check" in installer and "--install" in installer and "--restore" in installer,
         "standalone installer check/install/restore interface missing")
 require("dvswitch-mods-activity-mode-history.path" in installer and "activity-mode-history.tsv" in installer,
         "installer does not install and initialize persistent transition tracking")
+path_unit = (ROOT / "systemd/dvswitch-mods-activity-mode-history.path").read_text()
+service_unit = (ROOT / "systemd/dvswitch-mods-activity-mode-history.service").read_text()
+require("PathExists=/var/lib/dvswitch-mode-buttons/current-mode" in path_unit,
+        "mode-history tracker is not scheduled when persistent mode state already exists at boot")
+require("After=local-fs.target analog_bridge.service mmdvm_bridge.service" in service_unit,
+        "boot history reconciliation is not ordered after live bridge state is available")
 require("dashboard-activity-modes) CHILD_SCRIPT=\"$SCRIPT_DIR/mod-dashboard-activity-modes.sh\"" in manager,
         "manager does not register the standalone activity-label installer")
 require("dashboard-activity-modes" in manager.split("readonly -a COMPONENTS=(", 1)[1].split(")", 1)[0],

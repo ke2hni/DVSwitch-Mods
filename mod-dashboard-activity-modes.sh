@@ -7,7 +7,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.1.0"
+readonly SCRIPT_VERSION="1.1.1"
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly LH_TARGET="/usr/share/dvswitch/include/lh.php"
 readonly LOCALTX_TARGET="/usr/share/dvswitch/include/localtx.php"
@@ -103,7 +103,7 @@ run_install() {
         printf 'PASS: activity mode labels and transition tracking are already installed. No files changed.\n'
         return
     fi
-    if [[ -e "$HELPER_TARGET" ]] && ! grep -qE 'DVSwitch-Mods: dashboard activity network labels helper v[12]' "$HELPER_TARGET"; then
+    if [[ -e "$HELPER_TARGET" ]] && ! grep -qE 'DVSwitch-Mods: dashboard activity network labels helper v[123]' "$HELPER_TARGET"; then
         die "Refusing to replace an unrecognized helper file: $HELPER_TARGET"
     fi
     if [[ -e "$HISTORY_CAPTURE_TARGET" ]] && ! grep -qF 'Record DVSwitch mode transitions for timestamp-accurate activity labels.' "$HISTORY_CAPTURE_TARGET"; then die "Refusing to replace an unrecognized history recorder: $HISTORY_CAPTURE_TARGET"; fi
