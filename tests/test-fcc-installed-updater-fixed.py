@@ -67,7 +67,14 @@ with tempfile.TemporaryDirectory(prefix=".fcc-updater-test-", dir=ROOT.parent) a
         encoding="utf-8",
     )
     transaction = library / "transaction.sh"
-    shutil.copyfile(ROOT / "lib/transaction.sh", transaction)
+    transaction_text = (ROOT / "lib/transaction.sh").read_text(encoding="utf-8")
+    transaction_text = transaction_text.replace(
+        'install -o "$owner" -g "$group" -m "$mode" "$candidate" "$temporary"',
+        'install -m "$mode" "$candidate" "$temporary"',
+    )
+    require('install -o "$owner" -g "$group" -m "$mode" "$candidate" "$temporary"' not in transaction_text,
+            "isolated transaction helper could not be adapted for non-root CTY test")
+    transaction.write_text(transaction_text, encoding="utf-8")
 
     lh = dashboard / "lh.php"
     localtx = dashboard / "localtx.php"
@@ -78,6 +85,9 @@ with tempfile.TemporaryDirectory(prefix=".fcc-updater-test-", dir=ROOT.parent) a
     database = state / "dvswitch-mods-fcc-first-names.dat"
     archive = root / "fcc.zip"
     make_archive(archive, "Laura")
+    cty_archive = root / "cty.dat"
+    cty_archive.write_text("AD1C isolated CTY fixture\nArgentina: LU;\n" + "Test Entity: AA;\n" * 700, encoding="ascii")
+    require(10000 <= cty_archive.stat().st_size <= 2000000, "CTY fixture is outside accepted size bounds")
     subprocess.run(["python3", str(builder), "--archive", str(archive), "--output", str(database)], check=True, stdout=subprocess.DEVNULL)
     database.chmod(0o644)
     for path in (lh, localtx, helper):
@@ -123,21 +133,33 @@ with tempfile.TemporaryDirectory(prefix=".fcc-updater-test-", dir=ROOT.parent) a
     updater.chmod(0o755)
 
     curl = commands / "curl"
-    curl.write_text('#!/bin/bash\nset -eu\nif [[ "${!#}" == *country-files.com* ]]; then exit 22; fi\nout=""\nwhile [[ $# -gt 0 ]]; do if [[ "$1" == --output ]]; then out=$2; shift 2; else shift; fi; done\ncp -- "$FCC_TEST_ARCHIVE" "$out"\n', encoding="utf-8")
+    curl.write_text('#!/bin/bash\nset -eu\nurl=${!#}\nout=""\nwhile [[ $# -gt 0 ]]; do if [[ "$1" == --output ]]; then out=$2; shift 2; else shift; fi; done\nif [[ "$url" == *country-files.com* ]]; then cp -- "$CTY_TEST_FILE" "$out"; else cp -- "$FCC_TEST_ARCHIVE" "$out"; fi\n', encoding="utf-8")
     curl.chmod(0o755)
+    chown = commands / "chown"
+    chown.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
+    chown.chmod(0o755)
     systemctl = commands / "systemctl"
     systemctl.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
     systemctl.chmod(0o755)
     environment = os.environ.copy()
     environment["PATH"] = f"{commands}:{environment['PATH']}"
     environment["FCC_TEST_ARCHIVE"] = str(archive)
+    environment["CTY_TEST_FILE"] = str(cty_archive)
 
     original = digest(database)
     result = subprocess.run(["bash", str(updater)], env=environment, text=True, capture_output=True)
     require(result.returncode == 0, f"identical update failed: {result.stderr}")
     require("byte-for-byte identical" in result.stdout, "identical result was not reported")
+    require("CTY.DAT installed atomically" in result.stdout, "first CTY.DAT download was not installed")
+    installed_cty = state / "dvswitch-mods-cty.dat"
+    require(installed_cty.is_file() and digest(installed_cty) == digest(cty_archive),
+            "new CTY.DAT was not installed byte-for-byte")
     require(digest(database) == original, "identical update changed the database")
-    require(not (root / "backups").exists(), "identical update created a backup")
+    backup_sets = list((root / "backups").glob("install-*"))
+    require(len(backup_sets) == 1, "first CTY.DAT installation did not create exactly one backup set")
+    manifest = (backup_sets[0] / "MANIFEST").read_text(encoding="utf-8")
+    require(f"0\t{installed_cty}\t-" in manifest,
+            "new CTY.DAT backup set did not record that the target was originally absent")
     require(not list(state.glob(".dvswitch-fcc-firstnames.*")), "identical update left a workspace")
 
     make_archive(archive, "Laurie")
@@ -146,14 +168,14 @@ with tempfile.TemporaryDirectory(prefix=".fcc-updater-test-", dir=ROOT.parent) a
     require("installed atomically" in result.stdout, "changed installation was not reported")
     changed = digest(database)
     require(changed != original, "changed archive did not replace the database")
-    require(len(list((root / "backups").glob("install-*"))) == 1, "changed update did not create exactly one backup")
+    require(len(list((root / "backups").glob("install-*"))) == 2, "changed FCC database plus initial CTY file did not leave two backup sets")
     require(not list(state.glob(".dvswitch-fcc-firstnames.*")), "changed update left a workspace")
 
     archive.write_bytes(b"truncated zip")
     result = subprocess.run(["bash", str(updater)], env=environment, text=True, capture_output=True)
     require(result.returncode != 0, "broken FCC archive was accepted")
     require(digest(database) == changed, "failed update changed the installed database")
-    require(len(list((root / "backups").glob("install-*"))) == 1, "failed build created a backup")
+    require(len(list((root / "backups").glob("install-*"))) == 2, "failed build created a backup")
     failed_workspaces = list(state.glob(".dvswitch-fcc-firstnames.*"))
     require(not failed_workspaces, f"failed update left a workspace: {failed_workspaces}; stderr: {result.stderr}")
 

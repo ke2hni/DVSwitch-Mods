@@ -135,9 +135,14 @@ run_update() {
         else
             . "$TRANSACTION_LIBRARY"
             dvsm_transaction_begin "$BACKUP_ROOT"
-            if [[ -f "$CTY_DATABASE_TARGET" ]]; then dvsm_backup_file "$CTY_DATABASE_TARGET"; else dvsm_record_absent_file "$CTY_DATABASE_TARGET"; fi
             INSTALL_ACTIVE=1
-            dvsm_install_candidate "$cty_candidate" "$CTY_DATABASE_TARGET"
+            if [[ -f "$CTY_DATABASE_TARGET" ]]; then
+                dvsm_backup_file "$CTY_DATABASE_TARGET"
+                dvsm_install_candidate "$cty_candidate" "$CTY_DATABASE_TARGET"
+            else
+                dvsm_record_absent_file "$CTY_DATABASE_TARGET"
+                dvsm_install_new_candidate "$cty_candidate" "$CTY_DATABASE_TARGET" root www-data 0644
+            fi
             chown root:www-data "$CTY_DATABASE_TARGET"
             chmod 0644 "$CTY_DATABASE_TARGET"
             validate_cty "$CTY_DATABASE_TARGET"
