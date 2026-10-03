@@ -58,7 +58,14 @@ with tempfile.TemporaryDirectory(prefix=".fcc-updater-test-", dir=ROOT.parent) a
     builder_text = (ROOT / "lib/build_fcc_first_names.py").read_text(encoding="utf-8").replace("MIN_PRODUCTION_RECORDS = 700_000", "MIN_PRODUCTION_RECORDS = 2")
     builder.write_text(builder_text, encoding="utf-8")
     patcher = library / "patch_dashboard_first_names.py"
-    patcher.write_text("#!/usr/bin/env python3\n# Isolated updater test: validation succeeds without changing fixtures.\n", encoding="utf-8")
+    patcher.write_text(
+        "#!/usr/bin/env python3\n"
+        "import argparse\n"
+        "parser = argparse.ArgumentParser()\n"
+        "parser.add_argument('--lh', required=True)\n"
+        "parser.parse_args()\n",
+        encoding="utf-8",
+    )
     transaction = library / "transaction.sh"
     shutil.copyfile(ROOT / "lib/transaction.sh", transaction)
 
@@ -92,7 +99,6 @@ with tempfile.TemporaryDirectory(prefix=".fcc-updater-test-", dir=ROOT.parent) a
         'readonly SERVICE_TARGET="/etc/systemd/system/dvswitch-fcc-first-names-update.service"': f'readonly SERVICE_TARGET="{service}"',
         'readonly TIMER_TARGET="/etc/systemd/system/dvswitch-fcc-first-names-update.timer"': f'readonly TIMER_TARGET="{timer}"',
         'readonly LH_TARGET="/usr/share/dvswitch/include/lh.php"': f'readonly LH_TARGET="{lh}"',
-        'readonly LOCALTX_TARGET="/usr/share/dvswitch/include/localtx.php"': f'readonly LOCALTX_TARGET="{localtx}"',
         'readonly HELPER_TARGET="/usr/share/dvswitch/include/dvswitch_mods_fcc_first_names.php"': f'readonly HELPER_TARGET="{helper}"',
         'readonly DATABASE_TARGET="/var/lib/mmdvm/dvswitch-mods-fcc-first-names.dat"': f'readonly DATABASE_TARGET="{database}"',
         'readonly WORK_ROOT="/var/lib/mmdvm"': f'readonly WORK_ROOT="{state}"',
@@ -106,7 +112,6 @@ with tempfile.TemporaryDirectory(prefix=".fcc-updater-test-", dir=ROOT.parent) a
         '    [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Run this updater with sudo."': '    : # Root requirement bypassed only in isolated regression copy.',
         '    [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Run this utility with sudo."': '    : # Root requirement bypassed only in isolated regression copy.',
         'require_owner_mode "$LH_TARGET" root root 644': f'require_owner_mode "$LH_TARGET" {test_user} {test_group} 644',
-        'require_owner_mode "$LOCALTX_TARGET" root root 644': f'require_owner_mode "$LOCALTX_TARGET" {test_user} {test_group} 644',
         'require_owner_mode "$HELPER_TARGET" root root 644': f'require_owner_mode "$HELPER_TARGET" {test_user} {test_group} 644',
         'require_owner_mode "$DATABASE_TARGET" root www-data 644': f'require_owner_mode "$DATABASE_TARGET" {test_user} {test_group} 644',
     }

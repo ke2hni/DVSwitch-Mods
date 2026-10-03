@@ -15,7 +15,6 @@ readonly SERVICE_TARGET="/etc/systemd/system/dvswitch-fcc-first-names-update.ser
 readonly TIMER_TARGET="/etc/systemd/system/dvswitch-fcc-first-names-update.timer"
 readonly TIMER_UNIT="dvswitch-fcc-first-names-update.timer"
 readonly LH_TARGET="/usr/share/dvswitch/include/lh.php"
-readonly LOCALTX_TARGET="/usr/share/dvswitch/include/localtx.php"
 readonly HELPER_TARGET="/usr/share/dvswitch/include/dvswitch_mods_fcc_first_names.php"
 readonly DATABASE_TARGET="/var/lib/mmdvm/dvswitch-mods-fcc-first-names.dat"
 readonly CTY_DATABASE_TARGET="/var/lib/mmdvm/dvswitch-mods-cty.dat"
@@ -69,16 +68,13 @@ require_owner_mode() {
 }
 
 verify_installed_modification() {
-    require_file "$LH_TARGET"; require_file "$LOCALTX_TARGET"; require_file "$HELPER_TARGET"; require_file "$DATABASE_TARGET"
+    require_file "$LH_TARGET"; require_file "$HELPER_TARGET"; require_file "$DATABASE_TARGET"
     require_owner_mode "$LH_TARGET" root root 644
-    require_owner_mode "$LOCALTX_TARGET" root root 644
     require_owner_mode "$HELPER_TARGET" root root 644
     require_owner_mode "$DATABASE_TARGET" root www-data 644
     cp -- "$LH_TARGET" "$WORK_DIR/lh.php"
-    cp -- "$LOCALTX_TARGET" "$WORK_DIR/localtx.php"
-    python3 "$PATCHER" --lh "$WORK_DIR/lh.php" --localtx "$WORK_DIR/localtx.php"
+    python3 "$PATCHER" --lh "$WORK_DIR/lh.php"
     cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" || die "Installed lh.php is not the current supported modification."
-    cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" || die "Installed localtx.php is not the current supported modification."
     local actual
     actual=$(file_hash "$HELPER_TARGET"); [[ "$actual" == "$HELPER_SHA256" ]] || die "Unsupported installed FCC helper checksum: $actual"
     python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null
