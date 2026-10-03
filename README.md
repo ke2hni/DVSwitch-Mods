@@ -288,9 +288,11 @@ installs a self-contained weekly FCC database updater and randomized systemd
 timer.
 
 If no usable FCC/DMR name is available, the dashboard can show the callsign's
-DXCC country from CTY.DAT. The weekly updater downloads CTY.DAT, validates the
-download before replacement, and keeps the previous file if a refresh fails.
-The country line is omitted when CTY.DAT is unavailable or no country matches.
+DXCC country from CTY.DAT. During installation, the installer downloads and
+validates CTY.DAT when no valid copy is present, so the first install is ready
+without a separate updater command. The weekly updater refreshes CTY.DAT and
+keeps the previous file if a later refresh fails. The country line is omitted
+only when no country matches.
 
 Lookup input is normalized only for the private database lookup: surrounding or
 internal spaces and trailing Unicode replacement characters are removed, and
@@ -300,7 +302,7 @@ values such as `WD1V ��` without converting international suffixes into FCC 
 
 **Required first:** Independent of the P25/NXDN/DMR chain, but install it before
 the dashboard Target display modification. Internet access is required for the
-initial FCC database build.
+initial FCC database build and CTY.DAT download.
 
 ```bash
 sudo ./mod-dashboard-fcc-first-names.sh --check

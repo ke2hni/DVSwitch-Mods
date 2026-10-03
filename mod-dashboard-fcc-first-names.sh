@@ -17,6 +17,7 @@ readonly TIMER_SOURCE="$SCRIPT_DIR/systemd/dvswitch-fcc-first-names-update.timer
 readonly LH_TARGET="/usr/share/dvswitch/include/lh.php"
 readonly HELPER_TARGET="/usr/share/dvswitch/include/dvswitch_mods_fcc_first_names.php"
 readonly DATABASE_TARGET="/var/lib/mmdvm/dvswitch-mods-fcc-first-names.dat"
+readonly CTY_DATABASE_TARGET="/var/lib/mmdvm/dvswitch-mods-cty.dat"
 readonly UPDATER_TARGET="/usr/local/sbin/dvswitch-fcc-first-names-update"
 readonly INSTALLED_LIBRARY_DIR="/usr/local/lib/dvswitch-mods"
 readonly BUILDER_TARGET="$INSTALLED_LIBRARY_DIR/build_fcc_first_names.py"
@@ -27,6 +28,7 @@ readonly TIMER_TARGET="/etc/systemd/system/dvswitch-fcc-first-names-update.timer
 readonly TIMER_UNIT="dvswitch-fcc-first-names-update.timer"
 readonly WORK_ROOT="/var/lib/mmdvm"
 readonly FCC_URL="https://data.fcc.gov/download/pub/uls/complete/l_amat.zip"
+readonly CTY_URL="https://www.country-files.com/cty/cty.dat"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"
 readonly DASHBOARD_URL="https://127.0.0.1/dvswitch/"
 
@@ -266,6 +268,33 @@ build_database() {
         "$(file_hash "$WORK_DIR/fcc-first-names.dat")"
 }
 
+validate_cty() {
+    local file=$1 bytes
+    [[ -f "$file" && ! -L "$file" ]] || return 1
+    bytes=$(stat -c %s "$file") || return 1
+    (( bytes >= 10000 && bytes <= 2000000 )) || return 1
+    grep -q 'AD1C' "$file" && grep -q '^Argentina:' "$file"
+}
+
+prepare_cty_candidate() {
+    local archive="$WORK_DIR/cty.dat.download" candidate="$WORK_DIR/cty.dat"
+    if validate_cty "$CTY_DATABASE_TARGET"; then
+        printf 'CTY.DAT: valid country database already installed.\n'
+        return 0
+    fi
+    if [[ -e "$CTY_DATABASE_TARGET" || -L "$CTY_DATABASE_TARGET" ]] && [[ ! -f "$CTY_DATABASE_TARGET" || -L "$CTY_DATABASE_TARGET" ]]; then
+        die "Refusing unsupported CTY.DAT target state: $CTY_DATABASE_TARGET"
+    fi
+    printf 'CTY.DAT: downloading country/entity database for initial installation...\n'
+    if curl --fail --location --silent --show-error --connect-timeout 30 --max-time 120 --retry 2 --output "$archive" "$CTY_URL" && validate_cty "$archive"; then
+        cp -- "$archive" "$candidate"
+        printf 'CTY.DAT: downloaded and validated (%s bytes).\n' "$(stat -c %s "$candidate")"
+        return 0
+    fi
+    rm -f -- "$archive" "$candidate"
+    die "CTY.DAT download or validation failed. No installation changes have been made; correct the connection/feed issue and rerun --install."
+}
+
 backup_target() {
     local target=$1
     if [[ -f "$target" && ! -L "$target" ]]; then dvsm_backup_file "$target"
@@ -299,6 +328,11 @@ run_check() {
         database_checksum=$(file_hash "$DATABASE_TARGET")
         printf 'FCC database: %s validated records, %s bytes.\nFCC database SHA256: %s\n' "$database_count" "$(stat -c %s "$DATABASE_TARGET")" "$database_checksum"
     else printf 'FCC database: not installed; --install will download and build it.\n'; fi
+    if validate_cty "$CTY_DATABASE_TARGET"; then
+        printf 'CTY.DAT: installed and validated (%s bytes).\n' "$(stat -c %s "$CTY_DATABASE_TARGET")"
+    else
+        printf 'CTY.DAT: missing or invalid; --install will attempt a bounded country-file download.\n'
+    fi
     local release_state
     release_state=$(updater_release_state)
     if [[ "$release_state" == current ]]; then
@@ -314,9 +348,12 @@ run_check() {
 
 run_install() {
     preflight; prepare_dashboard
-    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_release_state)" == current ]]; then
+    local cty_ready=0
+    if validate_cty "$CTY_DATABASE_TARGET"; then cty_ready=1; fi
+    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_release_state)" == current ]] && [[ $cty_ready -eq 1 ]]; then
         printf 'PASS: worldwide DMR/FCC dashboard Name modification is already installed. No files changed.\n'; return
     fi
+    if [[ $cty_ready -eq 0 ]]; then prepare_cty_candidate; fi
     local database_ready=0
     if [[ -f "$DATABASE_TARGET" && ! -L "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null; then
         database_ready=1
@@ -330,8 +367,14 @@ run_install() {
     stage_install_component "$WORK_DIR/lh.php" "$LH_TARGET" root root 0644
     stage_install_component "$HELPER_SOURCE" "$HELPER_TARGET" root root 0644
     if [[ $database_ready -eq 0 ]]; then stage_install_component "$WORK_DIR/fcc-first-names.dat" "$DATABASE_TARGET" root www-data 0644; fi
+    if [[ -f "$WORK_DIR/cty.dat" && ! -L "$WORK_DIR/cty.dat" ]]; then
+        stage_install_component "$WORK_DIR/cty.dat" "$CTY_DATABASE_TARGET" root www-data 0644
+    elif ! validate_cty "$CTY_DATABASE_TARGET"; then
+        die "No validated CTY.DAT is available to complete the installation."
+    fi
     php -l "$LH_TARGET" >/dev/null; php -l "$HELPER_TARGET" >/dev/null
     python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null
+    validate_cty "$CTY_DATABASE_TARGET" || die "Installed CTY.DAT failed validation."
     if [[ $SYSTEMD_CHANGED -eq 1 ]]; then systemctl daemon-reload; fi
     if [[ $TIMER_CHANGED -eq 1 ]]; then
         systemctl enable "$TIMER_UNIT"
@@ -379,12 +422,12 @@ run_uninstall() {
     python3 "$PATCHER" --lh "$WORK_DIR/original/lh.php"
     . "$TRANSACTION_LIBRARY"
     dvsm_transaction_begin "$BACKUP_ROOT"
-    for target in "$LH_TARGET" "$HELPER_TARGET" "$DATABASE_TARGET"; do backup_target "$target"; done
+    for target in "$LH_TARGET" "$HELPER_TARGET" "$DATABASE_TARGET" "$CTY_DATABASE_TARGET"; do backup_target "$target"; done
     while IFS= read -r target; do backup_target "$target"; done < <(updater_targets)
     INSTALL_ACTIVE=1
     systemctl disable --now "$TIMER_UNIT" >/dev/null 2>&1 || true
     dvsm_restore_backup_set "$directory"
-    rm -f -- "$HELPER_TARGET" "$DATABASE_TARGET"
+    rm -f -- "$HELPER_TARGET" "$DATABASE_TARGET" "$CTY_DATABASE_TARGET"
     while IFS= read -r target; do rm -f -- "$target"; done < <(updater_targets)
     php -l "$LH_TARGET" >/dev/null
     systemctl daemon-reload
