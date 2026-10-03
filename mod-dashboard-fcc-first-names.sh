@@ -113,6 +113,23 @@ patcher_structure_supported() {
     grep -Fq '<th>Name</th>' "$target"
 }
 
+# systemd accepts trailing blank lines; ignore only those when validating a
+# deployed unit so harmless editor-added whitespace does not block --check.
+unit_file_matches() {
+    python3 - "$1" "$2" <<'PY'
+from pathlib import Path
+import sys
+
+def normalized(path):
+    lines = Path(path).read_bytes().splitlines()
+    while lines and not lines[-1].strip():
+        lines.pop()
+    return b"\n".join(lines) + (b"\n" if lines else b"")
+
+raise SystemExit(0 if normalized(sys.argv[1]) == normalized(sys.argv[2]) else 1)
+PY
+}
+
 updater_release_state() {
     local state
     state=$(updater_state)
@@ -130,7 +147,7 @@ updater_release_state() {
     if patcher_structure_supported "$PATCHER_TARGET"; then
         cmp -s "$BUILDER" "$BUILDER_TARGET" || die "Installed FCC builder does not match the supported previous release."
         cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die "Installed FCC transaction helper does not match the supported previous release."
-        cmp -s "$SERVICE_SOURCE" "$SERVICE_TARGET" || die "Installed FCC systemd service does not match the supported previous release."
+        unit_file_matches "$SERVICE_SOURCE" "$SERVICE_TARGET" || die "Installed FCC systemd service does not match the supported previous release."
         cmp -s "$TIMER_SOURCE" "$TIMER_TARGET" || die "Installed FCC timer does not match the supported previous release."
         [[ "$(stat -c '%U:%G:%a' "$UPDATER_TARGET")" == root:root:755 ]] || die "Incorrect updater ownership or mode."
         for target in "$BUILDER_TARGET" "$PATCHER_TARGET" "$TRANSACTION_TARGET" "$SERVICE_TARGET" "$TIMER_TARGET"; do
@@ -142,7 +159,7 @@ updater_release_state() {
            cmp -s "$PATCHER" "$PATCHER_TARGET" &&
            cmp -s "$BUILDER" "$BUILDER_TARGET" &&
            cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" &&
-           cmp -s "$SERVICE_SOURCE" "$SERVICE_TARGET" &&
+           unit_file_matches "$SERVICE_SOURCE" "$SERVICE_TARGET" &&
            cmp -s "$TIMER_SOURCE" "$TIMER_TARGET"; then
             printf 'current'
         else
@@ -154,14 +171,14 @@ updater_release_state() {
     cmp -s "$PATCHER" "$PATCHER_TARGET" || die "Installed FCC dashboard patcher does not match this release."
     cmp -s "$BUILDER" "$BUILDER_TARGET" || die "Installed FCC builder does not match this release."
     cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die "Installed FCC transaction helper does not match this release."
-    cmp -s "$SERVICE_SOURCE" "$SERVICE_TARGET" || die "Installed FCC systemd service does not match this release."
+    unit_file_matches "$SERVICE_SOURCE" "$SERVICE_TARGET" || die "Installed FCC systemd service does not match this release."
     [[ "$(stat -c '%U:%G:%a' "$UPDATER_TARGET")" == root:root:755 ]] || die "Incorrect updater ownership or mode."
     for target in "$BUILDER_TARGET" "$PATCHER_TARGET" "$TRANSACTION_TARGET" "$SERVICE_TARGET" "$TIMER_TARGET"; do
         [[ "$(stat -c '%U:%G:%a' "$target")" == root:root:644 ]] || die "Incorrect ownership or mode: $target"
     done
     systemctl is-enabled --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not enabled."
     systemctl is-active --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not active."
-    if cmp -s "$UPDATER_SOURCE" "$UPDATER_TARGET" && cmp -s "$PATCHER" "$PATCHER_TARGET" && cmp -s "$BUILDER" "$BUILDER_TARGET" && cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" && cmp -s "$SERVICE_SOURCE" "$SERVICE_TARGET" && cmp -s "$TIMER_SOURCE" "$TIMER_TARGET"; then
+    if cmp -s "$UPDATER_SOURCE" "$UPDATER_TARGET" && cmp -s "$PATCHER" "$PATCHER_TARGET" && cmp -s "$BUILDER" "$BUILDER_TARGET" && cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" && unit_file_matches "$SERVICE_SOURCE" "$SERVICE_TARGET" && cmp -s "$TIMER_SOURCE" "$TIMER_TARGET"; then
         printf 'current'
     else
         printf 'upgradeable'
