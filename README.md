@@ -308,12 +308,6 @@ Manual FCC update:
 sudo ./mod-dashboard-fcc-first-names.sh --update
 ```
 
-The same weekly updater refreshes the compact AD1C CTY.DAT prefix/entity data
-into `/var/lib/mmdvm/dvswitch-mods-cty.dat`, alongside the other dashboard data.
-When DMR ID and FCC lookups have no usable name, Gateway Activity keeps `---`
-and adds the matched DXCC entity on a second line. A failed or invalid CTY.DAT
-download leaves the last validated local copy in place.
-
 ### 6. Cleaner dashboard targets
 
 **What it adds:** Row-specific friendly talkgroup and reflector names, D-Star
@@ -327,10 +321,7 @@ and GPS/Data activity therefore display the resolved room name instead of a
 generic activity label. D-Star `CQCQCQ via REF030 C` rows display as `REF030 C`
 without a redundant `(Ref 030)` suffix; a bare `CQCQCQ` remains `General Call`.
 If no friendly DMR talkgroup name is available, the target displays as `TG ###`
-without repeating the same number in parentheses. For D-Star rows with a bare
-`CQCQCQ` target, the reflector is resolved from ircDDBGateway link history at
-the activity event time, so older rows keep the reflector linked when they
-were received. Rows with no linked reflector remain `General Call`.
+without repeating the same number in parentheses.
 
 **Required first:** `mod-dashboard-fcc-first-names.sh`; valid P25/NXDN JSON and
 BrandMeister/TGIF lists provide the friendly names.
