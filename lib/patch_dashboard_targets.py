@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 
 LEGACY_MARKER = "// DVSwitch-Mods: cleaned activity Target display v2"
@@ -31,6 +32,11 @@ LEGACY_LEGENDS = (
   <b>D-Star:</b> <b>General Call</b> = CQCQCQ (reflector not recorded)
 </div>
 ''',
+)
+CUSTOM_LEGEND_BLOCK = re.compile(
+    r'<div\b[^>]*>(?:(?!</div>).)*?<b>\s*Legend:\s*</b>'
+    r'(?:(?!</div>).)*?<b>\s*---\s*</b>(?:(?!</div>).)*?</div>',
+    re.IGNORECASE | re.DOTALL,
 )
 
 
@@ -112,7 +118,11 @@ def patch_text(text: str, name: str) -> str:
                 if len(legacy_matches) == 1:
                     text = text.replace(legacy_matches[0], LEGEND, 1)
                 else:
-                    text = once(text, "</div>\n<br>", "</div>\n<br>\n" + LEGEND + "<br>", "older Local Activity Target legend anchor")
+                    custom_legends = list(CUSTOM_LEGEND_BLOCK.finditer(text))
+                    if len(custom_legends) > 1:
+                        raise PatchError("ambiguous custom Local Activity Target legends")
+                    if not custom_legends:
+                        text = once(text, "</div>\n<br>", "</div>\n<br>\n" + LEGEND + "<br>", "older Local Activity Target legend anchor")
         return text.replace(LEGACY_MARKER, MARKER, 1).replace(OLDER_LEGACY_MARKER, MARKER, 1)
     if MARKER in text or LEGACY_MARKER in text or INCLUDE in text or "dvsModsTargetDisplay(" in text:
         raise PatchError(f"partial Target modification in {name}")

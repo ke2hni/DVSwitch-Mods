@@ -53,6 +53,24 @@ for name, original in (("lh.php", lh), ("localtx.php", localtx)):
     if name == "localtx.php":
         old_legend = changed.replace(patcher.LEGEND, patcher.LEGACY_LEGENDS[0], 1)
         require(patcher.patch_text(old_legend, name) == changed, name + " legacy legend upgrade failed")
+        custom_legend = '''<div style="margin:3px 0 0 14px;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
+  <b>Legend:</b> <b>---</b> = No usable worldwide DMR ID or FCC name data available, Maybe an International Callsign.
+</div>
+'''
+        customized = changed.replace(patcher.LEGEND, custom_legend, 1)
+        customized = customized.replace("<?php\n", "<div>another block</div>\n<br>\n<?php\n", 1)
+        require(customized.count("</div>\n<br>") >= 2,
+                f"duplicate generic legend anchors were not represented: {customized.count('</div>\\n<br>')}")
+        require(patcher.patch_text(customized, name) == customized,
+                name + " custom legend was not preserved when generic anchors repeat")
+        ambiguous = customized.replace(custom_legend, custom_legend + custom_legend, 1)
+        try:
+            patcher.patch_text(ambiguous, name)
+        except patcher.PatchError as error:
+            require("ambiguous custom Local Activity Target legends" in str(error),
+                    name + " duplicate custom legend failed for the wrong reason")
+        else:
+            raise SystemExit("FAIL: duplicate custom Local Activity legends were accepted")
     altered = changed + "<!-- user customization -->\n"
     require(patcher.patch_text(altered, name) == altered, name + " user customization was not preserved")
 
@@ -63,6 +81,14 @@ with tempfile.TemporaryDirectory() as directory:
     (data / "TGList_BM.txt").write_text("9;0;Local;TG9\n3100;0;USA_Bridge;TG3100\n999;0;BM Name;TG999\n")
     (data / "TGList_TGIF.txt").write_text("43389;0;SouthEast Link;TG43389\n999;0;Different Name;TG999\n")
     (data / "YSFHosts.txt").write_text("02034;XX-Alabama Link;host.example;42000\n44444;America-Link;host.example;42000\n")
+    (data / "ircDDBGateway-2026-10-02.log").write_text(
+        "M: 2026-10-02 04:07:21: Linking KE2HNI Z at startup to REF030 C\n"
+        "M: 2026-10-02 04:07:22: D-Plus link to REF030 C established\n"
+        "M: 2026-10-02 18:00:00: Linking KE2HNI Z to REF090 B\n"
+        "M: 2026-10-02 18:00:03: D-Plus link to REF090 B established\n"
+        "M: 2026-10-02 18:03:00: Remote control user has linked \"KE2HNI Z\" to \"U       \" with reconnect 4\n"
+        "M: 2026-10-02 18:03:01: Removing outgoing D-Plus link KE2HNI Z, REF090 B\n"
+    )
     cases = [
         ("P25", "TG 10200", "", "P25 North America (TG 10200)"),
         ("P25", "TG 43389", "", "Lookout Mountain Amateur Radio Community (TG 43389)"),
@@ -82,12 +108,23 @@ with tempfile.TemporaryDirectory() as directory:
     ]
     php_cases = json.dumps(cases)
     program = f'''<?php
-$dvsModsTargetDataDirectory = {str(directory)!r};
+    $dvsModsTargetDataDirectory = {str(directory)!r};
+date_default_timezone_set("UTC");
+$dvsModsTargetIrcDdbLogDirectory = {str(directory)!r};
 require {str(HELPER)!r};
 $cases = {php_cases};
 foreach ($cases as $case) {{
     $actual = dvsModsTargetDisplay($case[0], $case[1], $case[2]);
     if ($actual !== $case[3]) {{ file_put_contents("php://stderr", "FAIL: ".$case[0]." / ".$case[1]." => ".$actual." expected ".$case[3]."\\n"); exit(1); }}
+}}
+$dstarHistoryCases = [
+    ["2026-10-02 18:01:00", "REF090 B"],
+    ["2026-10-02 17:42:01", "REF030 C"],
+    ["2026-10-02 18:04:00", "General Call"],
+];
+foreach ($dstarHistoryCases as $case) {{
+    $actual = dvsModsTargetDisplay("D-Star", "CQCQCQ", "", $case[0]);
+    if ($actual !== $case[1]) {{ file_put_contents("php://stderr", "FAIL: D-Star event-time history at ".$case[0]." => ".$actual." expected ".$case[1]."\\n"); exit(1); }}
 }}
 echo "PASS: Target display helper cases\\n";
 ?>'''
