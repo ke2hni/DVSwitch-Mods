@@ -42,3 +42,7 @@ Then run the updater to download and validate CTY.DAT and the FCC database:
 sudo /usr/local/sbin/dvswitch-fcc-first-names-update && sudo ls -l /var/lib/mmdvm/dvswitch-mods-cty.dat
 
 After pi4test passes, repeat the same checks on pi5test and node3040. Install on node68425 only after test nodes pass and Jeff explicitly authorizes it.
+
+Manager upgrade regression (safe to run as the regular user; uses a temporary isolated manager and fake component installer):
+
+cd ~/DVSwitch-Mods && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-manager-recorded-upgrade.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-manager-structure.py

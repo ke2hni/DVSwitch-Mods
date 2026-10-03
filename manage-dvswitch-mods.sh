@@ -282,8 +282,9 @@ record_install() {
 }
 
 install_one() {
-    local requested=$1 before after additions backup count
+    local requested=$1 before after additions backup count was_recorded=0
     select_component "$requested"
+    if component_is_recorded "$COMPONENT"; then was_recorded=1; fi
     MANAGER_PHASE="checking $COMPONENT"
     printf '\n=== CHECK: %s ===\n' "$COMPONENT"
     "$CHILD_SCRIPT" --check
@@ -295,7 +296,11 @@ install_one() {
     additions=$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | sed '/^$/d')
     count=$(printf '%s\n' "$additions" | sed '/^$/d' | wc -l)
     if [[ $count -eq 0 ]]; then
-        printf 'NOTICE: %s was already installed; no new backup was created or recorded.\n' "$COMPONENT"
+        if [[ $was_recorded -eq 1 ]]; then
+            printf 'NOTICE: %s remains recorded; its installer created no new backup. The existing active record was retained.\n' "$COMPONENT"
+        else
+            printf 'NOTICE: %s was already installed; no new backup was created or recorded.\n' "$COMPONENT"
+        fi
         return
     fi
     [[ $count -eq 1 ]] || die "$COMPONENT created an unexpected number of backups; inspect $BACKUP_ROOT manually."
@@ -503,10 +508,6 @@ install_requested() {
         for component in "${COMPONENTS[@]}"; do
             if should_skip_all_component "$component"; then
                 printf '\n=== SKIP: %s is not supported on this host ===\n' "$component"
-                continue
-            fi
-            if component_is_recorded "$component"; then
-                printf '\n=== SKIP: %s ===\nThis installation is already recorded by the manager; continuing from the next unrecorded component.\n' "$component"
                 continue
             fi
             install_one "$component"

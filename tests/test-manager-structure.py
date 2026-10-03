@@ -57,12 +57,17 @@ def main() -> None:
             "reverse-order uninstall safety notice is missing")
     require("last_state_line" in master and "remove_last_state_line" in master,
             "recorded LIFO uninstall implementation is missing")
-    require("component_is_recorded" in master and "continuing from the next unrecorded component" in master,
-            "safe interrupted-install resume behavior is missing")
-    install_requested = master.index("install_requested()")
+    require('component_is_recorded "$COMPONENT"' in master and
+            '"$CHILD_SCRIPT" --check' in master and '"$CHILD_SCRIPT" --install' in master,
+            "recorded components are not rechecked and offered to their upgrade-aware installers")
+    install_requested = master[master.index("install_requested()") : master.index("uninstall_requested()")]
+    require('install_one "$component"' in install_requested and
+            'component_is_recorded "$component"; then' not in install_requested,
+            "manager records are incorrectly causing Install All to skip component upgrades")
+    install_requested_offset = master.index("install_requested()")
     require("preflight_recorded_backups" in master and
-            master.index("preflight_recorded_backups", install_requested) <
-            master.index("install_one", install_requested),
+            master.index("preflight_recorded_backups", install_requested_offset) <
+            master.index("install_one", install_requested_offset),
             "all recorded backups are not checked before installation")
     require("--reset-after-reinstall" in master and "reset_after_reinstall" in master,
             "fresh-reinstall stale-state recovery is missing")
