@@ -130,6 +130,31 @@ raise SystemExit(0 if normalized(sys.argv[1]) == normalized(sys.argv[2]) else 1)
 PY
 }
 
+# The previous FCC timer release randomized the weekly run by up to 96 hours.
+# Accept that exact prior setting so --check can report it as upgradeable.
+timer_file_matches_supported() {
+    unit_file_matches "$1" "$2" && return 0
+    python3 - "$1" "$2" <<'PY'
+from pathlib import Path
+import sys
+
+def normalized(data):
+    lines = data.splitlines()
+    while lines and not lines[-1].strip():
+        lines.pop()
+    return b"\n".join(lines) + (b"\n" if lines else b"")
+
+expected = Path(sys.argv[1]).read_bytes()
+old = b"RandomizedDelaySec=96h"
+current = b"RandomizedDelaySec=6h"
+if expected.count(current) != 1:
+    raise SystemExit(1)
+previous = expected.replace(current, old, 1)
+installed = Path(sys.argv[2]).read_bytes()
+raise SystemExit(0 if normalized(installed) == normalized(previous) else 1)
+PY
+}
+
 updater_release_state() {
     local state
     state=$(updater_state)
@@ -148,7 +173,7 @@ updater_release_state() {
         cmp -s "$BUILDER" "$BUILDER_TARGET" || die "Installed FCC builder does not match the supported previous release."
         cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die "Installed FCC transaction helper does not match the supported previous release."
         unit_file_matches "$SERVICE_SOURCE" "$SERVICE_TARGET" || die "Installed FCC systemd service does not match the supported previous release."
-        cmp -s "$TIMER_SOURCE" "$TIMER_TARGET" || die "Installed FCC timer does not match the supported previous release."
+        timer_file_matches_supported "$TIMER_SOURCE" "$TIMER_TARGET" || die "Installed FCC timer does not match the supported previous release."
         [[ "$(stat -c '%U:%G:%a' "$UPDATER_TARGET")" == root:root:755 ]] || die "Incorrect updater ownership or mode."
         for target in "$BUILDER_TARGET" "$PATCHER_TARGET" "$TRANSACTION_TARGET" "$SERVICE_TARGET" "$TIMER_TARGET"; do
             [[ "$(stat -c '%U:%G:%a' "$target")" == root:root:644 ]] || die "Incorrect ownership or mode: $target"
@@ -160,7 +185,7 @@ updater_release_state() {
            cmp -s "$BUILDER" "$BUILDER_TARGET" &&
            cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" &&
            unit_file_matches "$SERVICE_SOURCE" "$SERVICE_TARGET" &&
-           cmp -s "$TIMER_SOURCE" "$TIMER_TARGET"; then
+           unit_file_matches "$TIMER_SOURCE" "$TIMER_TARGET"; then
             printf 'current'
         else
             printf 'upgradeable'
@@ -178,7 +203,7 @@ updater_release_state() {
     done
     systemctl is-enabled --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not enabled."
     systemctl is-active --quiet "$TIMER_UNIT" || die "FCC weekly update timer is not active."
-    if cmp -s "$UPDATER_SOURCE" "$UPDATER_TARGET" && cmp -s "$PATCHER" "$PATCHER_TARGET" && cmp -s "$BUILDER" "$BUILDER_TARGET" && cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" && unit_file_matches "$SERVICE_SOURCE" "$SERVICE_TARGET" && cmp -s "$TIMER_SOURCE" "$TIMER_TARGET"; then
+    if cmp -s "$UPDATER_SOURCE" "$UPDATER_TARGET" && cmp -s "$PATCHER" "$PATCHER_TARGET" && cmp -s "$BUILDER" "$BUILDER_TARGET" && cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" && unit_file_matches "$SERVICE_SOURCE" "$SERVICE_TARGET" && unit_file_matches "$TIMER_SOURCE" "$TIMER_TARGET"; then
         printf 'current'
     else
         printf 'upgradeable'
