@@ -308,6 +308,12 @@ Manual FCC update:
 sudo ./mod-dashboard-fcc-first-names.sh --update
 ```
 
+The same weekly updater refreshes the compact AD1C CTY.DAT prefix/entity data
+into `/var/lib/mmdvm/dvswitch-mods-cty.dat`, alongside the other dashboard data.
+When DMR ID and FCC lookups have no usable name, Gateway Activity keeps `---`
+and adds the matched DXCC entity on a second line. A failed or invalid CTY.DAT
+download leaves the last validated local copy in place.
+
 ### 6. Cleaner dashboard targets
 
 **What it adds:** Row-specific friendly talkgroup and reflector names, D-Star

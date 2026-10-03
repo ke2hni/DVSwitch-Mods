@@ -154,7 +154,10 @@ def patch_lh(text: str) -> str:
     if start >= end:
         raise PatchError("invalid lh stock name-block order")
     replacement = '''                $dvsModsFirstName = dvsModsFccFirstName($listElem[2]);
-                echo '<td align="left" style="font-weight:bold;color:#464646;">&nbsp;<b>'.htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").'</b></td>';
+                $dvsModsCountry = ($dvsModsFirstName === '---') ? dvsModsFccCountry($listElem[2]) : '';
+                $dvsModsNameHtml = htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8");
+                if ($dvsModsCountry !== '') { $dvsModsNameHtml .= '<br>'.htmlspecialchars($dvsModsCountry, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8"); }
+                echo '<td align="left" style="font-weight:bold;color:#464646;">&nbsp;<b>'.$dvsModsNameHtml.'</b></td>';
 '''
     return text[:start] + replacement + text[end:]
 
@@ -206,7 +209,7 @@ def patch_text(text: str, name: str) -> str:
         text = text.replace(LEGACY_MARKER, MARKER, 1)
         return add_dmr_id_resolution(text, name)
     if text.count(MARKER) == 1:
-        if text.count(INCLUDE) != 1 or text.count("dvsModsFccFirstName($listElem[2])") != 1 or text.count("dvsModsDmrIdCallsign($listElem[2])") != 1 or text.count("<th>Name</th>") != 1:
+        if text.count(INCLUDE) != 1 or text.count("dvsModsFccFirstName($listElem[2])") != 1 or text.count("dvsModsFccCountry($listElem[2])") != 1 or text.count("dvsModsDmrIdCallsign($listElem[2])") != 1 or text.count("<th>Name</th>") != 1:
             raise PatchError(f"incomplete modified {name}")
         validate_current(text, name)
         for old_legend, new_legend in ((TARGET_PREVIOUS_LEGEND, TARGET_LEGEND), (TARGET_WIDE_PREVIOUS_LEGEND, TARGET_WIDE_LEGEND)):

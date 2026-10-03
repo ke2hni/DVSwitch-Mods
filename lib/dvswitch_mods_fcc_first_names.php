@@ -142,4 +142,59 @@ function dvsModsFccFirstName($rawCallsign) {
     }
     return $cache[$callsign] = $result;
 }
+
+/** Resolve a callsign to its CTY.DAT DXCC entity, including prefix exceptions. */
+function dvsModsFccCountry($rawCallsign) {
+    static $prefixes = null;
+    static $cache = array();
+    $callsign = strtoupper(trim((string)$rawCallsign));
+    $callsign = preg_replace('/[^A-Z0-9\/]/', '', $callsign);
+    if (!preg_match('/^[A-Z0-9]{3,10}(?:\/[A-Z0-9]{1,10})*$/D', $callsign)) { return ''; }
+    $callsign = preg_replace('/\/[A-Z]$/', '', $callsign);
+    if (isset($cache[$callsign])) { return $cache[$callsign]; }
+    $path = '/var/lib/mmdvm/dvswitch-mods-cty.dat';
+    if (!is_readable($path)) { return $cache[$callsign] = ''; }
+    if ($prefixes === null) {
+        $prefixes = array();
+        $contents = @file_get_contents($path);
+        if (!is_string($contents) || strpos($contents, 'AD1C') === false || strpos($contents, 'Argentina:') === false) { return $cache[$callsign] = ''; }
+        $current = '';
+        foreach (preg_split('/\r?\n/', $contents) as $line) {
+            if (strpos($line, ':') !== false && preg_match('/^([^:;]+):/', $line, $header)) {
+                $current = trim($header[1]);
+                continue;
+            }
+            if ($current === '') { continue; }
+            $line = strtoupper(trim(preg_replace('/\\s*#.*/', '', $line)));
+            $line = preg_replace('/\\s+/', '', $line);
+            if (strpos($line, ';') === false) { $line = rtrim($line, ','); }
+            foreach (explode(',', $line) as $entry) {
+                $entry = trim($entry);
+                if ($entry === '') { continue; }
+                $entry = rtrim($entry, ';');
+                $exact = false;
+                if (strpos($entry, '=') === 0) { $exact = true; $entry = substr($entry, 1); }
+                $entry = preg_replace('/\\([^)]*\\)/', '', $entry);
+                $rangePattern = '';
+                if (preg_match('/^([A-Z0-9]+)\\[([A-Z0-9]*)\\]$/', $entry, $range)) {
+                    $entry = $range[1];
+                    $rangePattern = '^'.preg_quote($range[1], '/').'[A-Z0-9]{0,'.strlen($range[2]).'}$';
+                }
+                if (!preg_match('/^[A-Z0-9]+$/', $entry)) { continue; }
+                $prefixes[] = array($exact ? 'exact' : ($rangePattern !== '' ? 'range' : 'prefix'), $exact ? $entry : ($rangePattern !== '' ? $rangePattern : $entry), $current);
+            }
+        }
+        usort($prefixes, function ($a, $b) { return strlen($b[1]) <=> strlen($a[1]); });
+    }
+    if (!$prefixes) { return $cache[$callsign] = ''; }
+    $candidates = explode('/', $callsign);
+    foreach (array_reverse($candidates) as $candidate) {
+        foreach ($prefixes as $entry) {
+            if ($entry[0] === 'exact' && $candidate === $entry[1]) { return $cache[$callsign] = $entry[2]; }
+            if ($entry[0] === 'range' && preg_match('/'.$entry[1].'/D', $candidate)) { return $cache[$callsign] = $entry[2]; }
+            if ($entry[0] === 'prefix' && strpos($candidate, $entry[1]) === 0) { return $cache[$callsign] = $entry[2]; }
+        }
+    }
+    return $cache[$callsign] = '';
+}
 ?>

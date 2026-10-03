@@ -4,7 +4,7 @@ Description=Weekly DVSwitch FCC first-name database update
 [Timer]
 OnCalendar=Mon *-*-* 00:00:00
 Persistent=true
-RandomizedDelaySec=96h
+RandomizedDelaySec=6h
 Unit=dvswitch-fcc-first-names-update.service
 
 [Install]

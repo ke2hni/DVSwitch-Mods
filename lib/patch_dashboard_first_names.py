@@ -30,7 +30,7 @@ def once(text: str, old: str, new: str, description: str) -> str:
 
 def patch_text(text: str) -> str:
     if text.count(MARKER) == 1:
-        required = (INCLUDE, "dvsModsFccFirstName($listElem[2])",
+        required = (INCLUDE, "dvsModsFccFirstName($listElem[2])", "dvsModsFccCountry($listElem[2])",
                     "dvsModsDmrIdCallsign($listElem[2])", "<th>Name</th>")
         if any(text.count(token) != 1 for token in required):
             raise PatchError("incomplete FCC Gateway Activity modification")
@@ -76,7 +76,10 @@ def patch_text(text: str) -> str:
     if start >= end:
         raise PatchError("invalid Gateway Activity name-block order")
     replacement = '''                $dvsModsFirstName = dvsModsFccFirstName($listElem[2]);
-                echo '<td align="left" style="font-weight:bold;color:#464646;white-space:normal;overflow-wrap:anywhere;word-break:normal;width:12ch;min-width:12ch;max-width:12ch;">&nbsp;<b>'.htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").'</b></td>';
+                $dvsModsCountry = ($dvsModsFirstName === '---') ? dvsModsFccCountry($listElem[2]) : '';
+                $dvsModsNameHtml = htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8");
+                if ($dvsModsCountry !== '') { $dvsModsNameHtml .= '<br>'.htmlspecialchars($dvsModsCountry, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8"); }
+                echo '<td align="left" style="font-weight:bold;color:#464646;white-space:normal;overflow-wrap:anywhere;word-break:normal;width:12ch;min-width:12ch;max-width:12ch;">&nbsp;<b>'.$dvsModsNameHtml.'</b></td>';
 '''
     text = text[:start] + replacement + text[end:]
     token = 'if ((is_numeric($listElem[2]) || strpos($listElem[2], "openSPOT") !== FALSE)'

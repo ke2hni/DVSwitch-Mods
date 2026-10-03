@@ -6,18 +6,16 @@
 from __future__ import annotations
 
 import argparse
-import re
 from pathlib import Path
 
 LEGACY_MARKER = "// DVSwitch-Mods: cleaned activity Target display v2"
 OLDER_LEGACY_MARKER = "// DVSwitch-Mods: cleaned activity Target display v1"
 MARKER = "// DVSwitch-Mods: cleaned activity Target display v3"
 INCLUDE = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_target_display.php';"
-LEGEND = '''<div style="margin:3px 0 0 14px;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
-  <b>Legend:</b> <b>---</b> = No usable worldwide DMR ID or FCC name data available, Maybe an International Callsign.
+LEGEND = '''<div style="margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
+  <b>Legend:</b> <b>---</b> = no usable worldwide DMR or FCC name data available
 </div>
 '''
-LOCAL_LEGEND_RE = re.compile(r'<div\b[^>]*>\s*<b>Legend:</b>\s*<b>---</b>.*?</div>', re.DOTALL)
 LEGACY_LEGENDS = (
     '''<div style="margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
   <b>Legend:</b> <b>---</b> = no usable worldwide DMR or FCC name data available<br>
@@ -98,11 +96,15 @@ def patch_text(text: str, name: str) -> str:
         if text.count(old_new) == 1: text = text.replace(old_new, new, 1)
         if text.count(old_post) == 1: text = text.replace(old_post, post_cell_padding, 1)
         if name == "localtx.php":
-            legend_matches = list(LOCAL_LEGEND_RE.finditer(text))
-            if len(legend_matches) > 1:
+            legend_count = text.count(LEGEND)
+            if legend_count > 1:
                 raise PatchError("duplicate Local Activity Target legends")
-            if len(legend_matches) == 1:
-                text = LOCAL_LEGEND_RE.sub(LEGEND.rstrip("\n"), text, count=1)
+            if legend_count == 1:
+                spaced_legend = "<br>\n" + LEGEND
+                if text.count(spaced_legend) == 0:
+                    text = once(text, LEGEND, spaced_legend, "existing Local Activity Target legend spacing")
+                elif text.count(spaced_legend) != 1:
+                    raise PatchError("ambiguous Local Activity Target legend spacing")
             else:
                 legacy_matches = [legacy for legacy in LEGACY_LEGENDS if text.count(legacy) == 1]
                 if len(legacy_matches) > 1:

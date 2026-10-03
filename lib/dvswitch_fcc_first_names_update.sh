@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly UPDATER_VERSION="1.3.0"
+readonly UPDATER_VERSION="1.4.0"
 readonly LIBRARY_DIR="/usr/local/lib/dvswitch-mods"
 readonly BUILDER="$LIBRARY_DIR/build_fcc_first_names.py"
 readonly PATCHER="$LIBRARY_DIR/patch_dashboard_first_names.py"
@@ -18,6 +18,7 @@ readonly LH_TARGET="/usr/share/dvswitch/include/lh.php"
 readonly LOCALTX_TARGET="/usr/share/dvswitch/include/localtx.php"
 readonly HELPER_TARGET="/usr/share/dvswitch/include/dvswitch_mods_fcc_first_names.php"
 readonly DATABASE_TARGET="/var/lib/mmdvm/dvswitch-mods-fcc-first-names.dat"
+readonly CTY_DATABASE_TARGET="/var/lib/mmdvm/dvswitch-mods-cty.dat"
 readonly WORK_ROOT="/var/lib/mmdvm"
 readonly FCC_URL="https://data.fcc.gov/download/pub/uls/complete/l_amat.zip"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"
@@ -81,6 +82,15 @@ verify_installed_modification() {
     local actual
     actual=$(file_hash "$HELPER_TARGET"); [[ "$actual" == "$HELPER_SHA256" ]] || die "Unsupported installed FCC helper checksum: $actual"
     python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null
+    if [[ -e "$CTY_DATABASE_TARGET" || -L "$CTY_DATABASE_TARGET" ]]; then validate_cty "$CTY_DATABASE_TARGET" || printf 'WARNING: cached CTY.DAT failed validation; country fallback will be unavailable.\n' >&2; fi
+}
+
+validate_cty() {
+    local file=$1 bytes
+    [[ -f "$file" && ! -L "$file" ]] || return 1
+    bytes=$(stat -c %s "$file")
+    (( bytes >= 10000 && bytes <= 2000000 )) || return 1
+    grep -q 'AD1C' "$file" && grep -q '^Argentina:' "$file"
 }
 
 preflight() {
@@ -88,7 +98,7 @@ preflight() {
     . /etc/os-release
     [[ ${ID:-} == debian ]] || die "Unsupported OS: ${ID:-unknown}"
     case "${VERSION_ID:-}" in 12|13) ;; *) die "Unsupported Debian version: ${VERSION_ID:-unknown}" ;; esac
-    for command in awk cmp cp curl date flock install mktemp mv python3 rm sha256sum stat systemctl; do require_command "$command"; done
+    for command in awk cmp cp curl date flock grep install mktemp mv python3 rm sha256sum stat systemctl; do require_command "$command"; done
     require_file "$BUILDER"; require_file "$PATCHER"; require_file "$TRANSACTION_LIBRARY"
     [[ "$(file_hash "$BUILDER")" == "$BUILDER_SHA256" ]] || die "Installed FCC builder checksum is unsupported."
     [[ "$(file_hash "$PATCHER")" == "$PATCHER_SHA256" ]] || die "Installed FCC dashboard patcher checksum is unsupported."
@@ -107,7 +117,7 @@ run_remove_updater() {
     local target
     for target in "$UPDATER_TARGET" "$BUILDER" "$PATCHER" "$TRANSACTION_LIBRARY" "$SERVICE_TARGET" "$TIMER_TARGET"; do require_file "$target"; done
     . "$TRANSACTION_LIBRARY"
-    dvsm_transaction_begin "$BACKUP_ROOT"
+        dvsm_transaction_begin "$BACKUP_ROOT"
     for target in "$UPDATER_TARGET" "$BUILDER" "$PATCHER" "$TRANSACTION_LIBRARY" "$SERVICE_TARGET" "$TIMER_TARGET"; do dvsm_backup_file "$target"; done
     INSTALL_ACTIVE=1
     systemctl disable --now "$TIMER_UNIT"
@@ -119,6 +129,31 @@ run_remove_updater() {
 }
 
 run_update() {
+    preflight
+    local cty_archive="$WORK_DIR/cty.dat.download" cty_candidate="$WORK_DIR/cty.dat"
+    printf 'CTY.DAT: attempting weekly prefix/entity refresh...\n'
+    if curl --fail --location --silent --show-error --connect-timeout 30 --max-time 120 --retry 2 --output "$cty_archive" "https://www.country-files.com/cty/cty.dat" && validate_cty "$cty_archive"; then
+        cp -- "$cty_archive" "$cty_candidate"
+        if [[ -f "$CTY_DATABASE_TARGET" ]] && cmp -s "$cty_candidate" "$CTY_DATABASE_TARGET"; then
+            printf 'CTY.DAT: installed copy is current; no replacement needed.\n'
+        else
+            . "$TRANSACTION_LIBRARY"
+            dvsm_transaction_begin "$BACKUP_ROOT"
+            if [[ -f "$CTY_DATABASE_TARGET" ]]; then dvsm_backup_file "$CTY_DATABASE_TARGET"; else dvsm_record_absent_file "$CTY_DATABASE_TARGET"; fi
+            INSTALL_ACTIVE=1
+            dvsm_install_candidate "$cty_candidate" "$CTY_DATABASE_TARGET"
+            chown root:www-data "$CTY_DATABASE_TARGET"
+            chmod 0644 "$CTY_DATABASE_TARGET"
+            validate_cty "$CTY_DATABASE_TARGET"
+            INSTALL_ACTIVE=0
+            printf 'PASS: CTY.DAT installed atomically (%s bytes).\n' "$(stat -c %s "$CTY_DATABASE_TARGET")"
+        fi
+        rm -f -- "$cty_archive" "$cty_candidate"
+    else
+        rm -f -- "$cty_archive" "$cty_candidate"
+        printf 'WARNING: CTY.DAT refresh failed validation or download; keeping the last known good file.\n' >&2
+        [[ -f "$CTY_DATABASE_TARGET" ]] && validate_cty "$CTY_DATABASE_TARGET" && printf 'CTY.DAT: last known good copy remains available.\n' || printf 'CTY.DAT: no valid cached copy is available yet.\n' >&2
+    fi
     preflight
     local archive="$WORK_DIR/l_amat.zip" candidate="$WORK_DIR/fcc-first-names.dat"
     printf 'FCC archive: downloading weekly Amateur Radio Service file...\n'
