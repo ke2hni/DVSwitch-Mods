@@ -19,7 +19,9 @@ def require(condition: bool, message: str) -> None:
         raise SystemExit("FAIL: " + message)
 
 
-with tempfile.TemporaryDirectory(prefix="dvswitch-manager-upgrade-") as temp:
+with tempfile.TemporaryDirectory(
+    prefix="dvswitch-manager-upgrade-", dir=ROOT.parent
+) as temp:
     sandbox = Path(temp)
     manager_dir = sandbox / "manager"
     state_dir = sandbox / "state"
