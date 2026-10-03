@@ -5,7 +5,7 @@
 require __DIR__.'/../lib/dvswitch_mods_fcc_first_names.php';
 
 $fixture = <<<'CTY'
-Test Country:  K,KA-KZ,=K1ABC,
+Test Country:  K,KA-KZ,
   W[AEG],N[AEG];
 Second Entity:  VE,VA;
 Special Entity:  =K1ABC;
