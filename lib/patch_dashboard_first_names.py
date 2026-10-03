@@ -30,9 +30,24 @@ def once(text: str, old: str, new: str, description: str) -> str:
 
 def patch_text(text: str) -> str:
     if text.count(MARKER) == 1:
-        required = (INCLUDE, "dvsModsFccFirstName($listElem[2])", "dvsModsFccCountry($listElem[2])",
+        required = (INCLUDE, "dvsModsFccFirstName($listElem[2])",
                     "dvsModsDmrIdCallsign($listElem[2])", "<th>Name</th>")
         if any(text.count(token) != 1 for token in required):
+            raise PatchError("incomplete FCC Gateway Activity modification")
+        legacy_name = "$dvsModsFirstName = dvsModsFccFirstName($listElem[2]);"
+        if text.count("dvsModsFccCountry($listElem[2])") == 1 and text.count("$dvsModsCountry = ($dvsModsFirstName === '---')") == 1:
+            pass
+        elif text.count(legacy_name) == 1 and "dvsModsFccCountry($listElem[2])" not in text:
+            country_lines = '''$dvsModsCountry = ($dvsModsFirstName === '---') ? dvsModsFccCountry($listElem[2]) : '';
+                $dvsModsNameHtml = htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8");
+                if ($dvsModsCountry !== '') { $dvsModsNameHtml .= '<br>'.htmlspecialchars($dvsModsCountry, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8"); }'''
+            text = text.replace(legacy_name, legacy_name + "\n                " + country_lines, 1)
+            old_output = "htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, \"UTF-8\").'</b></td>';"
+            new_output = "$dvsModsNameHtml.'</b></td>';"
+            if text.count(old_output) != 1:
+                raise PatchError("unsupported FCC Gateway Activity Name output block")
+            text = text.replace(old_output, new_output, 1)
+        else:
             raise PatchError("incomplete FCC Gateway Activity modification")
         if text.count(NAME_CELL_STYLE_NEW) == 1:
             return text
