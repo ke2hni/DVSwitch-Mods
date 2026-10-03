@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Jeff Milne, KE2HNI
 # Clean the DVSwitch Gateway and Local Activity Target columns.
-# v1.1.9: avoids duplicating unnamed talkgroup numbers in Target labels.
+# v1.2.0: resolves D-Star reflector labels from event-time gateway link history.
 
 set -euo pipefail
 
-readonly SCRIPT_VERSION="1.1.9"
+readonly SCRIPT_VERSION="1.2.0"
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly LH_TARGET="/usr/share/dvswitch/include/lh.php"
 readonly LOCALTX_TARGET="/usr/share/dvswitch/include/localtx.php"
@@ -60,6 +60,13 @@ show_result() {
     else
         printf 'MODIFICATION READY:\nBefore lh.php:      %s\nAfter lh.php:       %s\nBefore localtx.php: %s\nAfter localtx.php:  %s\n' \
             "$(file_hash "$LH_TARGET")" "$(file_hash "$WORK_DIR/lh.php")" "$(file_hash "$LOCALTX_TARGET")" "$(file_hash "$WORK_DIR/localtx.php")"
+        if (( helper_same )); then
+            printf 'Target helper: current version already installed.\n'
+        elif [[ -f "$HELPER_TARGET" ]]; then
+            printf 'Target helper: existing version will be backed up and upgraded.\n'
+        else
+            printf 'Target helper: new helper will be installed.\n'
+        fi
     fi
 }
 

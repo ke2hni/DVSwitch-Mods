@@ -1,17 +1,30 @@
-Update to the existing DVSwitch-Mods dashboard-targets component.
+DVSwitch-Mods dashboard-targets 1.2.0 event-time test package
 
-Copy these files to the same relative paths under ~/DVSwitch-Mods, replacing the current versions:
-- README.md
-- mod-dashboard-targets.sh
-- lib/dvswitch_mods_target_display.php
-- tests/test-dashboard-targets.py
+This package restores the D-Star event-time reflector lookup from the
+previously tested helper. It is an update to the existing dashboard-targets
+component; it adds no service and does not change the dashboard table patches.
 
-Then, on pi4test, run the regression test and check first:
+Test on pi4test first:
 
 cd ~/DVSwitch-Mods && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-dashboard-targets.py && sudo ./mod-dashboard-targets.sh --check
 
-Only if both pass, install:
+If both pass, install:
 
 sudo ./mod-dashboard-targets.sh --install
 
-The change keeps D-Star reflector output as REF030 C without a redundant suffix and fixes the tested no-friendly-name DMR fallback to show TG 999 once. Continue test order pi4test, pi5test, node3040. Do not install on node68425 without explicit authorization.
+Then compare the deployed helper and package source:
+
+sudo cmp -s lib/dvswitch_mods_target_display.php /usr/share/dvswitch/include/dvswitch_mods_target_display.php && echo 'PASS: deployed helper matches package'
+
+The runtime test includes the REF030 C link events from Oct 2 at 19:37:46/47
+and 22:26:48 local time, with D-Star activity events at 23:57:28 Oct 2 and
+00:06:07 Oct 3 local time. It also checks link changes, disconnect handling,
+and lookup of an earlier event after a later event. It uses the node's
+America/New_York timezone, matching the gateway log timestamps and dashboard
+UTC offsets represented by PHP timestamps.
+
+After pi4test passes, repeat on pi5test and node3040. Do not install this on
+production node68425 until test nodes pass and you explicitly authorize it.
+
+Package contents use the repository's canonical helper path:
+lib/dvswitch_mods_target_display.php.
