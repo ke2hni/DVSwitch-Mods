@@ -47,6 +47,8 @@ for name, original in (("lh.php", lh), ("localtx.php", localtx)):
     require(changed.count(patcher.MARKER) == 1, name + " marker missing")
     require(changed.count("dvsModsTargetDisplay(") == 1, name + " helper call missing")
     require(changed.count(patcher.LEGEND) == (1 if name == "localtx.php" else 0), name + " legend count incorrect")
+    if name == "localtx.php":
+        require('margin:3px 0 0 14px;' in patcher.LEGEND, "Local Activity legend 14px alignment is missing")
     require(patcher.patch_text(changed, name) == changed, name + " patch not idempotent")
     legacy = changed.replace(patcher.MARKER, patcher.LEGACY_MARKER, 1)
     require(patcher.patch_text(legacy, name) == changed, name + " v1 upgrade failed")

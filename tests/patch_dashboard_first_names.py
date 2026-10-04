@@ -31,10 +31,13 @@ TARGET_WIDE_PREVIOUS_LEGEND = TARGET_PREVIOUS_LEGEND.replace(
 TARGET_WIDE_LEGEND = TARGET_LEGEND.replace(
     'width:640px;', 'width:min(95%,1400px);'
 )
-TARGET_CURRENT_LEGEND = '''<div style="margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
+TARGET_CURRENT_LEGEND = '''<div style="margin:3px 0 0 14px;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
   <b>Legend:</b> <b>---</b> = No usable worldwide DMR ID or FCC name data available, Maybe an International Callsign.
 </div>
 '''
+TARGET_PREVIOUS_CURRENT_LEGEND = TARGET_CURRENT_LEGEND.replace(
+    'margin:3px 0 0 14px;', 'margin:3px auto 0 auto;'
+)
 SUPPORTED = {
     "lh.php": {
         "f8e6c9801c2613796f070921cee442943ed2dfdd4ec2466a266a6df369a8dc70",
@@ -98,7 +101,7 @@ def without_target_modification(text: str, name: str) -> str:
         text.count(TARGET_MARKER),
         text.count(TARGET_INCLUDE),
         text.count("dvsModsTargetDisplay("),
-        text.count(TARGET_CURRENT_LEGEND) + text.count(TARGET_LEGEND) + text.count(TARGET_PREVIOUS_LEGEND) + text.count(TARGET_WIDE_LEGEND) + text.count(TARGET_WIDE_PREVIOUS_LEGEND),
+        text.count(TARGET_CURRENT_LEGEND) + text.count(TARGET_PREVIOUS_CURRENT_LEGEND) + text.count(TARGET_LEGEND) + text.count(TARGET_PREVIOUS_LEGEND) + text.count(TARGET_WIDE_LEGEND) + text.count(TARGET_WIDE_PREVIOUS_LEGEND),
     )
     if counts == (0, 0, 0, 0):
         return text
@@ -112,7 +115,7 @@ def without_target_modification(text: str, name: str) -> str:
     recovered = recovered.replace(TARGET_INCLUDE + "\n", "", 1)
     recovered = recovered.replace(modified, original, 1)
     if name == "localtx.php":
-        for legend in (TARGET_CURRENT_LEGEND, TARGET_LEGEND, TARGET_PREVIOUS_LEGEND, TARGET_WIDE_LEGEND, TARGET_WIDE_PREVIOUS_LEGEND):
+        for legend in (TARGET_CURRENT_LEGEND, TARGET_PREVIOUS_CURRENT_LEGEND, TARGET_LEGEND, TARGET_PREVIOUS_LEGEND, TARGET_WIDE_LEGEND, TARGET_WIDE_PREVIOUS_LEGEND):
             if legend in recovered:
                 recovered = recovered.replace(legend, "", 1)
                 break
