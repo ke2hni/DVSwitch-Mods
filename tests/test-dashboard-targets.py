@@ -53,6 +53,8 @@ for name, original in (("lh.php", lh), ("localtx.php", localtx)):
     if name == "localtx.php":
         old_legend = changed.replace(patcher.LEGEND, patcher.LEGACY_LEGENDS[0], 1)
         require(patcher.patch_text(old_legend, name) == changed, name + " legacy legend upgrade failed")
+        stale_legend = changed.replace(patcher.LEGEND, patcher.LEGACY_LEGENDS[-1], 1)
+        require(patcher.patch_text(stale_legend, name) == changed, name + " previous short legend upgrade failed")
     altered = changed + "<!-- user customization -->\n"
     require(patcher.patch_text(altered, name) == altered, name + " user customization was not preserved")
 

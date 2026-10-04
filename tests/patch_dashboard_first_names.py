@@ -23,7 +23,7 @@ TARGET_PREVIOUS_LEGEND = '''<div style="width:640px;margin:3px auto 0 auto;font-
 '''
 TARGET_LEGEND = TARGET_PREVIOUS_LEGEND.replace(
     "no FCC first name available; callsign may be non-U.S./international or absent from FCC data",
-    "no usable worldwide DMR or FCC name data available",
+    "No usable worldwide DMR ID or FCC name data available, Maybe an International Callsign.",
 )
 TARGET_WIDE_PREVIOUS_LEGEND = TARGET_PREVIOUS_LEGEND.replace(
     'width:640px;', 'width:min(95%,1400px);'
@@ -32,7 +32,7 @@ TARGET_WIDE_LEGEND = TARGET_LEGEND.replace(
     'width:640px;', 'width:min(95%,1400px);'
 )
 TARGET_CURRENT_LEGEND = '''<div style="margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
-  <b>Legend:</b> <b>---</b> = no usable worldwide DMR or FCC name data available
+  <b>Legend:</b> <b>---</b> = No usable worldwide DMR ID or FCC name data available, Maybe an International Callsign.
 </div>
 '''
 SUPPORTED = {
