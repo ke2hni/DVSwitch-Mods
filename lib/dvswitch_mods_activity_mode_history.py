@@ -158,8 +158,11 @@ def main() -> None:
         # before a fresh ABInfo file reflects a just-selected mode.
         if live is None or state is None or live[0] < state[0]:
             append_transition(rows, state)
-        if rows:
-            write_history(HISTORY_FILE, rows)
+        # Create the history file even when neither a saved selection nor live
+        # ABInfo is available yet. This keeps installation independent of the
+        # optional Mode Buttons component and lets later bridge-config events
+        # populate the file as soon as runtime state becomes available.
+        write_history(HISTORY_FILE, rows)
 
 
 if __name__ == "__main__":

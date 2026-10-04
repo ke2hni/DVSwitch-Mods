@@ -211,10 +211,49 @@ with tempfile.TemporaryDirectory() as directory:
     require(history.read_text().splitlines()[-1].endswith("\tDSTAR"),
             "fresh non-DMR ABInfo mode was not recorded")
 
+with tempfile.TemporaryDirectory() as directory:
+    directory_path = Path(directory)
+    history = directory_path / "history.tsv"
+    bridge_ini = directory_path / "MMDVM_Bridge.ini"
+    abinfo = directory_path / "ABInfo_31001.json"
+    bridge_ini.write_text("[DMR Network]\nAddress=tgif.network\nPort=62030\n")
+    abinfo.write_text('{"tlv":{"ambe_mode":"DMR"}}')
+    os.utime(abinfo, (epoch, epoch))
+    environment = os.environ.copy()
+    environment.update({
+        "DVS_ACTIVITY_MODE_STATE": str(directory_path / "missing-buttons-current-mode"),
+        "DVS_ACTIVITY_LAST_DMR": str(directory_path / "missing-buttons-last-dmr"),
+        "DVS_ACTIVITY_MODE_HISTORY": str(history),
+        "DVS_ACTIVITY_MODE_LOCK": str(directory_path / "history.lock"),
+        "DVS_ACTIVITY_ABINFO_GLOB": str(directory_path / "ABInfo_*.json"),
+        "DVS_ACTIVITY_BRIDGE_INI": str(bridge_ini),
+    })
+    subprocess.run(["python3", str(HISTORY_RECORDER)], env=environment, check=True)
+    require(history.read_text().endswith("\tTGIF\n"),
+            "standalone activity-mode recorder requires Buttons-owned state")
+
+with tempfile.TemporaryDirectory() as directory:
+    directory_path = Path(directory)
+    history = directory_path / "history.tsv"
+    environment = os.environ.copy()
+    environment.update({
+        "DVS_ACTIVITY_MODE_STATE": str(directory_path / "missing-current-mode"),
+        "DVS_ACTIVITY_LAST_DMR": str(directory_path / "missing-last-dmr"),
+        "DVS_ACTIVITY_MODE_HISTORY": str(history),
+        "DVS_ACTIVITY_MODE_LOCK": str(directory_path / "history.lock"),
+        "DVS_ACTIVITY_ABINFO_GLOB": str(directory_path / "missing-ABInfo_*.json"),
+        "DVS_ACTIVITY_BRIDGE_INI": str(directory_path / "missing-MMDVM_Bridge.ini"),
+    })
+    subprocess.run(["python3", str(HISTORY_RECORDER)], env=environment, check=True)
+    require(history.is_file() and history.read_text() == "",
+            "recorder did not initialize empty standalone history before live state exists")
+
 installer = INSTALLER.read_text()
 manager = MANAGER.read_text()
 require("--check" in installer and "--install" in installer and "--restore" in installer,
         "standalone installer check/install/restore interface missing")
+require("DVSwitch-Mode-Buttons current-mode state is missing" not in installer,
+        "activity-mode installer still requires the separate Mode Buttons component")
 require("dvswitch-mods-activity-mode-history.path" in installer and "activity-mode-history.tsv" in installer,
         "installer does not install and initialize persistent transition tracking")
 require("systemctl reset-failed dvswitch-mods-activity-mode-history.path dvswitch-mods-activity-mode-history.service" in installer,
@@ -223,8 +262,8 @@ require("systemctl enable dvswitch-mods-activity-mode-history.service" in instal
         "installer does not enable the single boot reconciliation service")
 path_unit = (ROOT / "systemd/dvswitch-mods-activity-mode-history.path").read_text()
 service_unit = (ROOT / "systemd/dvswitch-mods-activity-mode-history.service").read_text()
-require("PathExists=" not in path_unit and "PathChanged=/var/lib/dvswitch-mode-buttons/current-mode" in path_unit,
-        "mode-history path watcher must react only to mode-file changes, not continuously trigger on file existence")
+require("PathExists=" not in path_unit and "PathChanged=/opt/MMDVM_Bridge/MMDVM_Bridge.ini" in path_unit,
+        "mode-history watcher must include the standalone DVSwitch bridge configuration")
 require("After=local-fs.target analog_bridge.service mmdvm_bridge.service" in service_unit,
         "boot history reconciliation is not ordered after live bridge state is available")
 require("WantedBy=multi-user.target" in service_unit,

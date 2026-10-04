@@ -92,7 +92,6 @@ show_result() {
 
 run_check() {
     preflight
-    [[ -r /var/lib/dvswitch-mode-buttons/current-mode ]] || die 'DVSwitch-Mode-Buttons current-mode state is missing; install and select a mode before using this modification.'
     prepare_candidates
     show_result
     printf 'PASS: supported activity cells and transition-tracker files. No files changed.\n'
@@ -100,7 +99,6 @@ run_check() {
 
 run_install() {
     preflight
-    [[ -r /var/lib/dvswitch-mode-buttons/current-mode ]] || die 'DVSwitch-Mode-Buttons current-mode state is missing; install and select a mode before installing this modification.'
     prepare_candidates
     show_result
     if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$HISTORY_CAPTURE_TARGET" ]] && cmp -s "$HISTORY_CAPTURE_SOURCE" "$HISTORY_CAPTURE_TARGET" && [[ -f "$HISTORY_SERVICE_TARGET" ]] && cmp -s "$HISTORY_SERVICE_SOURCE" "$HISTORY_SERVICE_TARGET" && [[ -f "$HISTORY_PATH_TARGET" ]] && cmp -s "$HISTORY_PATH_SOURCE" "$HISTORY_PATH_TARGET" && systemctl is-enabled --quiet dvswitch-mods-activity-mode-history.service && systemctl is-enabled --quiet dvswitch-mods-activity-mode-history.path && systemctl is-active --quiet dvswitch-mods-activity-mode-history.path; then

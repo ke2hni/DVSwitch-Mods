@@ -345,11 +345,12 @@ sudo ./mod-dashboard-targets.sh --install
 
 **What it adds:** Displays the selected **BM**, **TGIF**, or **STFU** label in
 Gateway Activity and Local Activity for DMR-protocol rows logged at or after
-the latest Mode Buttons selection. Older DMR rows retain their protocol label,
-so changing modes does not relabel prior activity. Other protocol labels and
-the underlying DVSwitch traffic remain unchanged. If the Mode Buttons state
-file is absent or does not identify one of those modes, the dashboard keeps
-its original DMR label.
+the recorded mode transition. Older DMR rows retain their protocol label, so
+changing modes does not relabel prior activity. This component works without
+DVSwitch-Mode-Buttons: it records the live mode from Analog_Bridge status and
+the active DMR network from MMDVM_Bridge configuration. When Mode Buttons is
+installed, its state changes provide an additional immediate transition event.
+Other protocol labels and underlying DVSwitch traffic remain unchanged.
 
 This is a standalone modification and is also included in the standard
 `manage-dvswitch-mods.sh` installation. It preserves the original mode value
