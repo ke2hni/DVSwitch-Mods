@@ -36,11 +36,18 @@ changed = patcher.patch_text(fixture)
 require(changed.count(patcher.MARKER) == 1, "marker missing")
 require(changed.count(patcher.INCLUDE) == 1, "helper include missing")
 require(changed.count("dvsModsFccFirstName($listElem[2])") == 1, "FCC lookup missing")
+require(changed.count("dvsModsCustomCallsignDescription($listElem[2])") == 1, "custom description lookup missing")
+require("($dvsModsCustomDescription !== false) ? $dvsModsCustomDescription : dvsModsFccFirstName" in changed, "custom description does not take precedence over database names")
 require(changed.count("dvsModsDmrIdCallsign($listElem[2])") == 1, "DMR resolver missing")
 require(changed.count("width:12ch;min-width:12ch;max-width:12ch") == 1, "Name-cell width and wrap limit missing")
 require(changed.count("overflow-wrap:anywhere") == 1, "Name-cell overflow wrapping missing")
 require("width:640px" not in changed, "fixture unexpectedly contained layout width")
 require(patcher.patch_text(changed) == changed, "patch is not idempotent")
+old_base_block = "$dvsModsFirstName = dvsModsFccFirstName($listElem[2]);\n                $dvsModsCountry = ($dvsModsFirstName === '---') ? dvsModsFccCountry($listElem[2]) : '';\n                $dvsModsNameHtml = htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, \"UTF-8\");\n                if ($dvsModsCountry !== '') { $dvsModsNameHtml .= '<br>'.htmlspecialchars($dvsModsCountry, ENT_QUOTES | ENT_SUBSTITUTE, \"UTF-8\"); }"
+new_custom_block = "$dvsModsCustomDescription = dvsModsCustomCallsignDescription($listElem[2]);\n                $dvsModsFirstName = ($dvsModsCustomDescription !== false) ? $dvsModsCustomDescription : dvsModsFccFirstName($listElem[2]);\n                $dvsModsCountry = ($dvsModsFirstName === '---') ? dvsModsFccCountry($listElem[2]) : '';\n                $dvsModsNameHtml = htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, \"UTF-8\");\n                if ($dvsModsCountry !== '') { $dvsModsNameHtml .= '<br>'.htmlspecialchars($dvsModsCountry, ENT_QUOTES | ENT_SUBSTITUTE, \"UTF-8\"); }"
+legacy_country_upgrade = changed.replace(new_custom_block, old_base_block, 1)
+require(legacy_country_upgrade != changed, "failed to prepare legacy country-fallback fixture")
+require(patcher.patch_text(legacy_country_upgrade) == changed, "existing country-fallback installation was not upgraded")
 
 legacy_name_style = changed.replace(patcher.NAME_CELL_STYLE_NEW, patcher.NAME_CELL_STYLE_OLD, 1)
 require(patcher.patch_text(legacy_name_style) == changed, "installed FCC Name-cell style was not upgraded")
@@ -73,12 +80,21 @@ with tempfile.TemporaryDirectory() as directory:
     require(b"\r\n" in raw and b"\n" not in raw.replace(b"\r\n", b""), "CRLF was not preserved")
 
 installer = (ROOT / "mod-dashboard-fcc-first-names.sh").read_text()
+custom_file = (ROOT / "data/callsign-descriptions.tsv").read_text()
+for entry in ("9999\tNXDN Announcement", "H4LNK\tYSF Link", "N0CALL\tP25 Announcement", "AMERICALNK\tAmerica Link"):
+    require(entry in custom_file, "starter custom-description entry missing: " + entry)
+require('readonly CALLSIGN_DESCRIPTIONS_TARGET="/etc/dvswitch-mods/callsign-descriptions.tsv"' in installer, "custom file install path missing")
+require('if [[ ! -e "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then' in installer, "installer does not preserve existing user descriptions")
+require('cp -a -- "$CALLSIGN_DESCRIPTIONS_TARGET" "$custom_temporary"' in installer, "uninstall does not preserve a user's custom descriptions")
+require('"$CALLSIGN_DESCRIPTIONS_TARGET"; do backup_target "$target"; done' in installer, "uninstall safety backup omits custom descriptions")
+require('Custom callsign descriptions: editable file present' in installer, "--check does not report custom file state")
 require("--localtx" not in installer, "FCC installer still invokes Local Activity patching")
 require('require_file "$LH_TARGET"' in installer, "FCC installer does not require Gateway Activity")
 require("LOCALTX_TARGET" not in installer, "FCC installer still owns Local Activity")
 php = shutil.which("php")
 if php:
     subprocess.run([php, str(ROOT / "tests/test-fcc-country-lookup.php")], check=True)
+    subprocess.run([php, str(ROOT / "tests/test-fcc-custom-descriptions.php")], check=True)
 else:
-    print("SKIP: CTY.DAT country lookup runtime cases (php unavailable)")
+    print("SKIP: PHP country/custom-description runtime cases (php unavailable)")
 print("PASS: surgical FCC Gateway Activity patcher tests")

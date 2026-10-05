@@ -32,10 +32,18 @@ def patch_text(text: str) -> str:
     if text.count(MARKER) == 1:
         required = (INCLUDE, "dvsModsFccFirstName($listElem[2])",
                     "dvsModsDmrIdCallsign($listElem[2])", "<th>Name</th>")
+        old_block = "$dvsModsFirstName = dvsModsFccFirstName($listElem[2]);\n                $dvsModsCountry = ($dvsModsFirstName === '---') ? dvsModsFccCountry($listElem[2]) : '';\n                $dvsModsNameHtml = htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, \"UTF-8\");\n                if ($dvsModsCountry !== '') { $dvsModsNameHtml .= '<br>'.htmlspecialchars($dvsModsCountry, ENT_QUOTES | ENT_SUBSTITUTE, \"UTF-8\"); }"
+        new_block = "$dvsModsCustomDescription = dvsModsCustomCallsignDescription($listElem[2]);\n                $dvsModsFirstName = ($dvsModsCustomDescription !== false) ? $dvsModsCustomDescription : dvsModsFccFirstName($listElem[2]);\n                $dvsModsCountry = ($dvsModsFirstName === '---') ? dvsModsFccCountry($listElem[2]) : '';\n                $dvsModsNameHtml = htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, \"UTF-8\");\n                if ($dvsModsCountry !== '') { $dvsModsNameHtml .= '<br>'.htmlspecialchars($dvsModsCountry, ENT_QUOTES | ENT_SUBSTITUTE, \"UTF-8\"); }"
+        if text.count("dvsModsCustomCallsignDescription($listElem[2])") == 0:
+            if text.count(old_block) != 1:
+                raise PatchError("unsupported existing Gateway Activity custom-description upgrade state")
+            text = text.replace(old_block, new_block, 1)
         if any(text.count(token) != 1 for token in required):
             raise PatchError("incomplete FCC Gateway Activity modification")
         legacy_name = "$dvsModsFirstName = dvsModsFccFirstName($listElem[2]);"
-        if text.count("dvsModsFccCountry($listElem[2])") == 1 and text.count("$dvsModsCountry = ($dvsModsFirstName === '---')") == 1:
+        if text.count("dvsModsCustomCallsignDescription($listElem[2])") == 1 and text.count("dvsModsFccCountry($listElem[2])") == 1:
+            pass
+        elif text.count("dvsModsFccCountry($listElem[2])") == 1 and text.count("$dvsModsCountry = ($dvsModsFirstName === '---')") == 1:
             pass
         elif text.count(legacy_name) == 1 and "dvsModsFccCountry($listElem[2])" not in text:
             country_lines = '''$dvsModsCountry = ($dvsModsFirstName === '---') ? dvsModsFccCountry($listElem[2]) : '';
@@ -90,7 +98,8 @@ def patch_text(text: str) -> str:
     end = text.rfind("\n", 0, text.index(end_token)) + 1
     if start >= end:
         raise PatchError("invalid Gateway Activity name-block order")
-    replacement = '''                $dvsModsFirstName = dvsModsFccFirstName($listElem[2]);
+    replacement = '''                $dvsModsCustomDescription = dvsModsCustomCallsignDescription($listElem[2]);
+                $dvsModsFirstName = ($dvsModsCustomDescription !== false) ? $dvsModsCustomDescription : dvsModsFccFirstName($listElem[2]);
                 $dvsModsCountry = ($dvsModsFirstName === '---') ? dvsModsFccCountry($listElem[2]) : '';
                 $dvsModsNameHtml = htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8");
                 if ($dvsModsCountry !== '') { $dvsModsNameHtml .= '<br>'.htmlspecialchars($dvsModsCountry, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8"); }

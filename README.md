@@ -309,6 +309,19 @@ sudo ./mod-dashboard-fcc-first-names.sh --check
 sudo ./mod-dashboard-fcc-first-names.sh --install
 ```
 
+The installer copies the starter custom-description file from
+`data/callsign-descriptions.tsv` to
+`/etc/dvswitch-mods/callsign-descriptions.tsv` once. Edit the installed file to
+add exact identifiers, one per line, separated from the description by a tab.
+A matching custom description takes precedence over FCC/DMR names and the
+CTY.DAT country fallback. Upgrades preserve the installed file and its edits;
+the file is also retained on uninstall. To adopt newer starter entries from
+GitHub later, compare the repository file with the installed file and merge the
+entries instead of replacing your edited copy blindly.
+
+Starter entries: `9999` (NXDN Announcement), `H4LNK` (YSF Link), `N0CALL`
+(P25 Announcement), and `AMERICALNK` (America Link).
+
 Manual FCC update:
 
 ```bash

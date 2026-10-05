@@ -11,7 +11,9 @@ timer = (ROOT / "systemd/dvswitch-fcc-first-names-update.timer").read_text()
 
 checks = {
     "database is colocated under /var/lib/mmdvm": "/var/lib/mmdvm/dvswitch-mods-cty.dat" in helper and "/var/lib/mmdvm/dvswitch-mods-cty.dat" in updater,
-    "country only appears when no DMR/FCC name exists": "$dvsModsFirstName === '---'" in patcher,
+    "country only appears when no DMR/FCC name or custom description exists": "$dvsModsFirstName === '---'" in patcher,
+    "custom callsign lookup precedes country fallback": "dvsModsCustomCallsignDescription($listElem[2])" in patcher and "dvsModsFccCountry($listElem[2])" in patcher,
+    "custom callsign data is user-editable outside the repository": "'/etc/dvswitch-mods/callsign-descriptions.tsv'" in helper,
     "entity is rendered on a separate escaped line": "$dvsModsNameHtml .= '<br>'.htmlspecialchars($dvsModsCountry" in patcher,
     "download is bounded and validated before replacement": "--max-time 120" in updater and "validate_cty \"$cty_archive\"" in updater,
     "failed feed retains last known good copy": "keeping the last known good file" in updater,

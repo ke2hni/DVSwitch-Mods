@@ -143,6 +143,35 @@ function dvsModsFccFirstName($rawCallsign) {
     return $cache[$callsign] = $result;
 }
 
+/** Return a user-defined display label for a callsign without a data name. */
+function dvsModsCustomCallsignDescription($rawCallsign) {
+    static $descriptions = null;
+    if ($descriptions === null) {
+        $descriptions = array();
+        global $dvsModsCustomCallsignDescriptionPath;
+        $path = isset($dvsModsCustomCallsignDescriptionPath) && is_string($dvsModsCustomCallsignDescriptionPath)
+            ? $dvsModsCustomCallsignDescriptionPath : '/etc/dvswitch-mods/callsign-descriptions.tsv';
+        if (is_readable($path)) {
+            $handle = @fopen($path, 'rb');
+            if ($handle !== false) {
+                while (($line = fgets($handle)) !== false) {
+                    $line = trim($line);
+                    if ($line === '' || $line[0] === '#') { continue; }
+                    $fields = explode("\t", $line, 2);
+                    if (count($fields) !== 2) { continue; }
+                    $callsign = strtoupper(trim($fields[0]));
+                    $description = trim($fields[1]);
+                    if (!preg_match('/^[A-Z0-9]{1,16}$/D', $callsign) || $description === '' || strlen($description) > 80 || preg_match('/[\x00-\x1F\x7F]/', $description)) { continue; }
+                    $descriptions[$callsign] = $description;
+                }
+                fclose($handle);
+            }
+        }
+    }
+    $callsign = strtoupper(trim((string)$rawCallsign));
+    return array_key_exists($callsign, $descriptions) ? $descriptions[$callsign] : false;
+}
+
 /** Resolve a callsign to its CTY.DAT DXCC entity, including prefix exceptions. */
 function dvsModsFccCountry($rawCallsign) {
     static $prefixes = null;

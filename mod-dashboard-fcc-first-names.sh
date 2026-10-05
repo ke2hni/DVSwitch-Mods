@@ -16,6 +16,8 @@ readonly SERVICE_SOURCE="$SCRIPT_DIR/systemd/dvswitch-fcc-first-names-update.ser
 readonly TIMER_SOURCE="$SCRIPT_DIR/systemd/dvswitch-fcc-first-names-update.timer"
 readonly LH_TARGET="/usr/share/dvswitch/include/lh.php"
 readonly HELPER_TARGET="/usr/share/dvswitch/include/dvswitch_mods_fcc_first_names.php"
+readonly CALLSIGN_DESCRIPTIONS_SOURCE="$SCRIPT_DIR/data/callsign-descriptions.tsv"
+readonly CALLSIGN_DESCRIPTIONS_TARGET="/etc/dvswitch-mods/callsign-descriptions.tsv"
 readonly DATABASE_TARGET="/var/lib/mmdvm/dvswitch-mods-fcc-first-names.dat"
 readonly CTY_DATABASE_TARGET="/var/lib/mmdvm/dvswitch-mods-cty.dat"
 readonly UPDATER_TARGET="/usr/local/sbin/dvswitch-fcc-first-names-update"
@@ -83,9 +85,10 @@ dashboard_health() {
 preflight() {
     check_platform
     for command in awk chmod chown cmp cp curl date install mktemp mv php python3 rm sha256sum stat systemctl; do require_command "$command"; done
-    require_file "$PATCHER"; require_file "$BUILDER"; require_file "$HELPER_SOURCE"; require_file "$TRANSACTION_LIBRARY"
+    require_file "$PATCHER"; require_file "$BUILDER"; require_file "$HELPER_SOURCE"; require_file "$CALLSIGN_DESCRIPTIONS_SOURCE"; require_file "$TRANSACTION_LIBRARY"
     require_file "$UPDATER_SOURCE"; require_file "$SERVICE_SOURCE"; require_file "$TIMER_SOURCE"
     require_file "$LH_TARGET"
+    if [[ -e "$CALLSIGN_DESCRIPTIONS_TARGET" || -L "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then require_file "$CALLSIGN_DESCRIPTIONS_TARGET"; fi
     php -l "$LH_TARGET" >/dev/null; php -l "$HELPER_SOURCE" >/dev/null
     dashboard_health || die "Apache or the HTTPS dashboard is not healthy."
 }
@@ -343,6 +346,7 @@ run_check() {
     else
         printf 'FCC weekly updater: not installed; --install will add it.\n'
     fi
+    if [[ -f "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then printf 'Custom callsign descriptions: editable file present at %s.\n' "$CALLSIGN_DESCRIPTIONS_TARGET"; else printf 'MODIFICATION READY: --install will create the editable custom callsign file at %s.\n' "$CALLSIGN_DESCRIPTIONS_TARGET"; fi
     printf 'PASS: supported activity-table structure. No files changed.\n'
 }
 
@@ -350,7 +354,7 @@ run_install() {
     preflight; prepare_dashboard
     local cty_ready=0
     if validate_cty "$CTY_DATABASE_TARGET"; then cty_ready=1; fi
-    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_release_state)" == current ]] && [[ $cty_ready -eq 1 ]]; then
+    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$DATABASE_TARGET" ]] && [[ -f "$CALLSIGN_DESCRIPTIONS_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_release_state)" == current ]] && [[ $cty_ready -eq 1 ]]; then
         printf 'PASS: worldwide DMR/FCC dashboard Name modification is already installed. No files changed.\n'; return
     fi
     if [[ $cty_ready -eq 0 ]]; then prepare_cty_candidate; fi
@@ -366,6 +370,11 @@ run_install() {
     stage_updater_components
     stage_install_component "$WORK_DIR/lh.php" "$LH_TARGET" root root 0644
     stage_install_component "$HELPER_SOURCE" "$HELPER_TARGET" root root 0644
+    if [[ ! -e "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then
+        backup_target "$CALLSIGN_DESCRIPTIONS_TARGET"
+        install -d -o root -g root -m 0755 "$(dirname "$CALLSIGN_DESCRIPTIONS_TARGET")"
+        dvsm_install_new_candidate "$CALLSIGN_DESCRIPTIONS_SOURCE" "$CALLSIGN_DESCRIPTIONS_TARGET" root root 0644
+    fi
     if [[ $database_ready -eq 0 ]]; then stage_install_component "$WORK_DIR/fcc-first-names.dat" "$DATABASE_TARGET" root www-data 0644; fi
     if [[ -f "$WORK_DIR/cty.dat" && ! -L "$WORK_DIR/cty.dat" ]]; then
         stage_install_component "$WORK_DIR/cty.dat" "$CTY_DATABASE_TARGET" root www-data 0644
@@ -411,7 +420,7 @@ uninstall_backup_file() {
 
 run_uninstall() {
     preflight
-    local name=$1 directory="$BACKUP_ROOT/$1" original_lh target
+    local name=$1 directory="$BACKUP_ROOT/$1" original_lh target custom_temporary=""
     [[ "$name" =~ ^install-[0-9]{8}-[0-9]{6}(-[0-9]+)?$ ]] || die "Invalid backup name."
     [[ -d "$directory" && ! -L "$directory" ]] || die "Backup not found: $name"
     require_file "$directory/MANIFEST"
@@ -420,13 +429,24 @@ run_uninstall() {
     install -d -m 0700 "$WORK_DIR/original"
     cp -- "$original_lh" "$WORK_DIR/original/lh.php"
     python3 "$PATCHER" --lh "$WORK_DIR/original/lh.php"
+    if [[ -f "$CALLSIGN_DESCRIPTIONS_TARGET" && ! -L "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then
+        custom_temporary="$WORK_DIR/callsign-descriptions.tsv"
+        cp -a -- "$CALLSIGN_DESCRIPTIONS_TARGET" "$custom_temporary"
+    fi
     . "$TRANSACTION_LIBRARY"
     dvsm_transaction_begin "$BACKUP_ROOT"
-    for target in "$LH_TARGET" "$HELPER_TARGET" "$DATABASE_TARGET" "$CTY_DATABASE_TARGET"; do backup_target "$target"; done
+    for target in "$LH_TARGET" "$HELPER_TARGET" "$DATABASE_TARGET" "$CTY_DATABASE_TARGET" "$CALLSIGN_DESCRIPTIONS_TARGET"; do backup_target "$target"; done
     while IFS= read -r target; do backup_target "$target"; done < <(updater_targets)
     INSTALL_ACTIVE=1
     systemctl disable --now "$TIMER_UNIT" >/dev/null 2>&1 || true
     dvsm_restore_backup_set "$directory"
+    if [[ -n "$custom_temporary" ]]; then
+        install -d -o root -g root -m 0755 "$(dirname "$CALLSIGN_DESCRIPTIONS_TARGET")"
+        local custom_restore
+        custom_restore=$(mktemp --tmpdir="$(dirname "$CALLSIGN_DESCRIPTIONS_TARGET")" .dvswitch-custom-callsigns.XXXXXX)
+        cp -a -- "$custom_temporary" "$custom_restore"
+        mv -fT -- "$custom_restore" "$CALLSIGN_DESCRIPTIONS_TARGET"
+    fi
     rm -f -- "$HELPER_TARGET" "$DATABASE_TARGET" "$CTY_DATABASE_TARGET"
     while IFS= read -r target; do rm -f -- "$target"; done < <(updater_targets)
     php -l "$LH_TARGET" >/dev/null

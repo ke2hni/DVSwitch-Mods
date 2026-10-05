@@ -1,0 +1,9 @@
+# DVSwitch-Mods custom Gateway Activity callsign descriptions
+# Format: CALLSIGN<TAB>DESCRIPTION. One exact callsign per line.
+# Edit the installed copy at /etc/dvswitch-mods/callsign-descriptions.tsv.
+# A matching description takes precedence over FCC/DMR names and CTY.DAT
+# country fallback.
+9999	NXDN Announcement
+H4LNK	YSF Link
+N0CALL	P25 Announcement
+AMERICALNK	America Link
