@@ -157,10 +157,11 @@ function dvsModsCustomCallsignDescription($rawCallsign) {
                 while (($line = fgets($handle)) !== false) {
                     $line = trim($line);
                     if ($line === '' || $line[0] === '#') { continue; }
-                    $fields = explode("\t", $line, 2);
-                    if (count($fields) !== 2) { continue; }
-                    $callsign = strtoupper(trim($fields[0]));
-                    $description = trim($fields[1]);
+                    $separator = strpos($line, "\t");
+                    if ($separator === false) { $separator = strpos($line, '='); }
+                    if ($separator === false) { continue; }
+                    $callsign = strtoupper(trim(substr($line, 0, $separator)));
+                    $description = trim(substr($line, $separator + 1));
                     if (!preg_match('/^[A-Z0-9]{1,16}$/D', $callsign) || $description === '' || strlen($description) > 80 || preg_match('/[\x00-\x1F\x7F]/', $description)) { continue; }
                     $descriptions[$callsign] = $description;
                 }

@@ -81,7 +81,7 @@ with tempfile.TemporaryDirectory() as directory:
 
 installer = (ROOT / "mod-dashboard-fcc-first-names.sh").read_text()
 custom_file = (ROOT / "data/callsign-descriptions.tsv").read_text()
-for entry in ("9999\tNXDN Announcement", "H4LNK\tYSF Link", "N0CALL\tP25 Announcement", "AMERICALNK\tAmerica Link"):
+for entry in ("9999 = Announcement", "H4MLNK = YSF Link", "N0CALL = Announcement", "AMERICALNK = America Link"):
     require(entry in custom_file, "starter custom-description entry missing: " + entry)
 require('readonly CALLSIGN_DESCRIPTIONS_TARGET="/etc/dvswitch-mods/callsign-descriptions.tsv"' in installer, "custom file install path missing")
 require('if [[ ! -e "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then' in installer, "installer does not preserve existing user descriptions")

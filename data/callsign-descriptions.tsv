@@ -1,9 +1,10 @@
 # DVSwitch-Mods custom Gateway Activity callsign descriptions
-# Format: CALLSIGN<TAB>DESCRIPTION. One exact callsign per line.
+# Format: CALLSIGN = DESCRIPTION. Keep one exact identifier per line.
+# Tab-separated CALLSIGN<TAB>DESCRIPTION entries are also supported.
 # Edit the installed copy at /etc/dvswitch-mods/callsign-descriptions.tsv.
 # A matching description takes precedence over FCC/DMR names and CTY.DAT
 # country fallback.
-9999	Announcement
-H4MLNK	YSF Link
-N0CALL	Announcement
-AMERICALNK	America Link
+9999 = Announcement
+H4MLNK = YSF Link
+N0CALL = Announcement
+AMERICALNK = America Link
