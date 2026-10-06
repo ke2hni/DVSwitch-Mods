@@ -365,7 +365,9 @@ sudo ./mod-dashboard-targets.sh --install
 
 **What it adds:** Displays the active **BM** or **TGIF** network label for DMR
 activity in Gateway Activity and Local Activity. Each DMR row is mapped using
-the latest BM/TGIF network selection at that row's timestamp. Switching to
+the latest BM/TGIF network selection at that row's timestamp. Activity row
+times are interpreted using the node's configured timezone to match DVSwitch's
+displayed timestamps. Switching to
 STFU or another non-DMR mode does not replace the DMR network label or relabel
 earlier activity. The component works without DVSwitch-Mode-Buttons: it records
 the live mode from Analog_Bridge status and the active DMR network from

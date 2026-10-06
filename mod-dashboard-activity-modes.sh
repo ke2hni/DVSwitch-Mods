@@ -7,7 +7,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.1.3"
+readonly SCRIPT_VERSION="1.1.4"
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly LH_TARGET="/usr/share/dvswitch/include/lh.php"
 readonly LOCALTX_TARGET="/usr/share/dvswitch/include/localtx.php"

@@ -2,12 +2,14 @@
 // DVSwitch-Mods: dashboard activity network labels helper v3
 // SPDX-License-Identifier: MIT
 
-/** Return the latest mode transition at or before a UTC activity timestamp. */
-function dvsModsActivityTransitionAt($utcTimestamp, $historyFile, $allowedModes = null)
+/** Return the latest mode transition at or before a dashboard activity timestamp. */
+function dvsModsActivityTransitionAt($dashboardTimestamp, $historyFile, $allowedModes = null)
 {
-    $utcTimestamp = (string)$utcTimestamp;
-    $event = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $utcTimestamp, new DateTimeZone('UTC'));
-    if ($event === false || $event->format('Y-m-d H:i:s') !== $utcTimestamp) { return null; }
+    $dashboardTimestamp = (string)$dashboardTimestamp;
+    // DVSwitch renders the activity timestamp in PHP's configured timezone.
+    // Parse it in that same timezone before comparing with epoch-based history.
+    $event = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $dashboardTimestamp, new DateTimeZone(date_default_timezone_get()));
+    if ($event === false || $event->format('Y-m-d H:i:s') !== $dashboardTimestamp) { return null; }
     $eventAt = $event->getTimestamp();
     if (!is_file($historyFile) || !is_readable($historyFile)) { return null; }
 
@@ -31,9 +33,9 @@ function dvsModsActivityTransitionAt($utcTimestamp, $historyFile, $allowedModes 
 }
 
 /** Return only the mode for callers that do not need the transition time. */
-function dvsModsActivityModeAt($utcTimestamp, $historyFile)
+function dvsModsActivityModeAt($dashboardTimestamp, $historyFile)
 {
-    $transition = dvsModsActivityTransitionAt($utcTimestamp, $historyFile);
+    $transition = dvsModsActivityTransitionAt($dashboardTimestamp, $historyFile);
     return $transition === null ? null : $transition['mode'];
 }
 
@@ -43,7 +45,7 @@ function dvsModsActivityModeAt($utcTimestamp, $historyFile)
  * Non-DMR mode changes do not replace that network label. Other modes and
  * older unknown rows retain their original dashboard label.
  */
-function dvsModsActivityModeLabel($mode, $utcTimestamp, $stateFile = null, $historyFile = null)
+function dvsModsActivityModeLabel($mode, $dashboardTimestamp, $stateFile = null, $historyFile = null)
 {
     $mode = (string)$mode;
     if ($mode !== 'DMR' && !preg_match('/^DMR Slot [12]$/D', $mode)) { return $mode; }
@@ -51,10 +53,11 @@ function dvsModsActivityModeLabel($mode, $utcTimestamp, $stateFile = null, $hist
     if ($historyFile === null) {
         $historyFile = '/var/lib/dvswitch-mods/activity-mode-history.tsv';
     }
-    $event = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', (string)$utcTimestamp, new DateTimeZone('UTC'));
-    if ($event === false || $event->format('Y-m-d H:i:s') !== (string)$utcTimestamp) { return $mode; }
+    $dashboardTimestamp = (string)$dashboardTimestamp;
+    $event = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $dashboardTimestamp, new DateTimeZone(date_default_timezone_get()));
+    if ($event === false || $event->format('Y-m-d H:i:s') !== $dashboardTimestamp) { return $mode; }
     $eventAt = $event->getTimestamp();
-    $transition = dvsModsActivityTransitionAt($utcTimestamp, $historyFile, array('BM', 'TGIF'));
+    $transition = dvsModsActivityTransitionAt($dashboardTimestamp, $historyFile, array('BM', 'TGIF'));
 
     // Use live state for the short interval before systemd records a recent
     // BM/TGIF button selection. Non-DMR selections such as STFU must never
