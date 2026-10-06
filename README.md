@@ -102,6 +102,12 @@ sudo ./manage-dvswitch-mods.sh --check all
 On a fresh DVSwitch installation, the first check normally reports early
 components as ready and later components as blocked by prerequisites. It checks
 everything, changes nothing, and prints the correct installation order.
+The P25 audio-announcement check builds a temporary candidate and therefore
+needs `make` and a C++ compiler. If either is missing, `--check all` reports the
+P25 component as blocked and continues checking the remaining components; it
+does not install packages. The standard `--install` path installs Debian's
+`build-essential` package before running component checks, which provides
+`make` and `c++` for that build.
 
 ### 4. Install or update every applicable standard repair and modification
 

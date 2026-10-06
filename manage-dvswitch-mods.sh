@@ -9,7 +9,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.2.3"
+readonly SCRIPT_VERSION="1.2.4"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly STATE_DIR="/var/lib/dvswitch-mods/manager"
 readonly STATE_FILE="$STATE_DIR/active-installs.tsv"
@@ -65,8 +65,13 @@ die() { printf 'ERROR: %s\n' "$1" >&2; exit 1; }
 report_unexpected_failure() {
     local line=$1 status=$2
     trap - ERR
-    printf 'ERROR: DVSwitch-Mods stopped unexpectedly during %s (line %s, status %s). Installation is incomplete; review the output above, then rerun option 1 to resume safely.\n' \
-        "$MANAGER_PHASE" "$line" "$status" >&2
+    if [[ "$MANAGER_PHASE" == checking* ]]; then
+        printf 'ERROR: DVSwitch-Mods stopped unexpectedly during %s (line %s, status %s). No installation was started; review the output above.\n' \
+            "$MANAGER_PHASE" "$line" "$status" >&2
+    else
+        printf 'ERROR: DVSwitch-Mods stopped unexpectedly during %s (line %s, status %s). Installation may be incomplete; review the output above, then rerun option 1 to resume safely.\n' \
+            "$MANAGER_PHASE" "$line" "$status" >&2
+    fi
     exit "$status"
 }
 trap 'report_unexpected_failure "$LINENO" "$?"' ERR
@@ -385,6 +390,7 @@ ensure_databases() {
 
 check_one() {
     select_component "$1"
+    MANAGER_PHASE="checking $COMPONENT"
     printf '\n=== CHECK: %s ===\n' "$COMPONENT"
     "$CHILD_SCRIPT" --check
 }
@@ -416,6 +422,7 @@ print_named_list() {
 check_all() {
     local component output status index=0
     local -a installed=() ready=() failed=() skipped=() expected=()
+    MANAGER_PHASE="checking all components"
     require_command grep
     for component in "${COMPONENTS[@]}"; do
         if should_skip_all_component "$component"; then
@@ -429,10 +436,11 @@ check_all() {
             continue
         fi
         printf '\n=== CHECK: %s ===\n' "$COMPONENT"
-        set +e
-        output=$("$CHILD_SCRIPT" --check 2>&1)
-        status=$?
-        set -e
+        if output=$("$CHILD_SCRIPT" --check 2>&1); then
+            status=0
+        else
+            status=$?
+        fi
         printf '%s\n' "$output"
         if [[ $status -ne 0 ]]; then
             failed+=("$COMPONENT — $(dependency_hint "$COMPONENT")")
@@ -536,10 +544,15 @@ uninstall_requested() {
 }
 
 main() {
+    local status
     case "${1:-}" in
         --list) [[ $# -eq 1 ]] || die "Unexpected arguments."; list_components ;;
         --status) [[ $# -eq 1 ]] || die "Unexpected arguments."; show_status ;;
-        --check) [[ $# -eq 2 ]] || die "--check requires a component name or all."; require_root; check_requested "$2" ;;
+        --check)
+            [[ $# -eq 2 ]] || die "--check requires a component name or all."
+            require_root
+            if check_requested "$2"; then :; else status=$?; exit "$status"; fi
+            ;;
         --install) [[ $# -eq 2 ]] || die "--install requires a component name or all."; initialize_state; install_requested "$2" ;;
         --uninstall) [[ $# -eq 2 ]] || die "--uninstall requires a component name or all."; initialize_state; uninstall_requested "$2" ;;
         --reset-after-reinstall) [[ $# -eq 1 ]] || die "Unexpected arguments."; initialize_state; reset_after_reinstall ;;
