@@ -9,6 +9,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+UPDATER = ROOT / "lib/dvswitch_fcc_first_names_update.sh"
 spec = importlib.util.spec_from_file_location("patcher", ROOT / "lib/patch_dashboard_first_names.py")
 patcher = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
@@ -17,6 +18,12 @@ spec.loader.exec_module(patcher)
 def require(value: bool, message: str) -> None:
     if not value:
         raise SystemExit("FAIL: " + message)
+
+updater_text = UPDATER.read_text(encoding="utf-8")
+require("_SHA256=" not in updater_text and "checksum is unsupported" not in updater_text,
+        "FCC updater still contains a release-pinned SHA checksum gate")
+for required in ("python3 \"$BUILDER\" --help", "python3 \"$PATCHER\" --help", "bash -n \"$TRANSACTION_LIBRARY\"", "cmp -s \"$candidate\" \"$DATABASE_TARGET\""):
+    require(required in updater_text, "FCC updater structural validation is missing: " + required)
 
 fixture = '''<?php
 include_once dirname(dirname(__FILE__)).'/include/functions.php';FUNCTIONS_ANCHOR

@@ -680,8 +680,10 @@ sudo ./repair-mmdvm-spacing-armhf.sh --install
 
 - Test on a non-production system first.
 - Always run `--check` before `--install`.
-- Never bypass an unsupported-version or checksum error.
-- Never edit a patcher's accepted hash merely to force installation.
+- Never bypass an unsupported-version error. The FCC updater checks installed
+  scripts structurally and validates the resulting FCC database; it does not
+  require release-pinned SHA checksums. MMDVM binary repairs retain their
+  build-specific SHA-256 identification because they patch compiled executables.
 - Never copy a patched executable or complete upstream file between systems.
 - Keep the protected backup until the installation has been fully tested.
 - These scripts are not affiliated with or endorsed by the DVSwitch project.

@@ -81,7 +81,7 @@ with tempfile.TemporaryDirectory(prefix=".fcc-updater-test-", dir=ROOT.parent) a
     helper = dashboard / "dvswitch_mods_fcc_first_names.php"
     lh.write_text("supported test lh\n", encoding="utf-8")
     localtx.write_text("supported test localtx\n", encoding="utf-8")
-    helper.write_text("supported test helper\n", encoding="utf-8")
+    helper.write_text("<?php\nfunction dvsModsFccFirstName() {}\nfunction dvsModsFccCountry() {}\nfunction dvsModsCustomCallsignDescription() {}\n", encoding="utf-8")
     database = state / "dvswitch-mods-fcc-first-names.dat"
     archive = root / "fcc.zip"
     make_archive(archive, "Laura")
@@ -115,10 +115,6 @@ with tempfile.TemporaryDirectory(prefix=".fcc-updater-test-", dir=ROOT.parent) a
         'readonly CTY_DATABASE_TARGET="/var/lib/mmdvm/dvswitch-mods-cty.dat"': f'readonly CTY_DATABASE_TARGET="{state / "dvswitch-mods-cty.dat"}"',
         'readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"': f'readonly BACKUP_ROOT="{root / "backups"}"',
         'readonly LOCK_FILE="/run/lock/dvswitch-fcc-first-names-update.lock"': f'readonly LOCK_FILE="{root / "update.lock"}"',
-        'readonly BUILDER_SHA256="d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2"': f'readonly BUILDER_SHA256="{digest(builder)}"',
-        'readonly PATCHER_SHA256="b373b714b80cb4b067e3fcfcb4ae1dbdba7cf0efa3c7dd87d3a8f2b9f83adcd5"': f'readonly PATCHER_SHA256="{digest(patcher)}"',
-        'readonly TRANSACTION_SHA256="13d743d6065f88888725a1aefe98c8d4ad957974ec5cd991a52ff20ac44a6532"': f'readonly TRANSACTION_SHA256="{digest(transaction)}"',
-        'readonly HELPER_SHA256="754493cb70436d3fe423e414d2f0a85b5a2374c197501f49a8f53c3a896928e7"': f'readonly HELPER_SHA256="{digest(helper)}"',
         '    . /etc/os-release': '    ID=debian; VERSION_ID=12',
         '    [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Run this updater with sudo."': '    : # Root requirement bypassed only in isolated regression copy.',
         '    [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Run this utility with sudo."': '    : # Root requirement bypassed only in isolated regression copy.',

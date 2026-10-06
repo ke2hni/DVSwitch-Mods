@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly UPDATER_VERSION="1.4.0"
+readonly UPDATER_VERSION="1.4.1"
 readonly LIBRARY_DIR="/usr/local/lib/dvswitch-mods"
 readonly BUILDER="$LIBRARY_DIR/build_fcc_first_names.py"
 readonly PATCHER="$LIBRARY_DIR/patch_dashboard_first_names.py"
@@ -22,11 +22,6 @@ readonly WORK_ROOT="/var/lib/mmdvm"
 readonly FCC_URL="https://data.fcc.gov/download/pub/uls/complete/l_amat.zip"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"
 readonly LOCK_FILE="/run/lock/dvswitch-fcc-first-names-update.lock"
-readonly BUILDER_SHA256="d4831315dfdd133174a415fe288c6c3c8d49852336a0dcc196b4b0a2130e4ae2"
-readonly PATCHER_SHA256="b373b714b80cb4b067e3fcfcb4ae1dbdba7cf0efa3c7dd87d3a8f2b9f83adcd5"
-readonly TRANSACTION_SHA256="13d743d6065f88888725a1aefe98c8d4ad957974ec5cd991a52ff20ac44a6532"
-readonly HELPER_SHA256="754493cb70436d3fe423e414d2f0a85b5a2374c197501f49a8f53c3a896928e7"
-
 WORK_DIR=""
 INSTALL_ACTIVE=0
 
@@ -54,13 +49,6 @@ on_error() {
 trap 'on_error $LINENO $?' ERR
 trap cleanup EXIT
 
-hash_is_supported() {
-    local actual=$1; shift
-    local supported
-    for supported in "$@"; do [[ "$actual" == "$supported" ]] && return 0; done
-    return 1
-}
-
 require_owner_mode() {
     local path=$1 expected owner=$2 group=$3 mode=$4 actual
     actual=$(stat -c '%U:%G:%a' "$path")
@@ -75,8 +63,9 @@ verify_installed_modification() {
     cp -- "$LH_TARGET" "$WORK_DIR/lh.php"
     python3 "$PATCHER" --lh "$WORK_DIR/lh.php"
     cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" || die "Installed lh.php is not the current supported modification."
-    local actual
-    actual=$(file_hash "$HELPER_TARGET"); [[ "$actual" == "$HELPER_SHA256" ]] || die "Unsupported installed FCC helper checksum: $actual"
+    grep -Fq 'function dvsModsFccFirstName(' "$HELPER_TARGET" || die "Installed FCC helper is missing the first-name lookup function."
+    grep -Fq 'function dvsModsFccCountry(' "$HELPER_TARGET" || die "Installed FCC helper is missing the country lookup function."
+    grep -Fq 'function dvsModsCustomCallsignDescription(' "$HELPER_TARGET" || die "Installed FCC helper is missing the custom-description lookup function."
     python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null
     if [[ -e "$CTY_DATABASE_TARGET" || -L "$CTY_DATABASE_TARGET" ]]; then validate_cty "$CTY_DATABASE_TARGET" || printf 'WARNING: cached CTY.DAT failed validation; country fallback will be unavailable.\n' >&2; fi
 }
@@ -96,9 +85,12 @@ preflight() {
     case "${VERSION_ID:-}" in 12|13) ;; *) die "Unsupported Debian version: ${VERSION_ID:-unknown}" ;; esac
     for command in awk cmp cp curl date flock grep install mktemp mv python3 rm sha256sum stat systemctl; do require_command "$command"; done
     require_file "$BUILDER"; require_file "$PATCHER"; require_file "$TRANSACTION_LIBRARY"
-    [[ "$(file_hash "$BUILDER")" == "$BUILDER_SHA256" ]] || die "Installed FCC builder checksum is unsupported."
-    [[ "$(file_hash "$PATCHER")" == "$PATCHER_SHA256" ]] || die "Installed FCC dashboard patcher checksum is unsupported."
-    [[ "$(file_hash "$TRANSACTION_LIBRARY")" == "$TRANSACTION_SHA256" ]] || die "Installed transaction helper checksum is unsupported."
+    python3 "$BUILDER" --help >/dev/null
+    python3 "$PATCHER" --help >/dev/null
+    bash -n "$TRANSACTION_LIBRARY"
+    for function_name in dvsm_transaction_begin dvsm_backup_file dvsm_install_candidate dvsm_transaction_rollback; do
+        grep -Eq "^${function_name}[[:space:]]*\\(\\)[[:space:]]*\\{" "$TRANSACTION_LIBRARY" || die "Installed transaction helper is missing $function_name."
+    done
     exec 9>"$LOCK_FILE"
     flock -n 9 || die "Another FCC first-name update is already running."
     [[ -d "$WORK_ROOT" && ! -L "$WORK_ROOT" ]] || die "Required work root is unavailable: $WORK_ROOT"
@@ -177,7 +169,7 @@ run_update() {
     INSTALL_ACTIVE=1
     dvsm_install_candidate "$candidate" "$DATABASE_TARGET"
     [[ "$(python3 "$BUILDER" --validate "$DATABASE_TARGET")" == "$count" ]]
-    [[ "$(file_hash "$DATABASE_TARGET")" == "$checksum" ]]
+    cmp -s "$candidate" "$DATABASE_TARGET"
     require_owner_mode "$DATABASE_TARGET" root www-data 644
     INSTALL_ACTIVE=0
     printf 'PASS: FCC first-name database installed atomically.\nBackup: %s\n' "$DVSM_TRANSACTION_DIR"
