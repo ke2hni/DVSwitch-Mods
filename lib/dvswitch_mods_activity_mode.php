@@ -2,13 +2,43 @@
 // DVSwitch-Mods: dashboard activity network labels helper v3
 // SPDX-License-Identifier: MIT
 
+/** Return the operating-system timezone used for DVSwitch activity timestamps. */
+function dvsModsActivityTimezone()
+{
+    static $timezone = null;
+    if ($timezone instanceof DateTimeZone) { return $timezone; }
+
+    $systemTimezone = @file_get_contents('/etc/timezone');
+    if (is_string($systemTimezone) && trim($systemTimezone) !== '') {
+        $systemTimezone = ltrim(trim($systemTimezone), '/');
+        try {
+            $timezone = new DateTimeZone($systemTimezone);
+            return $timezone;
+        } catch (Exception $exception) {
+            // Fall back to the /etc/localtime link or PHP's configured timezone.
+        }
+    }
+
+    $localtime = @readlink('/etc/localtime');
+    if (is_string($localtime) && preg_match('~/zoneinfo/(.+)$~', $localtime, $matches)) {
+        try {
+            $timezone = new DateTimeZone($matches[1]);
+            return $timezone;
+        } catch (Exception $exception) {
+            // Fall back to PHP's configured timezone.
+        }
+    }
+
+    $timezone = new DateTimeZone(date_default_timezone_get());
+    return $timezone;
+}
+
 /** Return the latest mode transition at or before a dashboard activity timestamp. */
 function dvsModsActivityTransitionAt($dashboardTimestamp, $historyFile, $allowedModes = null)
 {
     $dashboardTimestamp = (string)$dashboardTimestamp;
-    // DVSwitch renders the activity timestamp in PHP's configured timezone.
-    // Parse it in that same timezone before comparing with epoch-based history.
-    $event = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $dashboardTimestamp, new DateTimeZone(date_default_timezone_get()));
+    // PHP's configured timezone may differ from the operating-system timezone.
+    $event = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $dashboardTimestamp, dvsModsActivityTimezone());
     if ($event === false || $event->format('Y-m-d H:i:s') !== $dashboardTimestamp) { return null; }
     $eventAt = $event->getTimestamp();
     if (!is_file($historyFile) || !is_readable($historyFile)) { return null; }
@@ -54,7 +84,7 @@ function dvsModsActivityModeLabel($mode, $dashboardTimestamp, $stateFile = null,
         $historyFile = '/var/lib/dvswitch-mods/activity-mode-history.tsv';
     }
     $dashboardTimestamp = (string)$dashboardTimestamp;
-    $event = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $dashboardTimestamp, new DateTimeZone(date_default_timezone_get()));
+    $event = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $dashboardTimestamp, dvsModsActivityTimezone());
     if ($event === false || $event->format('Y-m-d H:i:s') !== $dashboardTimestamp) { return $mode; }
     $eventAt = $event->getTimestamp();
     $transition = dvsModsActivityTransitionAt($dashboardTimestamp, $historyFile, array('BM', 'TGIF'));

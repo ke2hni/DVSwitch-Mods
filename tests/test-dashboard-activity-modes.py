@@ -12,7 +12,8 @@ import shutil
 import subprocess
 import tempfile
 import os
-import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 PATCHER_PATH = ROOT / "lib/patch_dashboard_activity_modes.py"
@@ -74,7 +75,8 @@ with tempfile.TemporaryDirectory() as directory:
     state_stfu = Path(directory) / "current-mode-stfu"
     state_ysf = Path(directory) / "current-mode-ysf"
     event_time = "2026-09-30 22:00:00"
-    epoch = int(time.mktime(time.strptime(event_time, "%Y-%m-%d %H:%M:%S")))
+    system_timezone = ZoneInfo(Path("/etc/timezone").read_text().strip().lstrip("/"))
+    epoch = int(datetime.strptime(event_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=system_timezone).timestamp())
     for state, mode in ((state_tgif, "TGIF"), (state_bm, "BM"), (state_stfu, "STFU"), (state_ysf, "YSF")):
         state.write_text(mode + "\n")
         os.utime(state, (epoch - 10, epoch - 10))
