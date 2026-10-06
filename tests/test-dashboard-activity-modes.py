@@ -86,18 +86,24 @@ with tempfile.TemporaryDirectory() as directory:
         ("DMR Slot 3", event_time, "DMR Slot 3", str(state_tgif)),
         ("DMR", "not-a-log-time", "DMR", str(state_tgif)),
         ("DMR", event_time, "BM", str(state_bm)),
-        ("DMR", event_time, "STFU", str(state_stfu)),
+        ("DMR", event_time, "DMR", str(state_stfu)),
         ("DMR", event_time, "DMR", str(state_ysf)),
     ]
 
     history = Path(directory) / "activity-mode-history.tsv"
-    history.write_text(f"{epoch - 40}\tTGIF\n{epoch - 30}\tBM\n{epoch - 20}\tYSF\n{epoch - 10}\tTGIF\n")
+    history.write_text(f"{epoch - 40}\tTGIF\n{epoch - 30}\tBM\n{epoch - 20}\tSTFU\n{epoch - 15}\tYSF\n{epoch - 10}\tTGIF\n")
+    tgif_stfu_history = Path(directory) / "tgif-stfu-history.tsv"
+    tgif_stfu_history.write_text(f"{epoch - 40}\tTGIF\n{epoch - 30}\tSTFU\n{epoch - 20}\tYSF\n")
+    tgif_stfu_state = Path(directory) / "tgif-stfu-current-mode"
+    tgif_stfu_state.write_text("STFU\n")
+    os.utime(tgif_stfu_state, (epoch - 30, epoch - 30))
     historical_cases = [
         ("DMR", "2026-09-30 21:59:20", "TGIF"),
         ("DMR Slot 2", "2026-09-30 21:59:30", "BM"),
-        ("DMR Slot 1", "2026-09-30 21:59:40", "DMR Slot 1"),
-        ("DMR", "2026-09-30 21:59:49", "TGIF"),
-        ("DMR", event_time, "DMR"),
+        ("DMR Slot 1", "2026-09-30 21:59:40", "BM"),
+        ("DMR Slot 2", "2026-09-30 21:59:45", "BM"),
+        ("DMR", "2026-09-30 21:59:49", "BM"),
+        ("DMR", event_time, "TGIF"),
         ("YSF", "2026-09-30 21:59:50", "YSF"),
     ]
 
@@ -115,11 +121,17 @@ foreach ($historicalCases as $case) {{
     $actual = dvsModsActivityModeLabel($case[0], $case[1], {str(state_ysf)!r}, $history);
     if ($actual !== $case[2]) {{ dvsModsTestFail("FAIL: history ".json_encode($case)." => ".$actual); }}
 }}
+$tgifStfuHistory = {str(tgif_stfu_history)!r};
+$tgifStfuState = {str(tgif_stfu_state)!r};
+foreach (["2026-09-30 21:59:25", "2026-09-30 21:59:35"] as $tgifRxTime) {{
+    $actual = dvsModsActivityModeLabel("DMR Slot 2", $tgifRxTime, $tgifStfuState, $tgifStfuHistory);
+    if ($actual !== "TGIF") {{ dvsModsTestFail("FAIL: TGIF DMR label changed across STFU selection at ".$tgifRxTime." => ".$actual); }}
+}}
 $laterDmrState = {str(Path(directory) / 'later-current-mode')!r};
 file_put_contents($laterDmrState, "TGIF\\n");
 touch($laterDmrState, {epoch + 10});
 $nonDmrRx = dvsModsActivityModeLabel("DMR Slot 2", "2026-09-30 21:59:40", $laterDmrState, $history);
-if ($nonDmrRx !== "DMR Slot 2") {{ dvsModsTestFail("FAIL: earlier DMR RX row was relabeled after later TGIF selection => ".$nonDmrRx); }}
+if ($nonDmrRx !== "BM") {{ dvsModsTestFail("FAIL: previous BM DMR network label was lost after a non-DMR mode transition => ".$nonDmrRx); }}
 $staleDmrState = {str(Path(directory) / 'stale-current-mode')!r};
 file_put_contents($staleDmrState, "DSTAR\\n");
 touch($staleDmrState, {epoch - 30});
