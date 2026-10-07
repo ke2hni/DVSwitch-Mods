@@ -9,7 +9,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.0.7"
+readonly SCRIPT_VERSION="1.0.8"
 readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly HOSTS_FILE="/var/lib/mmdvm/YSFHosts.txt"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/ysf-dashboard-null"
@@ -94,7 +94,7 @@ dmr_v3_marker = "// DVSwitch-Mods: DMR Master friendly-name display v3"
 dmr_v8_marker = "// DVSwitch-Mods: DMR Master friendly-name display v8"
 buttons_markers = tuple(
     f"// DVSwitch-Mode-Buttons: standalone DMR Master display v{version}"
-    for version in range(1, 9)
+    for version in range(1, 10)
 )
 dmr_v2_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight: bold\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
 dmr_v3_output = '''                        echo "<tr><td  style=\\"background: #ffffed;\\" colspan=\\"2\\"><span style=\\"color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;text-align:center;\\">".dvsModsDmrMasterDisplay($dmrMasterHost, $abinfo)."</span></td></tr>\\n";}'''
@@ -233,7 +233,7 @@ verify_installed() {
     dmr_v6_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v6' "$TARGET" || true)
     dmr_v7_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v7' "$TARGET" || true)
     dmr_v8_count=$(grep -Fc '// DVSwitch-Mods: DMR Master friendly-name display v8' "$TARGET" || true)
-    buttons_marker_count=$(grep -Ec '// DVSwitch-Mode-Buttons: standalone DMR Master display v[1-8]$' "$TARGET" || true)
+    buttons_marker_count=$(grep -Ec '// DVSwitch-Mode-Buttons: standalone DMR Master display v[1-9]$' "$TARGET" || true)
     local dvswitch_mods_marker_count
     dvswitch_mods_marker_count=$((dmr_v2_count + dmr_v3_count + dmr_v4_count + dmr_v5_count + dmr_v6_count + dmr_v7_count + dmr_v8_count))
     if [[ $dvswitch_mods_marker_count -eq 1 && $buttons_marker_count -eq 0 ]]; then

@@ -8,7 +8,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.6.1"
+readonly SCRIPT_VERSION="1.6.2"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly TARGET="/usr/share/dvswitch/include/status.php"
 readonly BM_LIST="/var/lib/mmdvm/TGList_BM.txt"
@@ -16,8 +16,9 @@ readonly TGIF_LIST="/var/lib/mmdvm/TGList_TGIF.txt"
 readonly STATE_FILE="/var/lib/mmdvm/dvswitch-mods-dmr-state.json"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dmr-friendly-names"
 readonly MOD_MARKER="// DVSwitch-Mods: DMR Master friendly-name display v8"
-readonly BUTTONS_MARKER="// DVSwitch-Mode-Buttons: standalone DMR Master display v8"
-readonly BUTTONS_PREVIOUS_MARKER="// DVSwitch-Mode-Buttons: standalone DMR Master display v7"
+readonly BUTTONS_MARKER="// DVSwitch-Mode-Buttons: standalone DMR Master display v9"
+readonly BUTTONS_PREVIOUS_MARKER="// DVSwitch-Mode-Buttons: standalone DMR Master display v8"
+readonly BUTTONS_OLDER_MARKER="// DVSwitch-Mode-Buttons: standalone DMR Master display v7"
 
 WORK_DIR=""
 ACTIVE_BACKUP=""
@@ -116,14 +117,18 @@ PY_STATE
 }
 
 buttons_card_is_compatible() {
-    local current previous
+    local current previous older
     current=$(grep -Fc "$BUTTONS_MARKER" "$TARGET" || true)
     previous=$(grep -Fc "$BUTTONS_PREVIOUS_MARKER" "$TARGET" || true)
-    [[ $((current + previous)) -eq 1 ]] || return 1
+    older=$(grep -Fc "$BUTTONS_OLDER_MARKER" "$TARGET" || true)
+    [[ $((current + previous + older)) -eq 1 ]] || return 1
     [[ $(grep -Fc 'dvsButtonsDmrMasterDisplay($dmrMasterHost, $abinfo)' "$TARGET" || true) -eq 1 ]] || return 1
     [[ $(grep -Fc 'dvsButtonsDmrMasterHeading($dmrMasterHost, $abinfo)' "$TARGET" || true) -eq 1 ]] || return 1
     [[ $(grep -Fc "if (\$liveMode === 'DMR')" "$TARGET" || true) -ge 2 ]] || return 1
     if [[ $current -eq 1 ]]; then
+        [[ $(grep -Fc "function dvsButtonsDmrCurrentMode(\$abinfo, \$selectedModeFile = null)" "$TARGET" || true) -eq 1 ]] || return 1
+        [[ $(grep -Fc "in_array(\$selectedMode, array('BM', 'TGIF', 'STFU'), true)" "$TARGET" || true) -eq 1 ]]
+    elif [[ $previous -eq 1 ]]; then
         [[ $(grep -Fc "if (\$liveMode === 'STFU')" "$TARGET" || true) -eq 0 ]]
     else
         # Previous Buttons v7 is still structurally valid and owns the DMR card.
