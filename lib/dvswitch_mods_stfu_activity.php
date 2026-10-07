@@ -1,7 +1,7 @@
 <?php
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Jeff Milne, KE2HNI
-// DVSwitch-Mods: STFU activity feed v3
+// DVSwitch-Mods: STFU activity feed v4
 
 /** Parse recent STFU ODMR traffic into DVSwitch's activity-row structure. */
 function dvsModsStfuActivityRows($paths = null)
@@ -98,6 +98,17 @@ function dvsModsStfuRenderCard($abinfo, $lastHeard, $logPaths = null, $listPath 
     $latest = null;
     foreach (dvsModsStfuActivityRows($logPaths) as $row) {
         if (isset($row[1], $row[5]) && $row[1] === 'STFU' && $row[5] === 'Net') { $latest = $row; break; }
+    }
+    // In STFU mode, show the selected target from the live bridge status.
+    // Activity rows remain sourced from STFU.log, so tuning alone does not
+    // create an RX event or alter historical activity.
+    $liveMode = isset($abinfo['tlv']['ambe_mode']) ? strtoupper(trim((string)$abinfo['tlv']['ambe_mode'])) : '';
+    if ($liveMode === 'STFU' && isset($abinfo['last_tune'])) {
+        $tune = trim((string)$abinfo['last_tune']);
+        if (preg_match('/^(?:TG\\s*)?([0-9]+)$/iD', $tune, $match) && $match[1] !== '0') {
+            if ($latest === null) { $latest = array('', 'STFU', '', '', '', 'Net'); }
+            $latest[4] = 'TG '.$match[1];
+        }
     }
     echo "<br /><table>\n<tr><th colspan=\"2\">STFU Net</th></tr>\n";
     if (function_exists('isProcessRunning') && isProcessRunning('STFU')) {

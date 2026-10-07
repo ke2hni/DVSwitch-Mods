@@ -95,7 +95,7 @@ if shutil.which("php"):
         log_path = Path(directory) / "STFU.log"
         log_path.write_text(log, encoding="utf-8")
         talkgroup_path = Path(directory) / "TGList_BM.txt"
-        talkgroup_path.write_text("3100;0;USA-BRIDGE;TG3100\n", encoding="utf-8")
+        talkgroup_path.write_text("3100;0;USA-BRIDGE;TG3100\n93;0;NORTH-AMERICA;TG93\n", encoding="utf-8")
         program = f'''<?php
 function isProcessRunning($name) {{ return true; }}
 require {str(HELPER)!r};
@@ -119,6 +119,14 @@ echo "\\nCARD:".$card;
         require("USA-BRIDGE</span><br/><span" in card_output and "(TG 3100)" in card_output,
                 "STFU card did not put the talkgroup number on a separate line")
         require("Listening</span>" not in card_output, "STFU card showed Listening despite a logged target")
+        tuned_program = f'''<?php
+function isProcessRunning($name) {{ return true; }}
+require {str(HELPER)!r};
+dvsModsStfuRenderCard(array('tlv' => array('ambe_mode' => 'STFU'), 'last_tune' => '93'), array(), array({str(log_path)!r}), {str(talkgroup_path)!r});
+'''
+        tuned_result = subprocess.run(["php"], input=tuned_program, text=True, capture_output=True, check=True)
+        require("NORTH AMERICA</span><br/><span" in tuned_result.stdout and "(TG 93)" in tuned_result.stdout,
+                "STFU card did not show the currently tuned friendly target")
 else:
     print("SKIP: STFU log parser runtime cases (php is unavailable in this workspace)")
 
@@ -130,6 +138,8 @@ require("dvswitch-mode-buttons" not in installer_text, "STFU activity component 
 require("/var/log/dvswitch/STFU.log" in HELPER.read_text(), "STFU parser does not use the documented node log path")
 require("if ($mode !== 'STFU') { return; }" not in HELPER.read_text(), "STFU card is hidden outside STFU mode")
 require("foreach (dvsModsStfuActivityRows($logPaths) as $row)" in HELPER.read_text(), "STFU card does not read its own traffic log")
+require("$liveMode === 'STFU'" in HELPER.read_text() and "$abinfo['last_tune']" in HELPER.read_text(),
+        "STFU card does not use the selected target while STFU is active")
 dmr_source = DMR_PATCHER.read_text()
 dmr_helper = dmr_source.split("helper = r'''", 1)[1].split("'''", 1)[0]
 require("STFU" not in dmr_helper, "fresh DMR Master helper still handles STFU")
