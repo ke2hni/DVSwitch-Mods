@@ -209,7 +209,10 @@ run_install() {
     systemctl is-active --quiet apache2 || die 'apache2 is not active.'
     "$NETWORK_WRITER_TARGET" --seed-current
     systemctl daemon-reload
-    systemctl reset-failed dvswitch-mods-activity-mode-history.path dvswitch-mods-activity-mode-history.service
+    # A newly installed unit may not have a failed-state record yet; in that
+    # case systemctl reset-failed can report "Unit not loaded". Clearing an
+    # old failure is helpful, but must not block first-time installation.
+    systemctl reset-failed dvswitch-mods-activity-mode-history.path dvswitch-mods-activity-mode-history.service >/dev/null 2>&1 || true
     systemctl enable --now dvswitch-mods-activity-mode-history.path
     systemctl is-active --quiet dvswitch-mods-activity-mode-history.path || die 'DMR network history watcher is not active.'
     INSTALL_ACTIVE=0

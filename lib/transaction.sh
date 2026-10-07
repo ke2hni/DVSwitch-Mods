@@ -6,9 +6,9 @@
 # Transaction helpers for files already installed on the local system.
 
 DVSM_TRANSACTION_DIR=""
-declare -a DVSM_TRANSACTION_TARGETS=()
-declare -a DVSM_TRANSACTION_BACKUPS=()
-declare -a DVSM_TRANSACTION_EXISTED=()
+declare -ga DVSM_TRANSACTION_TARGETS=()
+declare -ga DVSM_TRANSACTION_BACKUPS=()
+declare -ga DVSM_TRANSACTION_EXISTED=()
 
 dvsm_transaction_error() {
     printf 'TRANSACTION ERROR: %s\n' "$1" >&2
