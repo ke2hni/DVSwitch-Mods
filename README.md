@@ -369,6 +369,9 @@ without repeating the same number in parentheses. For D-Star rows with a bare
 `CQCQCQ` target, the reflector is resolved from ircDDBGateway link history at
 the activity event time, so older rows keep the reflector linked when they
 were received. Rows with no linked reflector remain `General Call`.
+The target checker also recognizes the separate STFU activity component's
+BrandMeister-name wrapper, so rerunning or upgrading `dashboard-targets` keeps
+both components working together.
 
 **Required first:** `mod-dashboard-fcc-first-names.sh`; valid P25/NXDN JSON and
 BrandMeister/TGIF lists provide the friendly names.

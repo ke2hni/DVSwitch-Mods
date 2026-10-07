@@ -89,6 +89,23 @@ def cell_padding_block(name: str) -> str:
     raise PatchError(f"unsupported dashboard file: {name}")
 
 
+def stfu_target_block(target_block: str) -> str:
+    """Return the STFU activity wrapper around a supported Target cell."""
+    pattern = re.compile(
+        r"(?m)^([\t ]*)\$dvsModsTarget = dvsModsTargetDisplay\(([^;]+)\);$"
+    )
+    matches = list(pattern.finditer(target_block))
+    if len(matches) != 1:
+        raise PatchError("supported Target block has no unique helper assignment")
+    match = matches[0]
+    assignment = (
+        f"{match.group(1)}$dvsModsTarget = ($listElem[1] === 'STFU') ? "
+        f"dvsModsStfuTargetDisplay($listElem[4]) : "
+        f"dvsModsTargetDisplay({match.group(2)});"
+    )
+    return target_block[:match.start()] + assignment + target_block[match.end():]
+
+
 def once(text: str, old: str, new: str, description: str) -> str:
     count = text.count(old)
     if count != 1:
@@ -105,10 +122,16 @@ def patch_text(text: str, name: str) -> str:
     if marker_count == 1:
         old_new = new.replace(", $listElem[0]", "")
         old_post = post_cell_padding.replace(", $listElem[0]", "")
-        if text.count(INCLUDE) != 1 or (text.count(new) + text.count(post_cell_padding) + text.count(old_new) + text.count(old_post)) != 1:
+        variants = (new, post_cell_padding, old_new, old_post)
+        stfu_variants = tuple(stfu_target_block(candidate) for candidate in variants)
+        found = [candidate for candidate in variants + stfu_variants if text.count(candidate) == 1]
+        if text.count(INCLUDE) != 1 or len(found) != 1:
             raise PatchError(f"incomplete Target modification in {name}")
         if text.count(old_new) == 1: text = text.replace(old_new, new, 1)
         if text.count(old_post) == 1: text = text.replace(old_post, post_cell_padding, 1)
+        for older, current in ((stfu_variants[2], stfu_variants[0]), (stfu_variants[3], stfu_variants[1])):
+            if text.count(older) == 1:
+                text = text.replace(older, current, 1)
         if name == "localtx.php":
             legend_count = text.count(LEGEND)
             if legend_count > 1:

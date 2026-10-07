@@ -52,9 +52,9 @@ Manager upgrade regression (safe to run as the regular user; uses a temporary is
 
 cd ~/DVSwitch-Mods && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-manager-recorded-upgrade.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-manager-structure.py
 
-STFU log activity integration (run on pi4test first):
+STFU log activity integration and Target-wrapper compatibility (run on pi4test first):
 
-cd ~/DVSwitch-Mods && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-dashboard-stfu-activity.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-mode-buttons-v6-dmr-compatibility.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-manager-rx-monitor-component.py && sudo ./manage-dvswitch-mods.sh --check dashboard-stfu-activity
+cd ~/DVSwitch-Mods && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-dashboard-stfu-activity.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-dashboard-targets.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-mode-buttons-v6-dmr-compatibility.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-manager-rx-monitor-component.py && sudo ./manage-dvswitch-mods.sh --check dashboard-stfu-activity && sudo ./manage-dvswitch-mods.sh --check dashboard-targets
 
 If the check passes, install the separate STFU activity component:
 

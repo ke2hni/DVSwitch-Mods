@@ -50,6 +50,18 @@ for name, original in (("lh.php", lh), ("localtx.php", localtx)):
     if name == "localtx.php":
         require('margin:3px 0 0 14px;' in patcher.LEGEND, "Local Activity legend 14px alignment is missing")
     require(patcher.patch_text(changed, name) == changed, name + " patch not idempotent")
+    current_target = patcher.block(name)[1]
+    padded_target = patcher.cell_padding_block(name)
+    for target_cell in (current_target, padded_target):
+        base = changed.replace(patcher.block(name)[1], target_cell, 1)
+        wrapped_target = patcher.stfu_target_block(target_cell)
+        wrapped = base.replace(target_cell, wrapped_target, 1)
+        require(patcher.patch_text(wrapped, name) == wrapped,
+                name + " does not recognize the independent STFU target wrapper")
+        legacy_wrapper = wrapped_target.replace(", $listElem[0]);", ");")
+        legacy = base.replace(target_cell, legacy_wrapper, 1)
+        require(patcher.patch_text(legacy, name) == wrapped,
+                name + " did not upgrade the older STFU target helper call safely")
     legacy = changed.replace(patcher.MARKER, patcher.LEGACY_MARKER, 1)
     require(patcher.patch_text(legacy, name) == changed, name + " v1 upgrade failed")
     if name == "localtx.php":
