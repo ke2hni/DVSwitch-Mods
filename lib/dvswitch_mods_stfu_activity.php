@@ -1,7 +1,7 @@
 <?php
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Jeff Milne, KE2HNI
-// DVSwitch-Mods: STFU activity feed v4
+// DVSwitch-Mods: STFU activity feed v5
 
 /** Parse recent STFU ODMR traffic into DVSwitch's activity-row structure. */
 function dvsModsStfuActivityRows($paths = null)
@@ -92,18 +92,32 @@ function dvsModsStfuTargetDisplay($rawTarget, $listPath = null)
     return $label.' (TG '.$number.')';
 }
 
+/** Read the optional selected mode written by DVSwitch-Mode-Buttons. */
+function dvsModsStfuSelectedMode($modePath = null)
+{
+    if ($modePath === null) { $modePath = '/var/lib/dvswitch-mode-buttons/current-mode'; }
+    if (!is_file($modePath) || is_link($modePath) || !is_readable($modePath)) { return ''; }
+    $mode = strtoupper(trim((string)file_get_contents($modePath)));
+    return in_array($mode, array('BM', 'TGIF', 'STFU', 'YSF', 'P25', 'NXDN', 'DSTAR'), true) ? $mode : '';
+}
+
 /** Render an STFU status card separately from the BM/TGIF DMR Master card. */
-function dvsModsStfuRenderCard($abinfo, $lastHeard, $logPaths = null, $listPath = null)
+function dvsModsStfuRenderCard($abinfo, $lastHeard, $logPaths = null, $listPath = null, $modePath = null)
 {
     $latest = null;
     foreach (dvsModsStfuActivityRows($logPaths) as $row) {
         if (isset($row[1], $row[5]) && $row[1] === 'STFU' && $row[5] === 'Net') { $latest = $row; break; }
     }
-    // In STFU mode, show the selected target from the live bridge status.
-    // Activity rows remain sourced from STFU.log, so tuning alone does not
-    // create an RX event or alter historical activity.
+    // Analog_Bridge last_tune is shared across DMR-derived modes and can still
+    // contain BM/TGIF's value during a transition. When the optional Buttons
+    // selection file exists, trust last_tune only if STFU is selected. Without
+    // Buttons, preserve the standalone live-status fallback.
     $liveMode = isset($abinfo['tlv']['ambe_mode']) ? strtoupper(trim((string)$abinfo['tlv']['ambe_mode'])) : '';
-    if ($liveMode === 'STFU' && isset($abinfo['last_tune'])) {
+    $modePath = $modePath === null ? '/var/lib/dvswitch-mode-buttons/current-mode' : $modePath;
+    $modePathExists = is_file($modePath) && !is_link($modePath) && is_readable($modePath);
+    $selectedMode = dvsModsStfuSelectedMode($modePath);
+    $trustLiveTune = !$modePathExists || $selectedMode === 'STFU';
+    if ($trustLiveTune && $liveMode === 'STFU' && isset($abinfo['last_tune'])) {
         $tune = trim((string)$abinfo['last_tune']);
         if (preg_match('/^(?:TG\\s*)?([0-9]+)$/iD', $tune, $match) && $match[1] !== '0') {
             if ($latest === null) { $latest = array('', 'STFU', '', '', '', 'Net'); }

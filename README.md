@@ -35,7 +35,9 @@ DVSwitch-Mods provides two types of changes:
   activity targets. The separate STFU activity component reads STFU's own log
   and adds its RX/TX events to the Gateway Activity, Local Activity, and TRX
   views. STFU is displayed on its own status card rather than the DMR Master
-  card.
+  card. Its card only trusts Analog_Bridge's shared `last_tune` value when the
+  optional Mode Buttons state confirms STFU is selected; during a mode change,
+  it keeps the most recent STFU destination from STFU's own log.
 
 Standard component installers check compatibility before changing anything,
 create protected backups, install atomically, validate the result, and roll

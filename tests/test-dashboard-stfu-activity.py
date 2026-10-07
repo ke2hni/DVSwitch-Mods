@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import importlib.util
-import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -119,14 +118,25 @@ echo "\\nCARD:".$card;
         require("USA-BRIDGE</span><br/><span" in card_output and "(TG 3100)" in card_output,
                 "STFU card did not put the talkgroup number on a separate line")
         require("Listening</span>" not in card_output, "STFU card showed Listening despite a logged target")
+        state_path = Path(directory) / "current-mode"
+        state_path.write_text("STFU\n", encoding="utf-8")
         tuned_program = f'''<?php
 function isProcessRunning($name) {{ return true; }}
 require {str(HELPER)!r};
-dvsModsStfuRenderCard(array('tlv' => array('ambe_mode' => 'STFU'), 'last_tune' => '93'), array(), array({str(log_path)!r}), {str(talkgroup_path)!r});
+dvsModsStfuRenderCard(array('tlv' => array('ambe_mode' => 'STFU'), 'last_tune' => '93'), array(), array({str(log_path)!r}), {str(talkgroup_path)!r}, {str(state_path)!r});
 '''
         tuned_result = subprocess.run(["php"], input=tuned_program, text=True, capture_output=True, check=True)
         require("NORTH AMERICA</span><br/><span" in tuned_result.stdout and "(TG 93)" in tuned_result.stdout,
-                "STFU card did not show the currently tuned friendly target")
+                "selected STFU live target did not override its prior STFU log target")
+        state_path.write_text("TGIF\n", encoding="utf-8")
+        fallback_program = f'''<?php
+function isProcessRunning($name) {{ return true; }}
+require {str(HELPER)!r};
+dvsModsStfuRenderCard(array('tlv' => array('ambe_mode' => 'STFU'), 'last_tune' => '51598'), array(), array({str(log_path)!r}), {str(talkgroup_path)!r}, {str(state_path)!r});
+'''
+        fallback_result = subprocess.run(["php"], input=fallback_program, text=True, capture_output=True, check=True)
+        require("USA-BRIDGE</span><br/><span" in fallback_result.stdout and "(TG 3100)" in fallback_result.stdout,
+                "latest STFU log destination did not take precedence over stale shared last_tune")
 else:
     print("SKIP: STFU log parser runtime cases (php is unavailable in this workspace)")
 
@@ -140,6 +150,13 @@ require("if ($mode !== 'STFU') { return; }" not in HELPER.read_text(), "STFU car
 require("foreach (dvsModsStfuActivityRows($logPaths) as $row)" in HELPER.read_text(), "STFU card does not read its own traffic log")
 require("$liveMode === 'STFU'" in HELPER.read_text() and "$abinfo['last_tune']" in HELPER.read_text(),
         "STFU card does not use the selected target while STFU is active")
+require("dvsModsStfuSelectedMode($modePath)" in HELPER.read_text()
+        and "$trustLiveTune = !$modePathExists || $selectedMode === 'STFU'" in HELPER.read_text()
+        and "current-mode" in HELPER.read_text(),
+        "STFU card can still replace its target with a shared DMR last_tune during a mode transition")
+require("STFU activity feed v5" in HELPER.read_text()
+        and "STFU activity feed v[12345]" in INSTALLER.read_text(),
+        "STFU helper upgrade does not recognize the prior supported releases")
 dmr_source = DMR_PATCHER.read_text()
 dmr_helper = dmr_source.split("helper = r'''", 1)[1].split("'''", 1)[0]
 require("STFU" not in dmr_helper, "fresh DMR Master helper still handles STFU")
