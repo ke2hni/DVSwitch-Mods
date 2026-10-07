@@ -74,7 +74,10 @@ with tempfile.TemporaryDirectory() as directory:
     require("dvsModsStfuTargetDisplay($listElem[4])" in first["lh"], "Gateway Activity does not resolve STFU talkgroup names")
     require("RX STFU" in first["lh"], "Gateway Activity has no STFU RX indication")
     require('== "STFU"' in first["localtx"] and "dvsModsStfuTargetDisplay($listElem[4])" in first["localtx"], "Local Activity does not include STFU TX rows and targets")
-    require("RX STFU" in first["status"] and "Listening STFU" in first["status"], "TRX Info has no STFU receive/listening state")
+    require("RX STFU" in first["status"] and "Listening STFU" in first["status"],
+            "TRX Info has no STFU receive/listening state")
+    require("Listening DMR" in first["status"],
+            "TRX Info can show a stale STFU activity mode while live mode is DMR")
     require("dvsModsStfuRenderCard($abinfo, $lastHeard);" in first["status"], "separate STFU status card is not rendered")
     if shutil.which("php"):
         for path in files.values():
@@ -110,9 +113,12 @@ echo "\\nCARD:".$card;
         require(len(rows) == 2, "STFU parser did not produce both RX and TX events")
         require(rows[0][1] == "STFU" and rows[0][2] == "1234567" and rows[0][5] == "LNet" and rows[0][6] == "5.9", "local STFU TX record was parsed incorrectly")
         require(rows[1][1] == "STFU" and rows[1][2] == "3213930" and rows[1][4] == "TG 3100" and rows[1][5] == "Net" and rows[1][6] == "15.6", "network STFU RX record was parsed incorrectly")
-        require("STFU BrandMeister" in card_output, "STFU card disappeared when another mode was selected")
-        require("USA-BRIDGE (TG 3100)" in card_output and "Listening" not in card_output,
-                "STFU card did not show the friendly BM talkgroup from its own log")
+        require("STFU Net" in card_output, "STFU card header is not consistent with the other mode cards")
+        require('Room<br/><span style="color:#b5651d;' in card_output,
+                "STFU card friendly target does not use the dashboard target color")
+        require("USA-BRIDGE</span><br/><span" in card_output and "(TG 3100)" in card_output,
+                "STFU card did not put the talkgroup number on a separate line")
+        require("Listening</span>" not in card_output, "STFU card showed Listening despite a logged target")
 else:
     print("SKIP: STFU log parser runtime cases (php is unavailable in this workspace)")
 

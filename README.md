@@ -116,9 +116,20 @@ sudo ./mod-dashboard-stfu-activity.sh --check
 sudo ./mod-dashboard-stfu-activity.sh --install
 ```
 
-The STFU BrandMeister status card remains visible in every mode. When the STFU
-process is active, it shows the most recent STFU network talkgroup using
-`TGList_BM.txt`; if no STFU traffic is available yet, it shows `Listening`.
+The STFU Net status card remains visible in every mode. When the STFU process
+is active, it shows the most recent STFU network talkgroup using
+`TGList_BM.txt`. The friendly name and `(TG number)` appear on separate
+orange lines below the `Room` label; if no STFU traffic is available yet, it
+shows `Listening`.
+
+The standard P25/NXDN card modification shows each friendly reflector name
+with its `(TG number)` on the line below. The standalone
+`dashboard-ysf-target-id` component adds the YSF host ID below its room name:
+
+```bash
+sudo ./manage-dvswitch-mods.sh --check dashboard-ysf-target-id
+sudo ./manage-dvswitch-mods.sh --install dashboard-ysf-target-id
+```
 
 On a fresh DVSwitch installation, the first check normally reports early
 components as ready and later components as blocked by prerequisites. It checks
@@ -233,6 +244,16 @@ dashboard from displaying a literal `null` instead of the linked room name.
 sudo ./repair-ysf-dashboard-null.sh --check
 sudo ./repair-ysf-dashboard-null.sh --install
 ```
+
+### YSF reflector ID on the status card
+
+This independent component displays the YSF host ID below the room name in the
+YSF Net card. Install the YSF dashboard null repair first.
+
+~~~
+sudo ./manage-dvswitch-mods.sh --check dashboard-ysf-target-id
+sudo ./manage-dvswitch-mods.sh --install dashboard-ysf-target-id
+~~~
 
 ---
 

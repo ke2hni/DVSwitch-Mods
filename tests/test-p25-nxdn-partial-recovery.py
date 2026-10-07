@@ -50,6 +50,10 @@ class PartialRecoveryTests(unittest.TestCase):
             (installed_functions, installed_status),
         )
 
+    def test_reflector_number_is_rendered_below_friendly_name(self) -> None:
+        self.assertIn('$numberLine = $hasFriendlyName ? "<br/><span', PATCH.PHP_FUNCTION)
+        self.assertIn('(TG ".$number.")</span>', PATCH.PHP_FUNCTION)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -62,7 +62,16 @@ sudo ./manage-dvswitch-mods.sh --install dashboard-stfu-activity
 
 Then verify Gateway Activity receives STFU traffic, Local Activity records
 local STFU transmissions, the TRX Info card shows RX STFU, and the separate
-STFU BrandMeister card remains visible in other modes and shows the latest BM
-talkgroup name while STFU is active. Repeat on pi5test and
+STFU Net card remains visible in other modes, uses the dashboard's orange
+target color, and displays the friendly talkgroup name with (TG number) below
+it. TRX Info should show Listening DMR after selecting BM/TGIF with no current
+DMR receive; Gateway Activity history should retain each row's original mode.
+Check that P25/NXDN friendly-name cards also show the number below the name.
+Run the YSF target-ID check/install separately:
+
+sudo ./manage-dvswitch-mods.sh --check dashboard-ysf-target-id
+sudo ./manage-dvswitch-mods.sh --install dashboard-ysf-target-id
+
+Repeat on pi5test and
 node3040 after pi4test passes. Do not install on production node68425 until the
 test nodes pass and Jeff explicitly authorizes it.

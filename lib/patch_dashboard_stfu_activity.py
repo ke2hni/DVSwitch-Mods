@@ -8,7 +8,8 @@ import argparse
 from pathlib import Path
 import re
 
-MARKER = "// DVSwitch-Mods: STFU activity feed integration v1"
+OLD_MARKER = "// DVSwitch-Mods: STFU activity feed integration v1"
+MARKER = "// DVSwitch-Mods: STFU activity feed integration v2"
 INCLUDE = "include_once dirname(__FILE__).'/dvswitch_mods_stfu_activity.php';"
 
 
@@ -24,6 +25,10 @@ def replace_once(text: str, old: str, new: str, description: str) -> str:
 
 
 def patch_functions(text: str) -> str:
+    if OLD_MARKER in text and MARKER not in text:
+        if text.count(OLD_MARKER) != 1 or text.count(INCLUDE) != 1 or text.count("dvsModsStfuMergeActivity($lastHeard)") != 1:
+            raise PatchError("partial or duplicate legacy STFU functions.php integration")
+        return text.replace(OLD_MARKER, MARKER, 1)
     anchor = "$lastHeard = getLastHeard($reverseLogLinesMMDVM);"
     new = (f"{MARKER}\n{INCLUDE}\n" + anchor +
            "\n$lastHeard = dvsModsStfuMergeActivity($lastHeard);")
@@ -35,6 +40,10 @@ def patch_functions(text: str) -> str:
 
 
 def patch_lh(text: str) -> str:
+    if OLD_MARKER in text and MARKER not in text:
+        if text.count(OLD_MARKER) != 1 or "dvsModsStfuTargetDisplay($listElem[4])" not in text or "RX STFU" not in text:
+            raise PatchError("partial or duplicate legacy STFU Gateway Activity integration")
+        return text.replace(OLD_MARKER, MARKER, 1)
     rx = '                             if ($listElem[1] == "DMR Slot 1" && $listElem[5] == "Net")  {echo "<td colspan=\\"3\\" style=\\"background:#f93;\\">&nbsp;&nbsp;&nbsp;RX DMR&nbsp;&nbsp;&nbsp;</td>";}\n'
     if MARKER in text:
         if text.count(MARKER) != 1 or "dvsModsStfuTargetDisplay($listElem[4])" not in text or "RX STFU" not in text:
@@ -53,6 +62,10 @@ def patch_lh(text: str) -> str:
 
 
 def patch_localtx(text: str) -> str:
+    if OLD_MARKER in text and MARKER not in text:
+        if text.count(OLD_MARKER) != 1 or "dvsModsStfuTargetDisplay($listElem[4])" not in text or '== "STFU"' not in text:
+            raise PatchError("partial or duplicate legacy STFU Local Activity integration")
+        return text.replace(OLD_MARKER, MARKER, 1)
     if MARKER in text:
         if text.count(MARKER) != 1 or "dvsModsStfuTargetDisplay($listElem[4])" not in text or '== "STFU"' not in text:
             raise PatchError("partial or duplicate STFU Local Activity integration")
@@ -68,7 +81,8 @@ def patch_localtx(text: str) -> str:
 
 def patch_status(text: str) -> str:
     if MARKER in text:
-        if text.count(MARKER) != 1 or "dvsModsStfuRenderCard($abinfo, $lastHeard);" not in text or "RX STFU" not in text:
+        if (text.count(MARKER) != 1 or "dvsModsStfuRenderCard($abinfo, $lastHeard);" not in text
+                or "RX STFU" not in text or "Listening DMR" not in text or "Listening STFU" not in text):
             raise PatchError("partial or duplicate STFU TRX/status integration")
         return text
     trx_anchor = '            elseif ($listElem[2] && $listElem[6] == null && $abinfo[\'tlv\'][\'ambe_mode\']== "DSTAR"'
@@ -78,7 +92,19 @@ def patch_status(text: str) -> str:
                     echo "<td style=\\\"background:#4aa361;\\\">RX STFU</td>";
                     }
 '''
-    text = text.replace(trx_anchor, rx_branch + trx_anchor, 1)
+    live_mode_fallbacks = '''            elseif (isset($abinfo['tlv']['ambe_mode']) && strtoupper($abinfo['tlv']['ambe_mode']) === 'DMR' && getActualMode($lastHeard, $mmdvmconfigs) !== 'DMR') {
+                    echo "<td style=\\"background:#f93;\\">Listening DMR</td>";
+                    }
+            elseif (isset($abinfo['tlv']['ambe_mode']) && strtoupper($abinfo['tlv']['ambe_mode']) === 'STFU' && getActualMode($lastHeard, $mmdvmconfigs) !== 'STFU') {
+                    echo "<td style=\\"background:#0b0; color:#030;\\">Listening STFU</td>";
+                    }
+'''
+    if OLD_MARKER in text and MARKER not in text:
+        if text.count(OLD_MARKER) != 1 or text.count(rx_branch) != 1:
+            raise PatchError("legacy STFU TRX integration is incomplete or ambiguous")
+        text = text.replace(rx_branch, rx_branch + live_mode_fallbacks, 1)
+        return text.replace(OLD_MARKER, MARKER, 1)
+    text = text.replace(trx_anchor, rx_branch + live_mode_fallbacks + trx_anchor, 1)
     listening = '                    echo "<td style=\\"background:#0b0; color:#030;\\">Listening</td>";'
     listening_replacement = '''                    if (isset($abinfo['tlv']['ambe_mode']) && strtoupper($abinfo['tlv']['ambe_mode']) === 'STFU') {
                             echo "<td style=\\"background:#0b0; color:#030;\\">Listening STFU</td>";

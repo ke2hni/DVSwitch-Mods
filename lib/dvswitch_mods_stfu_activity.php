@@ -1,7 +1,7 @@
 <?php
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Jeff Milne, KE2HNI
-// DVSwitch-Mods: STFU activity feed v2
+// DVSwitch-Mods: STFU activity feed v3
 
 /** Parse recent STFU ODMR traffic into DVSwitch's activity-row structure. */
 function dvsModsStfuActivityRows($paths = null)
@@ -99,14 +99,21 @@ function dvsModsStfuRenderCard($abinfo, $lastHeard, $logPaths = null, $listPath 
     foreach (dvsModsStfuActivityRows($logPaths) as $row) {
         if (isset($row[1], $row[5]) && $row[1] === 'STFU' && $row[5] === 'Net') { $latest = $row; break; }
     }
-    echo "<br /><table>\n<tr><th colspan=\"2\">STFU BrandMeister</th></tr>\n";
+    echo "<br /><table>\n<tr><th colspan=\"2\">STFU Net</th></tr>\n";
     if (function_exists('isProcessRunning') && isProcessRunning('STFU')) {
-        echo '<tr><td style="background:#ffffed;" colspan="2">';
+        echo '<tr><td style="background:#ffffed;text-align:center;" colspan="2">';
         if ($latest !== null) {
             $label = dvsModsStfuTargetDisplay($latest[4], $listPath);
-            echo htmlspecialchars($label, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            if (preg_match('/^(.*?)\s+\((TG\s+[0-9]+)\)$/iD', $label, $parts)) {
+                echo 'Room<br/><span style="color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;">'.htmlspecialchars($parts[1], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</span>';
+                if (strcasecmp($parts[1], $parts[2]) !== 0) {
+                    echo '<br/><span style="color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;">('.htmlspecialchars($parts[2], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').')</span>';
+                }
+            } else {
+                echo 'Room<br/><span style="color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;">'.htmlspecialchars($label, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</span>';
+            }
         } else {
-            echo 'Listening';
+            echo '<span style="color:#b5651d;font-weight:bold;">Listening</span>';
         }
         echo "</td></tr>\n";
     } else {

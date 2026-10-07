@@ -9,7 +9,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.2.4"
+readonly SCRIPT_VERSION="1.2.5"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly STATE_DIR="/var/lib/dvswitch-mods/manager"
 readonly STATE_FILE="$STATE_DIR/active-installs.tsv"
@@ -42,6 +42,7 @@ readonly -a COMPONENTS=(
     dstar-tx-ref
     dmr-friendly-names
     ysf-dashboard-null
+    dashboard-ysf-target-id
     dashboard-fcc-first-names
     dashboard-targets
     dashboard-cell-padding
@@ -167,6 +168,7 @@ select_component() {
         dstar-tx-ref) CHILD_SCRIPT="$SCRIPT_DIR/mod-dstar-tx-ref.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dstar-tx-ref" ;;
         dmr-friendly-names) CHILD_SCRIPT="$SCRIPT_DIR/mod-dmr-friendly-names.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dmr-friendly-names" ;;
         ysf-dashboard-null) CHILD_SCRIPT="$SCRIPT_DIR/repair-ysf-dashboard-null.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/ysf-dashboard-null" ;;
+        dashboard-ysf-target-id) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-ysf-target-id.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-ysf-target-id" ;;
         dashboard-fcc-first-names) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-fcc-first-names.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"; UNINSTALL_ACTION="--uninstall" ;;
         dashboard-targets) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-targets.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-targets" ;;
         dashboard-cell-padding) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-cell-padding.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-cell-padding" ;;
@@ -405,6 +407,7 @@ dependency_hint() {
         dstar-tx-ref) printf 'install p25-nxdn-friendly-names first' ;;
         dmr-friendly-names) printf 'install dstar-tx-ref first' ;;
         ysf-dashboard-null) printf 'install dmr-friendly-names first' ;;
+        dashboard-ysf-target-id) printf 'install ysf-dashboard-null first' ;;
         dashboard-targets) printf 'review the detailed Target-modification error shown above' ;;
         *) printf 'review the detailed error shown above' ;;
     esac

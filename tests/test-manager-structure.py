@@ -32,6 +32,7 @@ def main() -> None:
         "mod-dstar-tx-ref.sh",
         "mod-dmr-friendly-names.sh",
         "repair-ysf-dashboard-null.sh",
+        "mod-dashboard-ysf-target-id.sh",
         "mod-dashboard-fcc-first-names.sh",
         "mod-dashboard-targets.sh",
         "mod-dashboard-cell-padding.sh",

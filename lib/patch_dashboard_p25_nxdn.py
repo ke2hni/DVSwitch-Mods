@@ -37,9 +37,11 @@ function formatReflectorLink($linkText, $mode) {
                         }
                 }
         }
-        if ($label === "") { $label = "TG ".$number; }
+        $hasFriendlyName = $label !== "";
+        if (!$hasFriendlyName) { $label = "TG ".$number; }
         $label = htmlspecialchars($label, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8");
-        return "Reflector<br/><span style=\"color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:normal;text-align:center;\">".$label."</span>";
+        $numberLine = $hasFriendlyName ? "<br/><span style=\"color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;text-align:center;\">(TG ".$number.")</span>" : "";
+        return "Reflector<br/><span style=\"color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;text-align:center;\">".$label."</span>".$numberLine;
 }
 
 '''
