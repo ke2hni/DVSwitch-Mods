@@ -16,6 +16,30 @@ SPEC.loader.exec_module(PATCH)
 
 
 class PartialRecoveryTests(unittest.TestCase):
+    def test_upgrades_known_previous_helper_without_touching_status(self) -> None:
+        functions = "<?php\n" + PATCH.LEGACY_PHP_FUNCTION + PATCH.FUNCTION_ANCHOR + " {}\n"
+        status = "<?php\n" + PATCH.P25_WRAPPED + ";\n" + PATCH.NXDN_WRAPPED + ";\n"
+
+        upgraded_functions, upgraded_status = PATCH.patch_text(functions, status)
+
+        self.assertEqual(upgraded_functions.count(PATCH.PHP_FUNCTION), 1)
+        self.assertNotIn(PATCH.LEGACY_PHP_FUNCTION, upgraded_functions)
+        self.assertEqual(upgraded_status, status)
+        self.assertEqual(
+            PATCH.patch_text(upgraded_functions, upgraded_status),
+            (upgraded_functions, upgraded_status),
+        )
+
+    def test_upgrades_known_previous_helper_and_recovers_rolled_back_status(self) -> None:
+        functions = "<?php\n" + PATCH.LEGACY_PHP_FUNCTION + PATCH.FUNCTION_ANCHOR + " {}\n"
+        status = "<?php\n" + PATCH.P25_PLAIN + ";\n" + PATCH.NXDN_PLAIN + ";\n"
+
+        upgraded_functions, upgraded_status = PATCH.patch_text(functions, status)
+
+        self.assertEqual(upgraded_functions.count(PATCH.PHP_FUNCTION), 1)
+        self.assertEqual(upgraded_status.count(PATCH.P25_WRAPPED), 1)
+        self.assertEqual(upgraded_status.count(PATCH.NXDN_WRAPPED), 1)
+
     def test_repairs_only_status_calls_when_helper_is_already_installed(self) -> None:
         functions = "<?php\n" + PATCH.PHP_FUNCTION + PATCH.FUNCTION_ANCHOR + " {}\n"
         status = (

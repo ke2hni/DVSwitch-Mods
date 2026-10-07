@@ -46,6 +46,37 @@ function formatReflectorLink($linkText, $mode) {
 
 '''
 
+# Exact helper shipped before the reflector-number-on-a-second-line update.
+# Recognizing this known version lets the installer upgrade existing nodes
+# without weakening checks for unknown or locally modified PHP.
+LEGACY_PHP_FUNCTION = r'''// DVSwitch-Mods: P25/NXDN friendly-name display v1
+function formatReflectorLink($linkText, $mode) {
+        if ($mode !== "P25" && $mode !== "NXDN") { return $linkText; }
+        if (!preg_match('/(?:TG|reflector)\s*([0-9]+)/iu', strip_tags($linkText), $matches)) { return $linkText; }
+        $number = $matches[1];
+        $label = "";
+        $jsonFile = "/var/lib/mmdvm/".$mode."Hosts.json";
+        if (is_readable($jsonFile)) {
+                $json = json_decode(file_get_contents($jsonFile), true);
+                if (isset($json["reflectors"]) && is_array($json["reflectors"])) {
+                        foreach ($json["reflectors"] as $reflector) {
+                                if (!is_array($reflector) || !array_key_exists("designator", $reflector) || (string)$reflector["designator"] !== $number) { continue; }
+                                foreach (array("name", "sponsor") as $field) {
+                                        if (!array_key_exists($field, $reflector) || !is_string($reflector[$field])) { continue; }
+                                        $candidate = preg_replace('/\s+/u', ' ', str_replace('_', ' ', trim($reflector[$field])));
+                                        if (is_string($candidate) && $candidate !== "") { $label = $candidate; break; }
+                                }
+                                break;
+                        }
+                }
+        }
+        if ($label === "") { $label = "TG ".$number; }
+        $label = htmlspecialchars($label, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8");
+        return "Reflector<br/><span style=\"color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:normal;text-align:center;\">".$label."</span>";
+}
+
+'''
+
 class PatchError(RuntimeError):
     pass
 
@@ -62,18 +93,22 @@ def patch_text(functions: str, status: str) -> tuple[str, str]:
         functions = once(functions, FUNCTION_ANCHOR, PHP_FUNCTION + FUNCTION_ANCHOR, "functions insertion anchor")
         status = once(status, P25_PLAIN, P25_WRAPPED, "P25 status call")
         status = once(status, NXDN_PLAIN, NXDN_WRAPPED, "NXDN status call")
-    elif fm == 1 and wrappers == 0:
-        # A previous whole-file restore can roll status.php back while leaving
-        # functions.php patched. Recover that recognizable split state by
-        # adding only the two missing wrappers; preserve every other status.php
-        # customization. Reject incomplete/ambiguous helper or call structures.
-        if functions.count(PHP_FUNCTION) != 1 or functions.count("function formatReflectorLink(") != 1:
-            raise PatchError("partial P25/NXDN modification: helper function is missing or ambiguous")
-        status = once(status, P25_PLAIN, P25_WRAPPED, "P25 status call after partial rollback")
-        status = once(status, NXDN_PLAIN, NXDN_WRAPPED, "NXDN status call after partial rollback")
-    elif fm == 1 and wrappers == 2:
-        if functions.count(PHP_FUNCTION) != 1 or status.count(P25_WRAPPED) != 1 or status.count(NXDN_WRAPPED) != 1:
+    elif fm == 1 and wrappers in (0, 2):
+        legacy_count = functions.count(LEGACY_PHP_FUNCTION)
+        current_count = functions.count(PHP_FUNCTION)
+        if functions.count("function formatReflectorLink(") != 1 or (legacy_count, current_count) not in ((1, 0), (0, 1)):
+            raise PatchError("partial P25/NXDN modification: helper function is missing, customized, or ambiguous")
+        if wrappers == 2 and (status.count(P25_WRAPPED) != 1 or status.count(NXDN_WRAPPED) != 1):
             raise PatchError("incomplete P25/NXDN modification")
+        if legacy_count == 1:
+            functions = once(functions, LEGACY_PHP_FUNCTION, PHP_FUNCTION, "previous P25/NXDN helper")
+        if wrappers == 0:
+            # A previous whole-file restore can roll status.php back while leaving
+            # functions.php patched. Recover that recognizable split state by
+            # adding only the two missing wrappers; preserve every other status.php
+            # customization. Reject incomplete/ambiguous helper or call structures.
+            status = once(status, P25_PLAIN, P25_WRAPPED, "P25 status call after partial rollback")
+            status = once(status, NXDN_PLAIN, NXDN_WRAPPED, "NXDN status call after partial rollback")
     elif fm or wrappers:
         raise PatchError("partial or ambiguous P25/NXDN modification")
     else:
