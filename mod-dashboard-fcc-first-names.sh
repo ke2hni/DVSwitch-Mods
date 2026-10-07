@@ -84,7 +84,7 @@ dashboard_health() {
 
 preflight() {
     check_platform
-    for command in awk chmod chown cmp cp curl date install mktemp mv php python3 rm sha256sum stat systemctl; do require_command "$command"; done
+    for command in awk chmod chown cmp cp curl date grep install mktemp mv php python3 rm sha256sum stat systemctl; do require_command "$command"; done
     require_file "$PATCHER"; require_file "$BUILDER"; require_file "$HELPER_SOURCE"; require_file "$CALLSIGN_DESCRIPTIONS_SOURCE"; require_file "$TRANSACTION_LIBRARY"
     require_file "$UPDATER_SOURCE"; require_file "$SERVICE_SOURCE"; require_file "$TIMER_SOURCE"
     require_file "$LH_TARGET"
@@ -160,10 +160,20 @@ raise SystemExit(0 if normalized(installed) == normalized(previous) else 1)
 PY
 }
 
+transaction_library_supported() {
+    local target=$1 function_name
+    [[ -f "$target" && ! -L "$target" ]] || return 1
+    bash -n "$target" || return 1
+    for function_name in dvsm_transaction_begin dvsm_backup_file dvsm_install_candidate dvsm_transaction_rollback; do
+        grep -Eq "^${function_name}[[:space:]]*\\(\\)[[:space:]]*\\{" "$target" || return 1
+    done
+}
+
 updater_release_state() {
     local state
     state=$(updater_state)
     [[ "$state" != absent ]] || { printf 'absent'; return; }
+    transaction_library_supported "$TRANSACTION_TARGET" || die "Installed FCC transaction helper is structurally unsupported."
     if [[ "$state" == legacy ]]; then
         [[ "$(stat -c '%U:%G:%a' "$UPDATER_TARGET")" == root:root:755 ]] || die "Incorrect legacy updater ownership or mode."
         for target in "$BUILDER_TARGET" "$TRANSACTION_TARGET" "$SERVICE_TARGET" "$TIMER_TARGET"; do
@@ -176,7 +186,6 @@ updater_release_state() {
     fi
     if patcher_structure_supported "$PATCHER_TARGET"; then
         cmp -s "$BUILDER" "$BUILDER_TARGET" || die "Installed FCC builder does not match the supported previous release."
-        cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die "Installed FCC transaction helper does not match the supported previous release."
         unit_file_matches "$SERVICE_SOURCE" "$SERVICE_TARGET" || die "Installed FCC systemd service does not match the supported previous release."
         timer_file_matches_supported "$TIMER_SOURCE" "$TIMER_TARGET" || die "Installed FCC timer does not match the supported previous release."
         [[ "$(stat -c '%U:%G:%a' "$UPDATER_TARGET")" == root:root:755 ]] || die "Incorrect updater ownership or mode."
@@ -200,7 +209,6 @@ updater_release_state() {
     cmp -s "$UPDATER_SOURCE" "$UPDATER_TARGET" || die "Installed FCC updater does not match this release."
     cmp -s "$PATCHER" "$PATCHER_TARGET" || die "Installed FCC dashboard patcher does not match this release."
     cmp -s "$BUILDER" "$BUILDER_TARGET" || die "Installed FCC builder does not match this release."
-    cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die "Installed FCC transaction helper does not match this release."
     unit_file_matches "$SERVICE_SOURCE" "$SERVICE_TARGET" || die "Installed FCC systemd service does not match this release."
     [[ "$(stat -c '%U:%G:%a' "$UPDATER_TARGET")" == root:root:755 ]] || die "Incorrect updater ownership or mode."
     for target in "$BUILDER_TARGET" "$PATCHER_TARGET" "$TRANSACTION_TARGET" "$SERVICE_TARGET" "$TIMER_TARGET"; do

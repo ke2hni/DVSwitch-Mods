@@ -87,6 +87,10 @@ with tempfile.TemporaryDirectory() as directory:
     require(b"\r\n" in raw and b"\n" not in raw.replace(b"\r\n", b""), "CRLF was not preserved")
 
 installer = (ROOT / "mod-dashboard-fcc-first-names.sh").read_text()
+require('cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die' not in installer,
+        "FCC dashboard installer still blocks a structurally compatible transaction helper revision")
+require('transaction_library_supported "$TRANSACTION_TARGET"' in installer,
+        "FCC dashboard installer does not validate the installed transaction helper structurally")
 custom_file = (ROOT / "data/callsign-descriptions.tsv").read_text()
 for entry in ("9999 = Announcement", "H4MLNK = YSF Link", "N0CALL = Announcement", "AMERICALNK = America Link"):
     require(entry in custom_file, "starter custom-description entry missing: " + entry)
