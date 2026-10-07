@@ -51,3 +51,17 @@ After pi4test passes, repeat the same checks on pi5test and node3040. Install on
 Manager upgrade regression (safe to run as the regular user; uses a temporary isolated manager and fake component installer):
 
 cd ~/DVSwitch-Mods && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-manager-recorded-upgrade.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-manager-structure.py
+
+STFU log activity integration (run on pi4test first):
+
+cd ~/DVSwitch-Mods && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-dashboard-stfu-activity.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-mode-buttons-v6-dmr-compatibility.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-manager-rx-monitor-component.py && sudo ./manage-dvswitch-mods.sh --check dashboard-stfu-activity
+
+If the check passes, install the separate STFU activity component:
+
+sudo ./manage-dvswitch-mods.sh --install dashboard-stfu-activity
+
+Then verify Gateway Activity receives STFU traffic, Local Activity records
+local STFU transmissions, the TRX Info card shows RX STFU, and the separate
+STFU BrandMeister card displays the BM talkgroup name. Repeat on pi5test and
+node3040 after pi4test passes. Do not install on production node68425 until the
+test nodes pass and Jeff explicitly authorizes it.

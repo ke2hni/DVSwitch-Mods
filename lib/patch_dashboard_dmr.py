@@ -42,7 +42,6 @@ function dvsModsDmrStateWrite($state) {
 
 function dvsModsDmrMasterHeading($master, $abinfo) {
         $state = dvsModsDmrStateRead();
-        $mode = isset($abinfo['tlv']['ambe_mode']) ? strtoupper(trim((string)$abinfo['tlv']['ambe_mode'])) : '';
         if (isset($state['current_network']) && ($state['current_network'] === 'BM' || $state['current_network'] === 'TGIF')) {
                 $network = $state['current_network'];
         } else {
@@ -108,7 +107,7 @@ function dvsModsDmrMasterDisplay($master, $abinfo) {
         $previousMode = isset($state['observed_mode']) ? strtoupper(trim((string)$state['observed_mode'])) : '';
         $previousNetwork = isset($state['observed_network']) ? strtoupper(trim((string)$state['observed_network'])) : '';
         $previousTalkgroup = isset($state['observed_tg']) ? trim((string)$state['observed_tg']) : '';
-        $isDmr = ($mode === 'DMR' || $mode === 'STFU');
+        $isDmr = ($mode === 'DMR');
         if (!$isDmr) {
                 unset($state['blocked_tg']);
         } else {
@@ -230,7 +229,9 @@ v5_start = v5_helper.index('function dvsModsDmrForeignTalkgroup(')
 v5_master = v5_helper[v5_start:].rstrip() + "\n"
 
 text = path.read_text(encoding="utf-8")
-if text.count(marker) == 1 and text.count(new_output) == 1 and text.count("function dvsModsDmrForeignTalkgroup(") == 1:
+old_stfu_dmr_condition = "        $isDmr = ($mode === 'DMR' || $mode === 'STFU');"
+new_dmr_condition = "        $isDmr = ($mode === 'DMR');"
+if text.count(marker) == 1 and text.count(new_output) == 1 and text.count("function dvsModsDmrForeignTalkgroup(") == 1 and text.count(old_stfu_dmr_condition) == 0:
     print("ALREADY MODIFIED: DMR friendly-name display is installed.")
     raise SystemExit(0)
 markers = text.count(marker)
@@ -248,15 +249,19 @@ old_logic = r'''        $network = dvsModsDmrNetwork($master);
         if ($mode === 'DMR') {
                 $talkgroup = dvsModsDmrTalkgroup($abinfo);
                 if ($talkgroup !== '' && !($network === 'TGIF' && $talkgroup === '9')) {'''
-new_logic = r'''        $network = ($mode === 'STFU') ? 'BM' : dvsModsDmrNetwork($master);
-        if ($mode === 'DMR' || $mode === 'STFU') {
+new_logic = r'''        $network = dvsModsDmrNetwork($master);
+        if ($mode === 'DMR') {
                 $talkgroup = dvsModsDmrTalkgroup($abinfo);
                 if ($talkgroup !== '' && !($mode === 'DMR' && $network === 'TGIF' && $talkgroup === '9')) {'''
 old_fallback = "        if ($talkgroup === '' && $mode === 'DMR') { $talkgroup = dvsModsDmrTalkgroup($abinfo); }"
-new_fallback = "        if ($talkgroup === '' && ($mode === 'DMR' || $mode === 'STFU')) { $talkgroup = dvsModsDmrTalkgroup($abinfo); }"
+new_fallback = "        if ($talkgroup === '' && $mode === 'DMR') { $talkgroup = dvsModsDmrTalkgroup($abinfo); }"
 
 handled_upgrade = 0
-if markers == 0 and text.count(legacy_v7_helper) == 1 and text.count(new_output) == 1:
+if markers == 1 and text.count(old_stfu_dmr_condition) == 1 and text.count(new_dmr_condition) == 0:
+    text = text.replace(old_stfu_dmr_condition, new_dmr_condition, 1)
+    handled_upgrade = 1
+    print("UPGRADED: STFU is no longer treated as a DMR Master network.")
+elif markers == 0 and text.count(legacy_v7_helper) == 1 and text.count(new_output) == 1:
     text = text.replace(legacy_v7_helper, helper, 1)
     handled_upgrade = 1
     print("UPGRADED: legacy v7 DMR friendly-name display to v8.")
@@ -266,7 +271,9 @@ elif markers == 0 and v7_markers == 1 and text.count(new_output) == 1 and text.c
     print("UPGRADED: complete v7 DMR friendly-name display marker to v8.")
     raise SystemExit(0)
 
-if handled_upgrade == 0 and markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 and v4_markers == 0 and v5_markers == 0 and v6_markers == 0:
+if handled_upgrade == 1:
+    pass
+elif markers == 0 and v1_markers == 0 and v2_markers == 0 and v3_markers == 0 and v4_markers == 0 and v5_markers == 0 and v6_markers == 0:
     counts = (text.count(include_anchor), text.count(old_output), text.count(v2_output), text.count(new_output))
     if counts != (1, 1, 0, 0):
         raise SystemExit("ERROR: unsupported or ambiguous DMR Master anchors: " + repr(counts))

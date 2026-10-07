@@ -3,7 +3,7 @@
 # Copyright (c) 2026 Jeff Milne, KE2HNI
 
 # Show the selected DMR network and talkgroup name in the DVSwitch Dashboard
-# DMR Master card. BrandMeister data is also used for STFU. This is display-only.
+# BM/TGIF DMR Master card. STFU activity and its status card are handled separately.
 
 set -Eeuo pipefail
 umask 077

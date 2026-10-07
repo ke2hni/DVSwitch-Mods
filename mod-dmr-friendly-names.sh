@@ -3,7 +3,7 @@
 # Copyright (c) 2026 Jeff Milne, KE2HNI
 
 # Show the selected DMR network and talkgroup name in the DVSwitch Dashboard
-# DMR Master card. BrandMeister data is also used for STFU. This is display-only.
+# BM/TGIF DMR Master card. STFU activity and its status card are handled separately.
 
 set -Eeuo pipefail
 umask 077
@@ -16,7 +16,8 @@ readonly TGIF_LIST="/var/lib/mmdvm/TGList_TGIF.txt"
 readonly STATE_FILE="/var/lib/mmdvm/dvswitch-mods-dmr-state.json"
 readonly BACKUP_ROOT="/var/backups/dvswitch-mods/dmr-friendly-names"
 readonly MOD_MARKER="// DVSwitch-Mods: DMR Master friendly-name display v8"
-readonly BUTTONS_MARKER="// DVSwitch-Mode-Buttons: standalone DMR Master display v7"
+readonly BUTTONS_MARKER="// DVSwitch-Mode-Buttons: standalone DMR Master display v8"
+readonly BUTTONS_PREVIOUS_MARKER="// DVSwitch-Mode-Buttons: standalone DMR Master display v7"
 
 WORK_DIR=""
 ACTIVE_BACKUP=""
@@ -115,11 +116,20 @@ PY_STATE
 }
 
 buttons_card_is_compatible() {
-    [[ $(grep -Fc "$BUTTONS_MARKER" "$TARGET" || true) -eq 1 ]] &&
-    [[ $(grep -Fc 'dvsButtonsDmrMasterDisplay($dmrMasterHost, $abinfo)' "$TARGET" || true) -eq 1 ]] &&
-    [[ $(grep -Fc 'dvsButtonsDmrMasterHeading($dmrMasterHost, $abinfo)' "$TARGET" || true) -eq 1 ]] &&
-    [[ $(grep -Fc "if (\$liveMode === 'DMR')" "$TARGET" || true) -ge 2 ]] &&
-    [[ $(grep -Fc "if (\$liveMode === 'STFU')" "$TARGET" || true) -ge 2 ]]
+    local current previous
+    current=$(grep -Fc "$BUTTONS_MARKER" "$TARGET" || true)
+    previous=$(grep -Fc "$BUTTONS_PREVIOUS_MARKER" "$TARGET" || true)
+    [[ $((current + previous)) -eq 1 ]] || return 1
+    [[ $(grep -Fc 'dvsButtonsDmrMasterDisplay($dmrMasterHost, $abinfo)' "$TARGET" || true) -eq 1 ]] || return 1
+    [[ $(grep -Fc 'dvsButtonsDmrMasterHeading($dmrMasterHost, $abinfo)' "$TARGET" || true) -eq 1 ]] || return 1
+    [[ $(grep -Fc "if (\$liveMode === 'DMR')" "$TARGET" || true) -ge 2 ]] || return 1
+    if [[ $current -eq 1 ]]; then
+        [[ $(grep -Fc "if (\$liveMode === 'STFU')" "$TARGET" || true) -eq 0 ]]
+    else
+        # Previous Buttons v7 is still structurally valid and owns the DMR card.
+        # Let the Buttons installer upgrade it without blocking Mods installation.
+        [[ $(grep -Fc "if (\$liveMode === 'STFU')" "$TARGET" || true) -ge 2 ]]
+    fi
 }
 
 patch_candidate() {

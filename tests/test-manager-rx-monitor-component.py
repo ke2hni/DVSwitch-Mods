@@ -22,8 +22,8 @@ def main() -> None:
     require(INSTALLER.is_file() and INSTALLER.stat().st_mode & 0o111,
             "RX Monitor installer is missing or not executable")
     component_list = manager.split("readonly -a COMPONENTS=(", 1)[1].split(")", 1)[0]
-    require(component_list.rstrip().endswith("dashboard-stfu-status\n    dashboard-rx-monitor-left"),
-            "STFU and RX Monitor are not appended to the standard component order")
+    require(component_list.rstrip().endswith("dashboard-stfu-status\n    dashboard-stfu-activity\n    dashboard-rx-monitor-left"),
+            "STFU status/activity and RX Monitor are not appended to the standard component order")
     require('Choose an option [0/1/2/3]:' in manager and '"4) Install STFU status cards' not in manager
             and '"5) Move RX Monitor' not in manager,
             "STFU or RX Monitor was incorrectly added as a dedicated menu option")
@@ -31,6 +31,8 @@ def main() -> None:
             "standard menu install does not process the complete component list")
     require('dashboard-stfu-status) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-stfu-status.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-stfu-status"; UNINSTALL_ACTION="--uninstall"' in manager,
             "STFU manager install/uninstall mapping or protected backup root is incorrect")
+    require('dashboard-stfu-activity) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-stfu-activity.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-stfu-activity"; UNINSTALL_ACTION="--uninstall"' in manager,
+            "STFU activity manager install/uninstall mapping or protected backup root is incorrect")
     require('dashboard-rx-monitor-left) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-rx-monitor-left.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-rx-monitor-left"; UNINSTALL_ACTION="--uninstall"' in manager,
             "manager uninstall mapping or protected backup root is incorrect")
     print("PASS: STFU and RX Monitor use the standard manager install and reverse-order uninstall flow")

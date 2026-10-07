@@ -48,6 +48,7 @@ readonly -a COMPONENTS=(
     dashboard-activity-modes
     dashboard-hostname-title
     dashboard-stfu-status
+    dashboard-stfu-activity
     dashboard-rx-monitor-left
 )
 
@@ -172,6 +173,7 @@ select_component() {
         dashboard-activity-modes) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-activity-modes.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-activity-modes" ;;
         dashboard-hostname-title) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-hostname-title.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-hostname-title" ;;
         dashboard-stfu-status) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-stfu-status.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-stfu-status"; UNINSTALL_ACTION="--uninstall" ;;
+        dashboard-stfu-activity) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-stfu-activity.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-stfu-activity"; UNINSTALL_ACTION="--uninstall" ;;
         dashboard-rx-monitor-left) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-rx-monitor-left.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-rx-monitor-left"; UNINSTALL_ACTION="--uninstall" ;;
         *) die "Unknown component: $COMPONENT" ;;
     esac

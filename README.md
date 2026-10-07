@@ -32,7 +32,10 @@ DVSwitch-Mods provides two types of changes:
   detection.
 - **Modifications** add optional dashboard features such as friendly reflector
   and talkgroup names, D-Star reflector details, FCC first names, and cleaner
-  activity targets.
+  activity targets. The separate STFU activity component reads STFU's own log
+  and adds its RX/TX events to the Gateway Activity, Local Activity, and TRX
+  views. STFU is displayed on its own status card rather than the DMR Master
+  card.
 
 Standard component installers check compatibility before changing anything,
 create protected backups, install atomically, validate the result, and roll
@@ -82,9 +85,9 @@ The menu provides three installation choices:
    installer. It creates its own protected and per-run backups.
 
 The Dark Mode and Display Layout installers do not require the standard
-component chain. STFU status and RX Monitor position are included at the end of
-the standard component installation and uninstall order. Option 0 exits without
-changing anything.
+component chain. STFU status, STFU activity, and RX Monitor position are
+included at the end of the standard component installation and uninstall
+order. Option 0 exits without changing anything.
 
 The standalone installers can also be run directly:
 
@@ -97,6 +100,20 @@ sudo ./dvswitch-display-layout.sh apply
 
 ```bash
 sudo ./manage-dvswitch-mods.sh --check all
+```
+
+STFU activity can also be checked or installed by itself:
+
+```bash
+sudo ./manage-dvswitch-mods.sh --check dashboard-stfu-activity
+sudo ./manage-dvswitch-mods.sh --install dashboard-stfu-activity
+```
+
+The component can also be checked or installed directly, without the manager:
+
+```bash
+sudo ./mod-dashboard-stfu-activity.sh --check
+sudo ./mod-dashboard-stfu-activity.sh --install
 ```
 
 On a fresh DVSwitch installation, the first check normally reports early
