@@ -62,6 +62,7 @@ sudo ./manage-dvswitch-mods.sh --install dashboard-stfu-activity
 
 Then verify Gateway Activity receives STFU traffic, Local Activity records
 local STFU transmissions, the TRX Info card shows RX STFU, and the separate
-STFU BrandMeister card displays the BM talkgroup name. Repeat on pi5test and
+STFU BrandMeister card remains visible in other modes and shows the latest BM
+talkgroup name while STFU is active. Repeat on pi5test and
 node3040 after pi4test passes. Do not install on production node68425 until the
 test nodes pass and Jeff explicitly authorizes it.

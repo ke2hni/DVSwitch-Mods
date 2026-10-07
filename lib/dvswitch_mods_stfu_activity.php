@@ -1,7 +1,7 @@
 <?php
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Jeff Milne, KE2HNI
-// DVSwitch-Mods: STFU activity feed v1
+// DVSwitch-Mods: STFU activity feed v2
 
 /** Parse recent STFU ODMR traffic into DVSwitch's activity-row structure. */
 function dvsModsStfuActivityRows($paths = null)
@@ -71,13 +71,14 @@ function dvsModsStfuMergeActivity($rows, $paths = null)
 }
 
 /** Look up an STFU destination using the node's BrandMeister talkgroup list. */
-function dvsModsStfuTargetDisplay($rawTarget)
+function dvsModsStfuTargetDisplay($rawTarget, $listPath = null)
 {
     $target = trim((string)$rawTarget);
     if (!preg_match('/^TG\s+([0-9]+)$/iD', $target, $match)) { return $target; }
     $number = $match[1];
     $names = array();
-    foreach (array('/var/lib/mmdvm/TGList_BM.txt') as $path) {
+    if ($listPath === null) { $listPath = '/var/lib/mmdvm/TGList_BM.txt'; }
+    foreach ((array)$listPath as $path) {
         if (!is_readable($path)) { continue; }
         foreach ((array)file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
             if ($line === '' || $line[0] === '#') { continue; }
@@ -92,19 +93,17 @@ function dvsModsStfuTargetDisplay($rawTarget)
 }
 
 /** Render an STFU status card separately from the BM/TGIF DMR Master card. */
-function dvsModsStfuRenderCard($abinfo, $lastHeard)
+function dvsModsStfuRenderCard($abinfo, $lastHeard, $logPaths = null, $listPath = null)
 {
-    $mode = isset($abinfo['tlv']['ambe_mode']) ? strtoupper(trim((string)$abinfo['tlv']['ambe_mode'])) : '';
-    if ($mode !== 'STFU') { return; }
     $latest = null;
-    foreach ((array)$lastHeard as $row) {
+    foreach (dvsModsStfuActivityRows($logPaths) as $row) {
         if (isset($row[1], $row[5]) && $row[1] === 'STFU' && $row[5] === 'Net') { $latest = $row; break; }
     }
     echo "<br /><table>\n<tr><th colspan=\"2\">STFU BrandMeister</th></tr>\n";
     if (function_exists('isProcessRunning') && isProcessRunning('STFU')) {
         echo '<tr><td style="background:#ffffed;" colspan="2">';
-        if ($latest !== null && function_exists('dvsModsTargetDisplay')) {
-            $label = dvsModsStfuTargetDisplay($latest[4]);
+        if ($latest !== null) {
+            $label = dvsModsStfuTargetDisplay($latest[4], $listPath);
             echo htmlspecialchars($label, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         } else {
             echo 'Listening';

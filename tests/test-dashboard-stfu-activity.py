@@ -91,16 +91,28 @@ if shutil.which("php"):
     with tempfile.TemporaryDirectory() as directory:
         log_path = Path(directory) / "STFU.log"
         log_path.write_text(log, encoding="utf-8")
+        talkgroup_path = Path(directory) / "TGList_BM.txt"
+        talkgroup_path.write_text("3100;0;USA-BRIDGE;TG3100\n", encoding="utf-8")
         program = f'''<?php
+function isProcessRunning($name) {{ return true; }}
 require {str(HELPER)!r};
 $rows = dvsModsStfuActivityRows(array({str(log_path)!r}));
 echo json_encode($rows);
+$rowsJson = json_encode($rows);
+ob_start();
+dvsModsStfuRenderCard(array('tlv' => array('ambe_mode' => 'YSF')), array(), array({str(log_path)!r}), {str(talkgroup_path)!r});
+$card = ob_get_clean();
+echo "\\nCARD:".$card;
 '''
         result = subprocess.run(["php"], input=program, text=True, capture_output=True, check=True)
-        rows = json.loads(result.stdout)
+        rows_json, card_output = result.stdout.split("\nCARD:", 1)
+        rows = json.loads(rows_json)
         require(len(rows) == 2, "STFU parser did not produce both RX and TX events")
         require(rows[0][1] == "STFU" and rows[0][2] == "1234567" and rows[0][5] == "LNet" and rows[0][6] == "5.9", "local STFU TX record was parsed incorrectly")
         require(rows[1][1] == "STFU" and rows[1][2] == "3213930" and rows[1][4] == "TG 3100" and rows[1][5] == "Net" and rows[1][6] == "15.6", "network STFU RX record was parsed incorrectly")
+        require("STFU BrandMeister" in card_output, "STFU card disappeared when another mode was selected")
+        require("USA-BRIDGE (TG 3100)" in card_output and "Listening" not in card_output,
+                "STFU card did not show the friendly BM talkgroup from its own log")
 else:
     print("SKIP: STFU log parser runtime cases (php is unavailable in this workspace)")
 
@@ -110,6 +122,8 @@ require("--check" in installer_text and "--install" in installer_text and "--uni
 require("dashboard-stfu-activity" in manager_text.split("readonly -a COMPONENTS=(", 1)[1].split(")", 1)[0], "manager does not register STFU activity")
 require("dvswitch-mode-buttons" not in installer_text, "STFU activity component depends on the Mode Buttons repository")
 require("/var/log/dvswitch/STFU.log" in HELPER.read_text(), "STFU parser does not use the documented node log path")
+require("if ($mode !== 'STFU') { return; }" not in HELPER.read_text(), "STFU card is hidden outside STFU mode")
+require("foreach (dvsModsStfuActivityRows($logPaths) as $row)" in HELPER.read_text(), "STFU card does not read its own traffic log")
 dmr_source = DMR_PATCHER.read_text()
 dmr_helper = dmr_source.split("helper = r'''", 1)[1].split("'''", 1)[0]
 require("STFU" not in dmr_helper, "fresh DMR Master helper still handles STFU")

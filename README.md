@@ -116,6 +116,10 @@ sudo ./mod-dashboard-stfu-activity.sh --check
 sudo ./mod-dashboard-stfu-activity.sh --install
 ```
 
+The STFU BrandMeister status card remains visible in every mode. When the STFU
+process is active, it shows the most recent STFU network talkgroup using
+`TGList_BM.txt`; if no STFU traffic is available yet, it shows `Listening`.
+
 On a fresh DVSwitch installation, the first check normally reports early
 components as ready and later components as blocked by prerequisites. It checks
 everything, changes nothing, and prints the correct installation order.
