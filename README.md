@@ -124,7 +124,7 @@ shows `Listening`.
 
 The standard P25/NXDN card modification shows each friendly reflector name
 with its `(TG number)` on the line below. The standalone
-`dashboard-ysf-target-id` component adds the YSF host ID below its room name:
+`dashboard-ysf-target-id` component adds the YSF host TG number below its room name:
 
 ```bash
 sudo ./manage-dvswitch-mods.sh --check dashboard-ysf-target-id
@@ -245,9 +245,9 @@ sudo ./repair-ysf-dashboard-null.sh --check
 sudo ./repair-ysf-dashboard-null.sh --install
 ```
 
-### YSF reflector ID on the status card
+### YSF reflector TG number on the status card
 
-This independent component displays the YSF host ID below the room name in the
+This independent component displays the YSF host TG number below the room name in the
 YSF Net card. Install the YSF dashboard null repair first.
 
 ~~~

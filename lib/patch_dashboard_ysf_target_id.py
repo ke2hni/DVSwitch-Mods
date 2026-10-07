@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Show the YSF host ID below its friendly room name on the status card."""
+"""Show the YSF talkgroup number below its friendly room name on the status card."""
 
 from __future__ import annotations
 
@@ -18,6 +18,10 @@ ID_RENDER = '''            if ($ysfLinkedToId !== "" && $ysfLinkedToId !== "null
             }
 '''
 
+TG_RENDER = ID_RENDER.replace("(ID ", "(TG ")
+ID_LABEL = '(ID ".htmlspecialchars($ysfLinkedToId, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8").")</span>";'
+TG_LABEL = ID_LABEL.replace("(ID ", "(TG ")
+
 
 class PatchError(RuntimeError):
     pass
@@ -33,21 +37,26 @@ def once(text: str, old: str, new: str, label: str) -> str:
 def patch(text: str) -> str:
     if MARKER in text:
         if (text.count(MARKER) != 1 or text.count(ID_ASSIGNMENT) != 1
-                or text.count('htmlspecialchars($ysfLinkedToId, ENT_QUOTES') != 1
-                or text.count('(ID ".htmlspecialchars($ysfLinkedToId') != 1):
-            raise PatchError("partial or duplicate YSF card target-ID patch")
-        return text
+                or text.count('htmlspecialchars($ysfLinkedToId, ENT_QUOTES') != 1):
+            raise PatchError("partial or duplicate YSF card target-number patch")
+        old_label_count = text.count(ID_LABEL)
+        new_label_count = text.count(TG_LABEL)
+        if old_label_count == 1 and new_label_count == 0:
+            return once(text, ID_LABEL, TG_LABEL, "previous YSF (ID) label")
+        if old_label_count == 0 and new_label_count == 1:
+            return text
+        raise PatchError("partial, duplicate, or unsupported YSF card target-number label")
     if text.count(LINKED) != 1 or text.count(HOST_NAME) != 1 or text.count(OUTPUT) != 1:
-        raise PatchError("YSF dashboard target-ID anchors are missing or ambiguous; install YSF dashboard repair first")
+        raise PatchError("YSF dashboard target anchors are missing or ambiguous; install YSF dashboard repair first")
     text = once(text, LINKED, LINKED + "\n                $ysfLinkedToId = \"\";", "YSF linked-name initialization")
-    text = once(text, HOST_NAME, HOST_NAME + "\n" + ID_ASSIGNMENT, "YSF host ID capture")
+    text = once(text, HOST_NAME, HOST_NAME + "\n" + ID_ASSIGNMENT, "YSF host TG-number capture")
     output_pattern = re.compile(r"(?m)^([\t ]*)" + re.escape(OUTPUT) + r"$")
     output_matches = list(output_pattern.finditer(text))
     if len(output_matches) != 1:
-        raise PatchError(f"unsupported or ambiguous YSF target ID rendering: {len(output_matches)} matches")
+        raise PatchError(f"unsupported or ambiguous YSF target-number rendering: {len(output_matches)} matches")
     match = output_matches[0]
     indent = match.group(1)
-    rendered = "\n".join(indent + line if line else "" for line in ID_RENDER.rstrip("\n").split("\n"))
+    rendered = "\n".join(indent + line if line else "" for line in TG_RENDER.rstrip("\n").split("\n"))
     replacement = indent + MARKER + "\n" + rendered + "\n" + indent + OUTPUT
     text = text[:match.start()] + replacement + text[match.end():]
     return text

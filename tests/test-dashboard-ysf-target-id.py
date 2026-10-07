@@ -24,6 +24,12 @@ fixture = """<?php
 first = PATCHER.patch(fixture)
 assert PATCHER.patch(first) == first, "patcher is not idempotent"
 assert PATCHER.ID_ASSIGNMENT in first
-assert "(ID " in PATCHER.ID_RENDER
-assert "htmlspecialchars($ysfLinkedToId" in PATCHER.ID_RENDER
-print("PASS: YSF reflector ID is captured and rendered on a safe second line")
+assert "(TG " in PATCHER.TG_RENDER
+assert "(ID " not in PATCHER.TG_RENDER
+assert "htmlspecialchars($ysfLinkedToId" in PATCHER.TG_RENDER
+legacy = first.replace(PATCHER.TG_LABEL, PATCHER.ID_LABEL)
+assert "(ID " in legacy
+upgraded = PATCHER.patch(legacy)
+assert "(TG " in upgraded and "(ID " not in upgraded
+assert PATCHER.patch(upgraded) == upgraded, "upgraded YSF label is not idempotent"
+print("PASS: YSF target number is rendered as TG and previous ID label upgrades safely")
