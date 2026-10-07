@@ -1,78 +1,51 @@
 <?php
-// DVSwitch-Mods: dashboard activity network labels helper v3
+// DVSwitch-Mods: DMR network activity labels v1
 // SPDX-License-Identifier: MIT
 
-/** Return the latest mode transition at or before a UTC activity timestamp. */
-function dvsModsActivityTransitionAt($utcTimestamp, $historyFile)
+/** Convert a MMDVM_Bridge UTC timestamp (optionally with milliseconds) to epoch ms. */
+function dvsModsActivityTimestampMs($timestamp)
 {
-    $utcTimestamp = (string)$utcTimestamp;
-    $event = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $utcTimestamp, new DateTimeZone('UTC'));
-    if ($event === false || $event->format('Y-m-d H:i:s') !== $utcTimestamp) { return null; }
-    $eventAt = $event->getTimestamp();
-    if (!is_file($historyFile) || !is_readable($historyFile)) { return null; }
+    $timestamp = (string)$timestamp;
+    if (!preg_match('/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?$/D', $timestamp, $match)) { return null; }
+    $fraction = isset($match[2]) ? str_pad($match[2], 6, '0') : '000000';
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s.u', $match[1].'.'.$fraction, new DateTimeZone('UTC'));
+    if ($date === false) { return null; }
+    $errors = DateTimeImmutable::getLastErrors();
+    if (is_array($errors) && ($errors['warning_count'] !== 0 || $errors['error_count'] !== 0)) { return null; }
+    if ($date->format('Y-m-d H:i:s') !== $match[1]) { return null; }
+    return ((int)$date->format('U') * 1000) + intdiv((int)$date->format('u'), 1000);
+}
 
+/** Find the latest BM/TGIF selection at or before the activity event. */
+function dvsModsDmrNetworkAt($timestamp, $historyFile = null)
+{
+    if ($historyFile === null) {
+        $historyFile = getenv('DVS_DMR_NETWORK_HISTORY_FILE') ?: '/var/lib/dvswitch-mods/dmr-network-history.tsv';
+    }
+    $eventAt = dvsModsActivityTimestampMs($timestamp);
+    if ($eventAt === null || !is_file($historyFile) || !is_readable($historyFile)) { return null; }
     $active = null;
     $activeAt = null;
     $lines = @file($historyFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     if (!is_array($lines)) { return null; }
     foreach ($lines as $line) {
         $fields = explode("\t", $line, 2);
-        if (count($fields) !== 2 || !ctype_digit($fields[0])) { continue; }
-        $historyMode = strtoupper(trim($fields[1]));
-        if (!in_array($historyMode, array('BM', 'TGIF', 'STFU', 'YSF', 'P25', 'NXDN', 'DSTAR'), true)) { continue; }
+        if (count($fields) !== 2 || !ctype_digit($fields[0]) || !in_array($fields[1], array('BM', 'TGIF'), true)) { continue; }
         $transitionAt = (int)$fields[0];
         if ($transitionAt <= $eventAt && ($activeAt === null || $transitionAt >= $activeAt)) {
-            $active = array('at' => $transitionAt, 'mode' => $historyMode);
+            $active = $fields[1];
             $activeAt = $transitionAt;
         }
     }
     return $active;
 }
 
-/** Return only the mode for callers that do not need the transition time. */
-function dvsModsActivityModeAt($utcTimestamp, $historyFile)
-{
-    $transition = dvsModsActivityTransitionAt($utcTimestamp, $historyFile);
-    return $transition === null ? null : $transition['mode'];
-}
-
-/**
- * Preserve the mode label represented by each event timestamp. DMR network
- * names are substituted only for rows whose timestamp falls inside a DMR
- * network selection interval; all other modes and older unknown rows retain
- * their original dashboard label.
- */
-function dvsModsActivityModeLabel($mode, $utcTimestamp, $stateFile = null, $historyFile = null)
+/** Relabel received DMR activity only; preserve every other DVSwitch label. */
+function dvsModsActivityModeLabel($mode, $utcTimestamp, $source = 'Net', $historyFile = null)
 {
     $mode = (string)$mode;
-    if ($mode !== 'DMR' && !preg_match('/^DMR Slot [12]$/D', $mode)) { return $mode; }
-
-    if ($historyFile === null) {
-        $historyFile = '/var/lib/dvswitch-mods/activity-mode-history.tsv';
-    }
-    $event = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', (string)$utcTimestamp, new DateTimeZone('UTC'));
-    if ($event === false || $event->format('Y-m-d H:i:s') !== (string)$utcTimestamp) { return $mode; }
-    $eventAt = $event->getTimestamp();
-    $transition = dvsModsActivityTransitionAt($utcTimestamp, $historyFile);
-
-    // Use live state for the short interval before systemd records a recent
-    // button selection. A later boot-reconciliation entry in history takes
-    // precedence over stale current-mode state left from before reboot.
-    if ($stateFile === null) { $stateFile = '/var/lib/dvswitch-mode-buttons/current-mode'; }
-    if (is_file($stateFile) && is_readable($stateFile)) {
-        $selectedMode = strtoupper(trim((string)file_get_contents($stateFile)));
-        $selectedAt = @filemtime($stateFile);
-        if ($selectedAt !== false && $eventAt >= $selectedAt) {
-            if ($transition !== null && $transition['at'] > $selectedAt) {
-                return in_array($transition['mode'], array('BM', 'TGIF', 'STFU'), true) ? $transition['mode'] : $mode;
-            }
-            return in_array($selectedMode, array('BM', 'TGIF', 'STFU'), true) ? $selectedMode : $mode;
-        }
-    }
-
-    $modeAtEvent = $transition === null ? null : $transition['mode'];
-    if (in_array($modeAtEvent, array('BM', 'TGIF', 'STFU'), true)) { return $modeAtEvent; }
-
-    return $mode;
+    if (!in_array($mode, array('DMR', 'DMR Slot 1', 'DMR Slot 2'), true) || $source !== 'Net') { return $mode; }
+    $network = dvsModsDmrNetworkAt($utcTimestamp, $historyFile);
+    return $network === null ? $mode : $network;
 }
 ?>

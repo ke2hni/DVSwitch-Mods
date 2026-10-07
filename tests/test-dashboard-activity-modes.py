@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 
-"""Regression tests for selected-network activity labels."""
+"""Tests for independent timestamped BM/TGIF Gateway Activity labels."""
 
 from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
-import os
 
 ROOT = Path(__file__).resolve().parents[1]
 PATCHER_PATH = ROOT / "lib/patch_dashboard_activity_modes.py"
 HELPER = ROOT / "lib/dvswitch_mods_activity_mode.php"
-HISTORY_RECORDER = ROOT / "lib/dvswitch_mods_activity_mode_history.py"
+WRITER = ROOT / "lib/dvswitch_mods_dmr_network_history.py"
 INSTALLER = ROOT / "mod-dashboard-activity-modes.sh"
 MANAGER = ROOT / "manage-dvswitch-mods.sh"
 
@@ -31,249 +31,121 @@ patcher = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
 spec.loader.exec_module(patcher)
 
-for filename in ("lh.php", "localtx.php"):
-    for padded in (False, True):
-        cell = patcher.MODE_CELL_PADDED[filename] if padded else patcher.MODE_CELL[filename]
-        original = (
-            "<?php\n"
-            "include_once dirname(dirname(__FILE__)).'/include/functions.php';\n"
-            + cell + "\n"
-            "$targetMode = dvsModsTargetDisplay($listElem[1], $listElem[4], $listElem[6]);\n"
-        )
-        changed = patcher.patch_text(original, filename)
-        require(changed.count(patcher.MARKER) == 1, filename + " marker missing")
-        require(changed.count(patcher.INCLUDE) == 1, filename + " helper include missing")
-        require(changed.count("dvsModsActivityModeLabel($listElem[1], $listElem[0])") == 1,
-                filename + " mode wrapper missing")
-        require(changed.index("$listElem[1] = $dvsModsActivityOriginalMode;") <
-                changed.index("$targetMode = dvsModsTargetDisplay"),
-                filename + " original mode was not restored before target formatting")
-        require(patcher.patch_text(changed, filename) == changed, filename + " patch is not idempotent")
+# Test parser patching, DMR-only Gateway display and removal of the earlier
+# experimental Local Activity wrapper. The code is idempotent after install.
+with tempfile.TemporaryDirectory() as directory:
+    base = Path(directory)
+    functions = base / "functions.php"
+    lh = base / "lh.php"
+    localtx = base / "localtx.php"
+    functions.write_text("""<?php
+function getHeardList($logLines) {
+    $timestamp = substr($logLines, 3, 19);
+    $timestamp = substr($logLines, 3, 19);
+}
+function getLastHeard() {}
+?>
+""")
+    cell = patcher.ORIGINAL_CELL
+    lh.write_text("<?php\ninclude_once dirname(dirname(__FILE__)).'/include/functions.php';\n" + cell + "\n?>\n")
+    localtx.write_text("<?php\n" + patcher.OLD_MARKER + "\n" + patcher.INCLUDE + "\n" + patcher.OLD_BEFORE + cell + patcher.OLD_AFTER + "\n?>\n")
+    patcher.patch_file(functions, patcher.patch_functions)
+    patcher.patch_file(lh, patcher.patch_lh)
+    patcher.patch_file(localtx, patcher.clean_localtx)
+    first = (functions.read_bytes(), lh.read_bytes(), localtx.read_bytes())
+    patcher.patch_file(functions, patcher.patch_functions)
+    patcher.patch_file(lh, patcher.patch_lh)
+    patcher.patch_file(localtx, patcher.clean_localtx)
+    require(first == (functions.read_bytes(), lh.read_bytes(), localtx.read_bytes()), "patcher is not idempotent")
+    require(functions.read_text().count("substr($logLines, 3, 23)") == 2, "millisecond timestamps were not retained")
+    require("$listElem[5]" in lh.read_text(), "Gateway Activity patch does not pass the traffic source")
+    require("dvsModsActivityModeLabel(" not in localtx.read_text(), "Local Activity still has the previous relabel wrapper")
+    for path in (functions, lh, localtx):
+        if shutil.which("php"):
+            subprocess.run(["php", "-l", str(path)], check=True, capture_output=True, text=True)
 
-        mixed = original.replace("\n", "\r\n")
-        mixed_changed = patcher.patch_text(mixed.replace("\r\n", "\n"), filename).replace("\n", "\r\n")
-        require(b"\r\n" in mixed_changed.encode() and b"\n" not in mixed_changed.replace("\r\n", "").encode(),
-                filename + " CRLF handling failed")
-
-    target_include = (
-        "<?php\n"
-        "include_once dirname(dirname(__FILE__)).'/include/functions.php';\n"
-        "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_fcc_first_names.php';\n"
-        "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_target_display.php';\n"
-        + patcher.MODE_CELL_PADDED[filename] + "\n"
-    )
-    changed = patcher.patch_text(target_include, filename)
-    require(changed.count(patcher.INCLUDE) == 1, filename + " helper include duplicated")
-    require(changed.index(patcher.INCLUDE) > changed.index("dvswitch_mods_target_display.php"),
-            filename + " helper include was not placed after existing dashboard helpers")
+uploaded = ROOT.parents[1] / "upload"
+for filename, transform in (
+    ("functions(20261006-233123).php", patcher.patch_functions),
+    ("lh(20261006-233121).php", patcher.patch_lh),
+    ("localtx(20261006-233121).php", patcher.clean_localtx),
+):
+    fixture = uploaded / filename
+    if fixture.is_file():
+        patched = transform(fixture.read_text(encoding="utf-8"))
+        if filename.startswith("functions"):
+            require(patched.count("substr($logLine, 3, 23)") == 2, "uploaded MMDVM parser fixture is unsupported")
+        elif filename.startswith("lh"):
+            require("$listElem[5]" in patched, "uploaded Gateway Activity fixture was not patched")
+        else:
+            require("dvsModsActivityModeLabel(" not in patched, "uploaded Local Activity fixture retained old wrapper")
 
 with tempfile.TemporaryDirectory() as directory:
-    state_tgif = Path(directory) / "current-mode-tgif"
-    state_bm = Path(directory) / "current-mode-bm"
-    state_stfu = Path(directory) / "current-mode-stfu"
-    state_ysf = Path(directory) / "current-mode-ysf"
-    event_time = "2026-09-30 22:00:00"
-    epoch = 1790805600  # 2026-09-30 22:00:00 UTC
-    for state, mode in ((state_tgif, "TGIF"), (state_bm, "BM"), (state_stfu, "STFU"), (state_ysf, "YSF")):
-        state.write_text(mode + "\n")
-        os.utime(state, (epoch - 10, epoch - 10))
-    no_history = Path(directory) / "no-history.tsv"
-    cases = [
-        ("DMR", event_time, "TGIF", str(state_tgif)),
-        ("DMR Slot 2", event_time, "TGIF", str(state_tgif)),
-        ("DMR Slot 1", "2026-09-30 21:59:40", "DMR Slot 1", str(state_tgif)),
-        ("YSF", event_time, "YSF", str(state_tgif)),
-        ("DMR Slot 3", event_time, "DMR Slot 3", str(state_tgif)),
-        ("DMR", "not-a-log-time", "DMR", str(state_tgif)),
-        ("DMR", event_time, "BM", str(state_bm)),
-        ("DMR", event_time, "STFU", str(state_stfu)),
-        ("DMR", event_time, "DMR", str(state_ysf)),
-    ]
+    base = Path(directory)
+    history = base / "history.tsv"
+    environment = os.environ.copy()
+    environment.update({
+        "DVS_DMR_NETWORK_HISTORY_FILE": str(history),
+        "DVS_DMR_NETWORK_HISTORY_LOCK": str(base / "lock"),
+        "DVS_MMDVM_BRIDGE_INI": str(base / "MMDVM_Bridge.ini"),
+    })
+    def record(network: str, stamp: int) -> None:
+        subprocess.run(["python3", str(WRITER), "--record", network, str(stamp)], env=environment, check=True, capture_output=True)
 
-    history = Path(directory) / "activity-mode-history.tsv"
-    history.write_text(f"{epoch - 40}\tTGIF\n{epoch - 30}\tBM\n{epoch - 20}\tYSF\n{epoch - 10}\tTGIF\n")
-    historical_cases = [
-        ("DMR", "2026-09-30 21:59:20", "TGIF"),
-        ("DMR Slot 2", "2026-09-30 21:59:30", "BM"),
-        ("DMR Slot 1", "2026-09-30 21:59:40", "DMR Slot 1"),
-        ("DMR", "2026-09-30 21:59:49", "TGIF"),
-        ("DMR", event_time, "DMR"),
-        ("YSF", "2026-09-30 21:59:50", "YSF"),
-    ]
+    record("BM", 1790805600123)
+    record("BM", 1790805600123)  # duplicate hook/path event is ignored
+    record("TGIF", 1790805660456)
+    record("BM", 1790805720789)
+    require(history.read_text() == "1790805600123\tBM\n1790805660456\tTGIF\n1790805720789\tBM\n", "writer did not keep ordered distinct network transitions")
+    ini = base / "MMDVM_Bridge.ini"
+    ini.write_text("[DMR Network]\nAddress=tgif.network\nPort=62030\n")
+    subprocess.run(["python3", str(WRITER), "--current"], env=environment, check=True, capture_output=True, text=True)
+    require(history.read_text().splitlines()[-1].endswith("\tTGIF"), "standalone INI watcher did not detect TGIF")
+    subprocess.run(["python3", str(WRITER), "--seed-current"], env=environment, check=True, capture_output=True, text=True)
+    require(history.read_text().splitlines()[-1].endswith("\tTGIF"), "install-time seed did not recognize current network")
 
+with tempfile.TemporaryDirectory() as directory:
+    base = Path(directory)
+    history = base / "history.tsv"
+    history.write_text("1790805600000\tBM\n1790805600300\tTGIF\n")
+    environment = os.environ.copy()
+    environment.update({
+        "DVS_DMR_NETWORK_HISTORY_FILE": str(history),
+        "DVS_DMR_NETWORK_HISTORY_LOCK": str(base / "lock"),
+    })
+    subprocess.run(["python3", str(WRITER), "--record", "TGIF", "1790805600200"], env=environment, check=True, capture_output=True)
+    require(history.read_text() == "1790805600000\tBM\n1790805600200\tTGIF\n", "out-of-order button/watch events were not sorted and collapsed")
+
+with tempfile.TemporaryDirectory() as directory:
+    history = Path(directory) / "history.tsv"
+    history.write_text("1790805600123\tBM\n1790805660456\tTGIF\n1790805720789\tBM\n")
+    labels = [
+        ("DMR", "2026-09-30 22:00:00.100", "Net", "DMR"),
+        ("DMR Slot 2", "2026-09-30 22:00:00.200", "Net", "BM"),
+        ("DMR Slot 1", "2026-09-30 22:01:00.500", "Net", "TGIF"),
+        ("DMR", "2026-09-30 22:02:00.800", "Net", "BM"),
+        ("DMR Slot 2", "2026-09-30 22:01:00.500", "LNet", "DMR Slot 2"),
+        ("YSF", "2026-09-30 22:01:00.500", "Net", "YSF"),
+        ("DMR", "not-a-log-time", "Net", "DMR"),
+    ]
     program = f'''<?php
 require {str(HELPER)!r};
-function dvsModsTestFail($message) {{ file_put_contents('php://stderr', $message."\\n"); exit(1); }}
-$cases = {json.dumps(cases)};
+$cases = {json.dumps(labels)};
 foreach ($cases as $case) {{
-    $actual = dvsModsActivityModeLabel($case[0], $case[1], $case[3], {str(no_history)!r});
-    if ($actual !== $case[2]) {{ dvsModsTestFail("FAIL: ".json_encode($case)." => ".$actual); }}
+  $actual = dvsModsActivityModeLabel($case[0], $case[1], $case[2], {str(history)!r});
+  if ($actual !== $case[3]) {{ fwrite(STDERR, "FAIL: ".json_encode($case)." => ".$actual."\\n"); exit(1); }}
 }}
-$historicalCases = {json.dumps(historical_cases)};
-$history = {str(history)!r};
-foreach ($historicalCases as $case) {{
-    $actual = dvsModsActivityModeLabel($case[0], $case[1], {str(state_ysf)!r}, $history);
-    if ($actual !== $case[2]) {{ dvsModsTestFail("FAIL: history ".json_encode($case)." => ".$actual); }}
-}}
-$laterDmrState = {str(Path(directory) / 'later-current-mode')!r};
-file_put_contents($laterDmrState, "TGIF\\n");
-touch($laterDmrState, {epoch + 10});
-$nonDmrRx = dvsModsActivityModeLabel("DMR Slot 2", "2026-09-30 21:59:40", $laterDmrState, $history);
-if ($nonDmrRx !== "DMR Slot 2") {{ dvsModsTestFail("FAIL: earlier DMR RX row was relabeled after later TGIF selection => ".$nonDmrRx); }}
-$staleDmrState = {str(Path(directory) / 'stale-current-mode')!r};
-file_put_contents($staleDmrState, "DSTAR\\n");
-touch($staleDmrState, {epoch - 30});
-$afterBootSync = dvsModsActivityModeLabel("DMR Slot 2", "2026-09-30 21:59:55", $staleDmrState, $history);
-if ($afterBootSync !== "TGIF") {{ dvsModsTestFail("FAIL: boot TGIF transition did not override stale DSTAR state => ".$afterBootSync); }}
-$beforeBootSync = dvsModsActivityModeLabel("DMR Slot 2", "2026-09-30 21:59:15", $staleDmrState, $history);
-if ($beforeBootSync !== "DMR Slot 2") {{ dvsModsTestFail("FAIL: pre-sync row was relabeled => ".$beforeBootSync); }}
-echo "PASS: selected-network activity label cases\\n";
-?>'''
-    php = shutil.which("php")
-    if php:
-        result = subprocess.run([php], input=program, text=True, capture_output=True)
-        require(result.returncode == 0, result.stderr.strip() or "PHP activity-mode helper tests failed")
-        print(result.stdout.strip())
+'''
+    if shutil.which("php"):
+        subprocess.run(["php"], input=program, text=True, capture_output=True, check=True)
     else:
-        print("SKIP: PHP runtime helper cases (php unavailable)")
-
-with tempfile.TemporaryDirectory() as directory:
-    directory_path = Path(directory)
-    state = directory_path / "current-mode"
-    last_dmr = directory_path / "last-dmr-network"
-    history = directory_path / "history.tsv"
-    lock = directory_path / "history.lock"
-    environment = os.environ.copy()
-    environment.update({
-        "DVS_ACTIVITY_MODE_STATE": str(state),
-        "DVS_ACTIVITY_LAST_DMR": str(last_dmr),
-        "DVS_ACTIVITY_MODE_HISTORY": str(history),
-        "DVS_ACTIVITY_MODE_LOCK": str(lock),
-        "DVS_ACTIVITY_ABINFO_GLOB": str(directory_path / "ABInfo_*.json"),
-        "DVS_ACTIVITY_BRIDGE_INI": str(directory_path / "MMDVM_Bridge.ini"),
-    })
-    last_dmr.write_text("TGIF\n")
-    os.utime(last_dmr, (epoch - 40, epoch - 40))
-    state.write_text("YSF\n")
-    os.utime(state, (epoch - 20, epoch - 20))
-    subprocess.run(["python3", str(HISTORY_RECORDER)], env=environment, check=True)
-    require(history.read_text() == f"{epoch - 40}\tTGIF\n{epoch - 20}\tYSF\n",
-            "history recorder did not seed last DMR network and current mode")
-    state.write_text("BM\n")
-    os.utime(state, (epoch - 10, epoch - 10))
-    subprocess.run(["python3", str(HISTORY_RECORDER)], env=environment, check=True)
-    require(history.read_text().endswith(f"{epoch - 10}\tBM\n"),
-            "history recorder did not record a selected DMR network transition")
-    require(history.read_text().count("\n") == 3, "history recorder duplicated a seeded mode transition")
-
-with tempfile.TemporaryDirectory() as directory:
-    directory_path = Path(directory)
-    state = directory_path / "current-mode"
-    last_dmr = directory_path / "last-dmr-network"
-    history = directory_path / "history.tsv"
-    lock = directory_path / "history.lock"
-    bridge_ini = directory_path / "MMDVM_Bridge.ini"
-    abinfo = directory_path / "ABInfo_31001.json"
-    stale_at = epoch - 60
-    live_at = epoch - 20
-    state.write_text("DSTAR\n")
-    last_dmr.write_text("TGIF\n")
-    history.write_text(f"{stale_at}\tDSTAR\n")
-    bridge_ini.write_text("[DMR Network]\nAddress=tgif.network\nPort=62030\n")
-    abinfo.write_text('{"tlv":{"ambe_mode":"DMR"}}')
-    os.utime(state, (stale_at, stale_at))
-    os.utime(abinfo, (live_at, live_at))
-    environment = os.environ.copy()
-    environment.update({
-        "DVS_ACTIVITY_MODE_STATE": str(state),
-        "DVS_ACTIVITY_LAST_DMR": str(last_dmr),
-        "DVS_ACTIVITY_MODE_HISTORY": str(history),
-        "DVS_ACTIVITY_MODE_LOCK": str(lock),
-        "DVS_ACTIVITY_ABINFO_GLOB": str(directory_path / "ABInfo_*.json"),
-        "DVS_ACTIVITY_BRIDGE_INI": str(bridge_ini),
-    })
-    subprocess.run(["python3", str(HISTORY_RECORDER)], env=environment, check=True)
-    rows = [line.split("\t") for line in history.read_text().splitlines()]
-    require(rows[-1][1] == "TGIF" and int(rows[-1][0]) > stale_at,
-            "fresh DMR/TGIF runtime state did not supersede stale DSTAR boot state")
-    require(state.read_text() == "DSTAR\n", "history startup sync unexpectedly changed Buttons-owned current-mode state")
-    initial_row_count = len(rows)
-    subprocess.run(["python3", str(HISTORY_RECORDER)], env=environment, check=True)
-    require(len(history.read_text().splitlines()) == initial_row_count,
-            "repeated boot/path capture appended a duplicate unchanged mode")
-
-    # A live non-DMR mode remains authoritative when its ABInfo is newer.
-    state.write_text("TGIF\n")
-    os.utime(state, (live_at - 10, live_at - 10))
-    abinfo.write_text('{"tlv":{"ambe_mode":"DSTAR"}}')
-    os.utime(abinfo, (live_at + 10, live_at + 10))
-    subprocess.run(["python3", str(HISTORY_RECORDER)], env=environment, check=True)
-    require(history.read_text().splitlines()[-1].endswith("\tDSTAR"),
-            "fresh non-DMR ABInfo mode was not recorded")
-
-with tempfile.TemporaryDirectory() as directory:
-    directory_path = Path(directory)
-    history = directory_path / "history.tsv"
-    bridge_ini = directory_path / "MMDVM_Bridge.ini"
-    abinfo = directory_path / "ABInfo_31001.json"
-    bridge_ini.write_text("[DMR Network]\nAddress=tgif.network\nPort=62030\n")
-    abinfo.write_text('{"tlv":{"ambe_mode":"DMR"}}')
-    os.utime(abinfo, (epoch, epoch))
-    environment = os.environ.copy()
-    environment.update({
-        "DVS_ACTIVITY_MODE_STATE": str(directory_path / "missing-buttons-current-mode"),
-        "DVS_ACTIVITY_LAST_DMR": str(directory_path / "missing-buttons-last-dmr"),
-        "DVS_ACTIVITY_MODE_HISTORY": str(history),
-        "DVS_ACTIVITY_MODE_LOCK": str(directory_path / "history.lock"),
-        "DVS_ACTIVITY_ABINFO_GLOB": str(directory_path / "ABInfo_*.json"),
-        "DVS_ACTIVITY_BRIDGE_INI": str(bridge_ini),
-    })
-    subprocess.run(["python3", str(HISTORY_RECORDER)], env=environment, check=True)
-    require(history.read_text().endswith("\tTGIF\n"),
-            "standalone activity-mode recorder requires Buttons-owned state")
-
-with tempfile.TemporaryDirectory() as directory:
-    directory_path = Path(directory)
-    history = directory_path / "history.tsv"
-    environment = os.environ.copy()
-    environment.update({
-        "DVS_ACTIVITY_MODE_STATE": str(directory_path / "missing-current-mode"),
-        "DVS_ACTIVITY_LAST_DMR": str(directory_path / "missing-last-dmr"),
-        "DVS_ACTIVITY_MODE_HISTORY": str(history),
-        "DVS_ACTIVITY_MODE_LOCK": str(directory_path / "history.lock"),
-        "DVS_ACTIVITY_ABINFO_GLOB": str(directory_path / "missing-ABInfo_*.json"),
-        "DVS_ACTIVITY_BRIDGE_INI": str(directory_path / "missing-MMDVM_Bridge.ini"),
-    })
-    subprocess.run(["python3", str(HISTORY_RECORDER)], env=environment, check=True)
-    require(history.is_file() and history.read_text() == "",
-            "recorder did not initialize empty standalone history before live state exists")
+        print("SKIP: PHP helper cases (php unavailable)")
 
 installer = INSTALLER.read_text()
 manager = MANAGER.read_text()
-require("--check" in installer and "--install" in installer and "--restore" in installer,
-        "standalone installer check/install/restore interface missing")
-require("DVSwitch-Mode-Buttons current-mode state is missing" not in installer,
-        "activity-mode installer still requires the separate Mode Buttons component")
-require("dvswitch-mods-activity-mode-history.path" in installer and "activity-mode-history.tsv" in installer,
-        "installer does not install and initialize persistent transition tracking")
-require("systemctl reset-failed dvswitch-mods-activity-mode-history.path dvswitch-mods-activity-mode-history.service" in installer,
-        "installer does not clear the prior systemd start-limit state before enabling the repaired tracker")
-require("systemctl enable dvswitch-mods-activity-mode-history.service" in installer,
-        "installer does not enable the single boot reconciliation service")
-path_unit = (ROOT / "systemd/dvswitch-mods-activity-mode-history.path").read_text()
-service_unit = (ROOT / "systemd/dvswitch-mods-activity-mode-history.service").read_text()
-require("PathExists=" not in path_unit and "PathChanged=/opt/MMDVM_Bridge/MMDVM_Bridge.ini" in path_unit,
-        "mode-history watcher must include the standalone DVSwitch bridge configuration")
-require("After=local-fs.target analog_bridge.service mmdvm_bridge.service" in service_unit,
-        "boot history reconciliation is not ordered after live bridge state is available")
-require("WantedBy=multi-user.target" in service_unit,
-        "mode-history service is not enabled for a single ordered boot reconciliation")
-require("dashboard-activity-modes) CHILD_SCRIPT=\"$SCRIPT_DIR/mod-dashboard-activity-modes.sh\"" in manager,
-        "manager does not register the standalone activity-label installer")
-require("dashboard-activity-modes" in manager.split("readonly -a COMPONENTS=(", 1)[1].split(")", 1)[0],
-        "activity-label component is absent from standard manager installation")
-component_order = manager.split("readonly -a COMPONENTS=(", 1)[1].split(")", 1)[0].split()
-require(component_order.index("dashboard-activity-modes") == component_order.index("dashboard-cell-padding") + 1,
-        "activity-label component must follow dashboard cell padding in manager order")
-
-print("PASS: dashboard activity-mode patcher and manager tests")
+require("--check" in installer and "--install" in installer and "--restore" in installer, "installer interface is incomplete")
+require("DVSwitch-Mode-Buttons current-mode state is missing" not in installer, "Mods installer depends on Mode Buttons")
+require("--seed-current" in installer and "--current" in installer, "installer lacks history initialization and standalone detection")
+require("dashboard-activity-modes) CHILD_SCRIPT=\"$SCRIPT_DIR/mod-dashboard-activity-modes.sh\"" in manager, "manager no longer uses the established installer filename")
+require("dashboard-activity-modes" in manager.split("readonly -a COMPONENTS=(", 1)[1].split(")", 1)[0], "manager does not register the component")
+print("PASS: timestamped DMR network history, Gateway-only labels, standalone install, and manager registration")

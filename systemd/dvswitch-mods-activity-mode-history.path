@@ -1,11 +1,7 @@
 [Unit]
-Description=Watch DVSwitch mode state for dashboard activity history
+Description=Watch MMDVM_Bridge DMR network selection for Gateway Activity labels
 
 [Path]
-# Buttons selections provide an immediate event when that optional component
-# is installed. The bridge configuration watch keeps this component useful on
-# standalone DVSwitch installations too.
-PathChanged=/var/lib/dvswitch-mode-buttons/current-mode
 PathChanged=/opt/MMDVM_Bridge/MMDVM_Bridge.ini
 Unit=dvswitch-mods-activity-mode-history.service
 
