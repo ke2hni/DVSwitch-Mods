@@ -131,7 +131,7 @@ require {str(HELPER)!r};
 dvsModsStfuRenderCard(array('tlv' => array('ambe_mode' => 'STFU'), 'last_tune' => '93'), array(), array({str(log_path)!r}), {str(talkgroup_path)!r}, {str(state_path)!r});
 '''
         tuned_result = subprocess.run(["php"], input=tuned_program, text=True, capture_output=True, check=True)
-        require("NORTH AMERICA</span><br/><span" in tuned_result.stdout and "(TG 93)" in tuned_result.stdout,
+        require("NORTH-AMERICA</span><br/><span" in tuned_result.stdout and "(TG 93)" in tuned_result.stdout,
                 "selected STFU live target did not override its prior STFU log target")
         state_path.write_text("TGIF\n", encoding="utf-8")
         fallback_program = f'''<?php
