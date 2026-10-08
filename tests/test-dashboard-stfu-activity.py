@@ -93,6 +93,8 @@ if shutil.which("php"):
     with tempfile.TemporaryDirectory() as directory:
         log_path = Path(directory) / "STFU.log"
         log_path.write_text(log, encoding="utf-8")
+        empty_log_path = Path(directory) / "STFU-empty.log"
+        empty_log_path.write_text("", encoding="utf-8")
         talkgroup_path = Path(directory) / "TGList_BM.txt"
         talkgroup_path.write_text("3100;0;USA-BRIDGE;TG3100\n93;0;NORTH_AMERICA;TG93\n", encoding="utf-8")
         program = f'''<?php
@@ -127,6 +129,16 @@ dvsModsStfuRenderCard(array('tlv' => array('ambe_mode' => 'STFU'), 'last_tune' =
         tuned_result = subprocess.run(["php"], input=tuned_program, text=True, capture_output=True, check=True)
         require("NORTH AMERICA</span><br/><span" in tuned_result.stdout and "(TG 93)" in tuned_result.stdout,
                 "STFU card did not show the currently tuned friendly target")
+        saved_target_path = Path(directory) / "stfu-target"
+        saved_target_path.write_text("93\n", encoding="utf-8")
+        saved_program = f'''<?php
+function isProcessRunning($name) {{ return true; }}
+require {str(HELPER)!r};
+dvsModsStfuRenderCard(array('tlv' => array('ambe_mode' => 'DMR')), array(), array({str(empty_log_path)!r}), {str(talkgroup_path)!r}, {str(saved_target_path)!r});
+'''
+        saved_result = subprocess.run(["php"], input=saved_program, text=True, capture_output=True, check=True)
+        require("NORTH AMERICA</span><br/><span" in saved_result.stdout and "(TG 93)" in saved_result.stdout,
+                "STFU card did not show its saved target after reboot when another mode is active")
 else:
     print("SKIP: STFU log parser runtime cases (php is unavailable in this workspace)")
 
@@ -139,6 +151,7 @@ require("/var/log/dvswitch/STFU.log" in HELPER.read_text(), "STFU parser does no
 require("null, '---', '---'" in HELPER.read_text(), "STFU rows do not use the standard unavailable Loss/BER markers")
 require("STFU Net</th>" in HELPER.read_text(), "STFU Net card label was regressed")
 require("$liveMode === 'STFU'" in HELPER.read_text() and "$abinfo['last_tune']" in HELPER.read_text(), "STFU card does not retain the live selected target")
+require("/var/lib/dvswitch-mode-buttons/stfu-target" in HELPER.read_text(), "STFU card does not read the optional saved-target snapshot")
 require("if ($mode !== 'STFU') { return; }" not in HELPER.read_text(), "STFU card is hidden outside STFU mode")
 dmr_source = DMR_PATCHER.read_text()
 dmr_helper = dmr_source.split("helper = r'''", 1)[1].split("'''", 1)[0]

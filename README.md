@@ -35,8 +35,11 @@ DVSwitch-Mods provides two types of changes:
   activity targets. The separate STFU activity component reads STFU's own log
   and adds its RX/TX events to the Gateway Activity, Local Activity, and TRX
   views. STFU is displayed on its own status card rather than the DMR Master
-  card. STFU rows use `---` in Loss and BER, matching the dashboard's standard
-  marker for modes whose event source does not provide those measurements.
+  card. When Mode Buttons is installed, the STFU card can show its saved target
+  after reboot while another mode is selected; log-derived activity remains the
+  fallback on standalone Mods nodes. STFU rows use `---` in Loss and BER,
+  matching the dashboard's standard marker for modes whose event source does
+  not provide those measurements.
 
 Standard component installers check compatibility before changing anything,
 create protected backups, install atomically, validate the result, and roll
