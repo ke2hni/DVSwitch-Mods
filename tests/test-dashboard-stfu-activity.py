@@ -121,24 +121,17 @@ echo "\\nCARD:".$card;
         require("USA-BRIDGE</span><br/><span" in card_output and "(TG 3100)" in card_output,
                 "STFU card did not put the talkgroup number on a separate line")
         require("Listening</span>" not in card_output, "STFU card showed Listening despite a logged target")
-        tuned_program = f'''<?php
-function isProcessRunning($name) {{ return true; }}
-require {str(HELPER)!r};
-dvsModsStfuRenderCard(array('tlv' => array('ambe_mode' => 'STFU'), 'last_tune' => '93'), array(), array({str(log_path)!r}), {str(talkgroup_path)!r});
-'''
-        tuned_result = subprocess.run(["php"], input=tuned_program, text=True, capture_output=True, check=True)
-        require("NORTH AMERICA</span><br/><span" in tuned_result.stdout and "(TG 93)" in tuned_result.stdout,
-                "STFU card did not show the currently tuned friendly target")
         saved_target_path = Path(directory) / "stfu-target"
         saved_target_path.write_text("93\n", encoding="utf-8")
         saved_program = f'''<?php
 function isProcessRunning($name) {{ return true; }}
 require {str(HELPER)!r};
-dvsModsStfuRenderCard(array('tlv' => array('ambe_mode' => 'DMR')), array(), array({str(empty_log_path)!r}), {str(talkgroup_path)!r}, {str(saved_target_path)!r});
+dvsModsStfuRenderCard(array('tlv' => array('ambe_mode' => 'STFU'), 'last_tune' => '3100'), array(), array({str(log_path)!r}), {str(talkgroup_path)!r}, {str(saved_target_path)!r});
 '''
         saved_result = subprocess.run(["php"], input=saved_program, text=True, capture_output=True, check=True)
         require("NORTH AMERICA</span><br/><span" in saved_result.stdout and "(TG 93)" in saved_result.stdout,
-                "STFU card did not show its saved target after reboot when another mode is active")
+                "shared ABInfo last_tune or DMR log target overrode the independently saved STFU target")
+        require("TG 3100" not in saved_result.stdout, "DMR talkgroup leaked into the STFU card")
         startup_ini_path = Path(directory) / "DVSwitch.ini"
         startup_ini_path.write_text(
             "[DMR]\nStartTG = 7000\n[STFU] ; BrandMeister\nStartTG = 3166 ; boot target\n[OTHER]\nStartTG = 8000\n",
@@ -149,11 +142,13 @@ dvsModsStfuRenderCard(array('tlv' => array('ambe_mode' => 'DMR')), array(), arra
         startup_program = f'''<?php
 function isProcessRunning($name) {{ return true; }}
 require {str(HELPER)!r};
-dvsModsStfuRenderCard(array('tlv' => array('ambe_mode' => 'DMR')), array(), array({str(empty_log_path)!r}), {str(talkgroup_path)!r}, {str(empty_saved_target_path)!r}, {str(startup_ini_path)!r});
+dvsModsStfuRenderCard(array('tlv' => array('ambe_mode' => 'STFU'), 'last_tune' => '51598'), array(), array({str(log_path)!r}), {str(talkgroup_path)!r}, {str(empty_saved_target_path)!r}, {str(startup_ini_path)!r});
 '''
         startup_result = subprocess.run(["php"], input=startup_program, text=True, capture_output=True, check=True)
         require("TG 3166" in startup_result.stdout and "Listening" not in startup_result.stdout,
                 "STFU card did not parse StartTG under a commented [STFU] section header")
+        require("TG 3100" not in startup_result.stdout,
+                "an older STFU log or shared ABInfo last_tune overrode the configured startup target")
 else:
     print("SKIP: STFU log parser runtime cases (php is unavailable in this workspace)")
 
@@ -165,10 +160,10 @@ require("dvswitch-mode-buttons" not in installer_text, "STFU activity component 
 require("/var/log/dvswitch/STFU.log" in HELPER.read_text(), "STFU parser does not use the documented node log path")
 require("null, '---', '---'" in HELPER.read_text(), "STFU rows do not use the standard unavailable Loss/BER markers")
 require("STFU Net</th>" in HELPER.read_text(), "STFU Net card label was regressed")
-require("$liveMode === 'STFU'" in HELPER.read_text() and "$abinfo['last_tune']" in HELPER.read_text(), "STFU card does not retain the live selected target")
+require("$abinfo['last_tune']" not in HELPER.read_text(), "STFU card incorrectly uses the shared live target field")
 require("/var/lib/dvswitch-mode-buttons/stfu-target" in HELPER.read_text(), "STFU card does not read the optional saved-target snapshot")
-require("STFU activity feed v6" in HELPER.read_text(), "repo-root STFU helper is not the intended v6 helper")
-require("STFU activity feed v[123456]" in installer_text, "installer does not accept the v6 helper during upgrade")
+require("STFU activity feed v7" in HELPER.read_text(), "repo-root STFU helper is not the intended v7 helper")
+require("STFU activity feed v[1234567]" in installer_text, "installer does not accept the v7 helper during upgrade")
 require(r"\](?:\s*[;#].*)?$/" in HELPER.read_text(), "STFU INI parser does not accept comments after section names")
 require("if ($mode !== 'STFU') { return; }" not in HELPER.read_text(), "STFU card is hidden outside STFU mode")
 dmr_source = DMR_PATCHER.read_text()

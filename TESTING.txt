@@ -66,9 +66,12 @@ STFU Net card remains visible in other modes, uses the dashboard's orange
 target color, and displays the friendly talkgroup name with (TG number) below
 it. TRX Info should show Listening DMR after selecting BM/TGIF with no current
 DMR receive; Gateway Activity history should retain each row's original mode.
-With DVSwitch-Mode-Buttons installed, tune an STFU target, switch to BM, reboot,
-and confirm STFU Net still shows the saved room. The STFU activity component
-must also continue to show log-derived targets on nodes without Mode Buttons.
+With DVSwitch-Mode-Buttons installed, tune an STFU target, switch to BM/TGIF,
+change the DMR target, and confirm STFU Net keeps its own saved target. Reboot
+and confirm it still shows that target; with no saved STFU target, show
+`[STFU] StartTG` from `/opt/MMDVM_Bridge/DVSwitch.ini`. Never let shared
+Analog_Bridge `last_tune` replace the STFU target. The STFU activity component
+must also retain log-derived targets on standalone Mods nodes.
 Check that P25/NXDN friendly-name cards also show the number below the name.
 Run the YSF target-ID check/install separately:
 

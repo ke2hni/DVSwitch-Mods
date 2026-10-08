@@ -9,8 +9,9 @@ test node:
   sudo ./manage-dvswitch-mods.sh --install dashboard-stfu-activity
   sudo ./manage-dvswitch-mods.sh --check dashboard-stfu-activity
 
-The STFU Net card shows the current target while STFU is active, and the last
-logged target when STFU activity is available. When Mode Buttons is installed,
-it can also show the saved STFU target after reboot while another mode is
-selected. Gateway and Local activity remain based on actual logged events.
+The STFU Net card shows its independently saved STFU target, then `[STFU] StartTG`
+from `/opt/MMDVM_Bridge/DVSwitch.ini`, and only then a logged STFU target for
+standalone Mods nodes. It never uses the shared Analog_Bridge `last_tune`, which
+may change when BM/TGIF is tuned. Gateway and Local activity remain based on
+actual logged events.
 This component does not require DVSwitch-Mode-Buttons.
