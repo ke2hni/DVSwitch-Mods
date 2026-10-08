@@ -102,7 +102,7 @@ function dvsModsStfuStartupTarget($iniPath = null)
     foreach ((array)file($iniPath, FILE_IGNORE_NEW_LINES) as $line) {
         $line = trim($line);
         if ($line === '' || $line[0] === ';' || $line[0] === '#') { continue; }
-        if (preg_match('/^\[\s*([^\]]+)\s*\]$/', $line, $section)) {
+        if (preg_match('/^\[\s*([^\]]+)\s*\](?:\s*[;#].*)?$/', $line, $section)) {
             $inStfu = strcasecmp(trim($section[1]), 'STFU') === 0;
             continue;
         }

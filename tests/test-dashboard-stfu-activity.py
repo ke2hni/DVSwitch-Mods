@@ -139,6 +139,21 @@ dvsModsStfuRenderCard(array('tlv' => array('ambe_mode' => 'DMR')), array(), arra
         saved_result = subprocess.run(["php"], input=saved_program, text=True, capture_output=True, check=True)
         require("NORTH AMERICA</span><br/><span" in saved_result.stdout and "(TG 93)" in saved_result.stdout,
                 "STFU card did not show its saved target after reboot when another mode is active")
+        startup_ini_path = Path(directory) / "DVSwitch.ini"
+        startup_ini_path.write_text(
+            "[DMR]\nStartTG = 7000\n[STFU] ; BrandMeister\nStartTG = 3166 ; boot target\n[OTHER]\nStartTG = 8000\n",
+            encoding="utf-8",
+        )
+        empty_saved_target_path = Path(directory) / "stfu-target-empty"
+        empty_saved_target_path.write_text("\n", encoding="utf-8")
+        startup_program = f'''<?php
+function isProcessRunning($name) {{ return true; }}
+require {str(HELPER)!r};
+dvsModsStfuRenderCard(array('tlv' => array('ambe_mode' => 'DMR')), array(), array({str(empty_log_path)!r}), {str(talkgroup_path)!r}, {str(empty_saved_target_path)!r}, {str(startup_ini_path)!r});
+'''
+        startup_result = subprocess.run(["php"], input=startup_program, text=True, capture_output=True, check=True)
+        require("TG 3166" in startup_result.stdout and "Listening" not in startup_result.stdout,
+                "STFU card did not parse StartTG under a commented [STFU] section header")
 else:
     print("SKIP: STFU log parser runtime cases (php is unavailable in this workspace)")
 
@@ -154,6 +169,7 @@ require("$liveMode === 'STFU'" in HELPER.read_text() and "$abinfo['last_tune']" 
 require("/var/lib/dvswitch-mode-buttons/stfu-target" in HELPER.read_text(), "STFU card does not read the optional saved-target snapshot")
 require("STFU activity feed v6" in HELPER.read_text(), "repo-root STFU helper is not the intended v6 helper")
 require("STFU activity feed v[123456]" in installer_text, "installer does not accept the v6 helper during upgrade")
+require(r"\](?:\s*[;#].*)?$/" in HELPER.read_text(), "STFU INI parser does not accept comments after section names")
 require("if ($mode !== 'STFU') { return; }" not in HELPER.read_text(), "STFU card is hidden outside STFU mode")
 dmr_source = DMR_PATCHER.read_text()
 dmr_helper = dmr_source.split("helper = r'''", 1)[1].split("'''", 1)[0]
