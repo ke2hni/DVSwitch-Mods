@@ -1,0 +1,16 @@
+DVSwitch-Mods STFU selected-target card update
+
+Overlay these files into the existing DVSwitch-Mods repository. Then run on a
+test node:
+
+  cd ~/DVSwitch-Mods
+  python3 tests/test-dashboard-stfu-activity.py
+  sudo ./manage-dvswitch-mods.sh --check dashboard-stfu-activity
+  sudo ./manage-dvswitch-mods.sh --install dashboard-stfu-activity
+  sudo ./manage-dvswitch-mods.sh --check dashboard-stfu-activity
+
+The STFU Net card uses the current live STFU target first, then the saved
+last-tuned target from Mode Buttons, then the latest STFU log target. If none is
+available, it reads `[STFU] StartTG` from `/opt/MMDVM_Bridge/DVSwitch.ini`.
+Gateway and Local activity remain based on actual logged events.
+This component does not require DVSwitch-Mode-Buttons.
