@@ -1,7 +1,7 @@
 <?php
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Jeff Milne, KE2HNI
-// DVSwitch-Mods: STFU activity feed v1
+// DVSwitch-Mods: STFU activity feed v4
 
 /** Parse recent STFU ODMR traffic into DVSwitch's activity-row structure. */
 function dvsModsStfuActivityRows($paths = null)
@@ -36,9 +36,7 @@ function dvsModsStfuActivityRows($paths = null)
             $message = $match[2];
             if (preg_match('/^DMR, ODMR Begin (Tx|Rx):\s*src\s*=\s*([0-9]+),\s*dst\s*=\s*([0-9]+)\s*\((GROUP|PRIVATE)\)/i', $message, $call)) {
                 $direction = strtoupper($call[1]);
-                // STFU.log supplies call events and frame counts, but no radio
-                // loss or BER measurements. Use DVSwitch's standard unavailable
-                // marker so these columns match other modes without fabricating data.
+                // STFU.log has no Loss/BER fields; use the dashboard's unavailable marker.
                 $row = array($match[1], 'STFU', $call[2], '', 'TG '.$call[3], $direction === 'TX' ? 'Net' : 'LNet', null, '---', '---', '', '');
                 $events[] = array('row' => $row, 'direction' => $direction, 'sequence' => $sequence++);
                 $open[$direction] = count($events) - 1;
@@ -74,13 +72,14 @@ function dvsModsStfuMergeActivity($rows, $paths = null)
 }
 
 /** Look up an STFU destination using the node's BrandMeister talkgroup list. */
-function dvsModsStfuTargetDisplay($rawTarget)
+function dvsModsStfuTargetDisplay($rawTarget, $listPath = null)
 {
     $target = trim((string)$rawTarget);
     if (!preg_match('/^TG\s+([0-9]+)$/iD', $target, $match)) { return $target; }
     $number = $match[1];
     $names = array();
-    foreach (array('/var/lib/mmdvm/TGList_BM.txt') as $path) {
+    if ($listPath === null) { $listPath = '/var/lib/mmdvm/TGList_BM.txt'; }
+    foreach ((array)$listPath as $path) {
         if (!is_readable($path)) { continue; }
         foreach ((array)file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
             if ($line === '' || $line[0] === '#') { continue; }
@@ -95,22 +94,38 @@ function dvsModsStfuTargetDisplay($rawTarget)
 }
 
 /** Render an STFU status card separately from the BM/TGIF DMR Master card. */
-function dvsModsStfuRenderCard($abinfo, $lastHeard)
+function dvsModsStfuRenderCard($abinfo, $lastHeard, $logPaths = null, $listPath = null)
 {
-    $mode = isset($abinfo['tlv']['ambe_mode']) ? strtoupper(trim((string)$abinfo['tlv']['ambe_mode'])) : '';
-    if ($mode !== 'STFU') { return; }
     $latest = null;
-    foreach ((array)$lastHeard as $row) {
+    foreach (dvsModsStfuActivityRows($logPaths) as $row) {
         if (isset($row[1], $row[5]) && $row[1] === 'STFU' && $row[5] === 'Net') { $latest = $row; break; }
     }
-    echo "<br /><table>\n<tr><th colspan=\"2\">STFU BrandMeister</th></tr>\n";
+    // In STFU mode, show the selected target from the live bridge status.
+    // Activity rows remain sourced from STFU.log, so tuning alone does not
+    // create an RX event or alter historical activity.
+    $liveMode = isset($abinfo['tlv']['ambe_mode']) ? strtoupper(trim((string)$abinfo['tlv']['ambe_mode'])) : '';
+    if ($liveMode === 'STFU' && isset($abinfo['last_tune'])) {
+        $tune = trim((string)$abinfo['last_tune']);
+        if (preg_match('/^(?:TG\\s*)?([0-9]+)$/iD', $tune, $match) && $match[1] !== '0') {
+            if ($latest === null) { $latest = array('', 'STFU', '', '', '', 'Net'); }
+            $latest[4] = 'TG '.$match[1];
+        }
+    }
+    echo "<br /><table>\n<tr><th colspan=\"2\">STFU Net</th></tr>\n";
     if (function_exists('isProcessRunning') && isProcessRunning('STFU')) {
-        echo '<tr><td style="background:#ffffed;" colspan="2">';
-        if ($latest !== null && function_exists('dvsModsTargetDisplay')) {
-            $label = dvsModsStfuTargetDisplay($latest[4]);
-            echo htmlspecialchars($label, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        echo '<tr><td style="background:#ffffed;text-align:center;" colspan="2">';
+        if ($latest !== null) {
+            $label = dvsModsStfuTargetDisplay($latest[4], $listPath);
+            if (preg_match('/^(.*?)\s+\((TG\s+[0-9]+)\)$/iD', $label, $parts)) {
+                echo 'Room<br/><span style="color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;">'.htmlspecialchars($parts[1], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</span>';
+                if (strcasecmp($parts[1], $parts[2]) !== 0) {
+                    echo '<br/><span style="color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;">('.htmlspecialchars($parts[2], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').')</span>';
+                }
+            } else {
+                echo 'Room<br/><span style="color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;">'.htmlspecialchars($label, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</span>';
+            }
         } else {
-            echo 'Listening';
+            echo '<span style="color:#b5651d;font-weight:bold;">Listening</span>';
         }
         echo "</td></tr>\n";
     } else {
