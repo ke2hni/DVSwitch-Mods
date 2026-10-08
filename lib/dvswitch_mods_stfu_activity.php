@@ -1,7 +1,7 @@
 <?php
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Jeff Milne, KE2HNI
-// DVSwitch-Mods: STFU activity feed v5
+// DVSwitch-Mods: STFU activity feed v1
 
 /** Parse recent STFU ODMR traffic into DVSwitch's activity-row structure. */
 function dvsModsStfuActivityRows($paths = null)
@@ -36,7 +36,10 @@ function dvsModsStfuActivityRows($paths = null)
             $message = $match[2];
             if (preg_match('/^DMR, ODMR Begin (Tx|Rx):\s*src\s*=\s*([0-9]+),\s*dst\s*=\s*([0-9]+)\s*\((GROUP|PRIVATE)\)/i', $message, $call)) {
                 $direction = strtoupper($call[1]);
-                $row = array($match[1], 'STFU', $call[2], '', 'TG '.$call[3], $direction === 'TX' ? 'Net' : 'LNet', null, '', '', '', '');
+                // STFU.log supplies call events and frame counts, but no radio
+                // loss or BER measurements. Use DVSwitch's standard unavailable
+                // marker so these columns match other modes without fabricating data.
+                $row = array($match[1], 'STFU', $call[2], '', 'TG '.$call[3], $direction === 'TX' ? 'Net' : 'LNet', null, '---', '---', '', '');
                 $events[] = array('row' => $row, 'direction' => $direction, 'sequence' => $sequence++);
                 $open[$direction] = count($events) - 1;
                 continue;
@@ -71,14 +74,13 @@ function dvsModsStfuMergeActivity($rows, $paths = null)
 }
 
 /** Look up an STFU destination using the node's BrandMeister talkgroup list. */
-function dvsModsStfuTargetDisplay($rawTarget, $listPath = null)
+function dvsModsStfuTargetDisplay($rawTarget)
 {
     $target = trim((string)$rawTarget);
     if (!preg_match('/^TG\s+([0-9]+)$/iD', $target, $match)) { return $target; }
     $number = $match[1];
     $names = array();
-    if ($listPath === null) { $listPath = '/var/lib/mmdvm/TGList_BM.txt'; }
-    foreach ((array)$listPath as $path) {
+    foreach (array('/var/lib/mmdvm/TGList_BM.txt') as $path) {
         if (!is_readable($path)) { continue; }
         foreach ((array)file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
             if ($line === '' || $line[0] === '#') { continue; }
@@ -92,53 +94,23 @@ function dvsModsStfuTargetDisplay($rawTarget, $listPath = null)
     return $label.' (TG '.$number.')';
 }
 
-/** Read the optional selected mode written by DVSwitch-Mode-Buttons. */
-function dvsModsStfuSelectedMode($modePath = null)
-{
-    if ($modePath === null) { $modePath = '/var/lib/dvswitch-mode-buttons/current-mode'; }
-    if (!is_file($modePath) || is_link($modePath) || !is_readable($modePath)) { return ''; }
-    $mode = strtoupper(trim((string)file_get_contents($modePath)));
-    return in_array($mode, array('BM', 'TGIF', 'STFU', 'YSF', 'P25', 'NXDN', 'DSTAR'), true) ? $mode : '';
-}
-
 /** Render an STFU status card separately from the BM/TGIF DMR Master card. */
-function dvsModsStfuRenderCard($abinfo, $lastHeard, $logPaths = null, $listPath = null, $modePath = null)
+function dvsModsStfuRenderCard($abinfo, $lastHeard)
 {
+    $mode = isset($abinfo['tlv']['ambe_mode']) ? strtoupper(trim((string)$abinfo['tlv']['ambe_mode'])) : '';
+    if ($mode !== 'STFU') { return; }
     $latest = null;
-    foreach (dvsModsStfuActivityRows($logPaths) as $row) {
+    foreach ((array)$lastHeard as $row) {
         if (isset($row[1], $row[5]) && $row[1] === 'STFU' && $row[5] === 'Net') { $latest = $row; break; }
     }
-    // Analog_Bridge last_tune is shared across DMR-derived modes and can still
-    // contain BM/TGIF's value during a transition. When the optional Buttons
-    // selection file exists, trust last_tune only if STFU is selected. Without
-    // Buttons, preserve the standalone live-status fallback.
-    $liveMode = isset($abinfo['tlv']['ambe_mode']) ? strtoupper(trim((string)$abinfo['tlv']['ambe_mode'])) : '';
-    $modePath = $modePath === null ? '/var/lib/dvswitch-mode-buttons/current-mode' : $modePath;
-    $modePathExists = is_file($modePath) && !is_link($modePath) && is_readable($modePath);
-    $selectedMode = dvsModsStfuSelectedMode($modePath);
-    $trustLiveTune = !$modePathExists || $selectedMode === 'STFU';
-    if ($trustLiveTune && $liveMode === 'STFU' && isset($abinfo['last_tune'])) {
-        $tune = trim((string)$abinfo['last_tune']);
-        if (preg_match('/^(?:TG\\s*)?([0-9]+)$/iD', $tune, $match) && $match[1] !== '0') {
-            if ($latest === null) { $latest = array('', 'STFU', '', '', '', 'Net'); }
-            $latest[4] = 'TG '.$match[1];
-        }
-    }
-    echo "<br /><table>\n<tr><th colspan=\"2\">STFU Net</th></tr>\n";
+    echo "<br /><table>\n<tr><th colspan=\"2\">STFU BrandMeister</th></tr>\n";
     if (function_exists('isProcessRunning') && isProcessRunning('STFU')) {
-        echo '<tr><td style="background:#ffffed;text-align:center;" colspan="2">';
-        if ($latest !== null) {
-            $label = dvsModsStfuTargetDisplay($latest[4], $listPath);
-            if (preg_match('/^(.*?)\s+\((TG\s+[0-9]+)\)$/iD', $label, $parts)) {
-                echo 'Room<br/><span style="color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;">'.htmlspecialchars($parts[1], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</span>';
-                if (strcasecmp($parts[1], $parts[2]) !== 0) {
-                    echo '<br/><span style="color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;">('.htmlspecialchars($parts[2], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').')</span>';
-                }
-            } else {
-                echo 'Room<br/><span style="color:#b5651d;font-weight:bold;white-space:normal;word-break:normal;overflow-wrap:anywhere;">'.htmlspecialchars($label, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</span>';
-            }
+        echo '<tr><td style="background:#ffffed;" colspan="2">';
+        if ($latest !== null && function_exists('dvsModsTargetDisplay')) {
+            $label = dvsModsStfuTargetDisplay($latest[4]);
+            echo htmlspecialchars($label, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         } else {
-            echo '<span style="color:#b5651d;font-weight:bold;">Listening</span>';
+            echo 'Listening';
         }
         echo "</td></tr>\n";
     } else {

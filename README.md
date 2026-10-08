@@ -35,9 +35,8 @@ DVSwitch-Mods provides two types of changes:
   activity targets. The separate STFU activity component reads STFU's own log
   and adds its RX/TX events to the Gateway Activity, Local Activity, and TRX
   views. STFU is displayed on its own status card rather than the DMR Master
-  card. Its card only trusts Analog_Bridge's shared `last_tune` value when the
-  optional Mode Buttons state confirms STFU is selected; during a mode change,
-  it keeps the most recent STFU destination from STFU's own log.
+  card. STFU rows use `---` in Loss and BER, matching the dashboard's standard
+  marker for modes whose event source does not provide those measurements.
 
 Standard component installers check compatibility before changing anything,
 create protected backups, install atomically, validate the result, and roll
@@ -116,21 +115,6 @@ The component can also be checked or installed directly, without the manager:
 ```bash
 sudo ./mod-dashboard-stfu-activity.sh --check
 sudo ./mod-dashboard-stfu-activity.sh --install
-```
-
-The STFU Net status card remains visible in every mode. When the STFU process
-is active, it shows the most recent STFU network talkgroup using
-`TGList_BM.txt`. The friendly name and `(TG number)` appear on separate
-orange lines below the `Room` label; if no STFU traffic is available yet, it
-shows `Listening`.
-
-The standard P25/NXDN card modification shows each friendly reflector name
-with its `(TG number)` on the line below. The standalone
-`dashboard-ysf-target-id` component adds the YSF host TG number below its room name:
-
-```bash
-sudo ./manage-dvswitch-mods.sh --check dashboard-ysf-target-id
-sudo ./manage-dvswitch-mods.sh --install dashboard-ysf-target-id
 ```
 
 On a fresh DVSwitch installation, the first check normally reports early
@@ -246,16 +230,6 @@ dashboard from displaying a literal `null` instead of the linked room name.
 sudo ./repair-ysf-dashboard-null.sh --check
 sudo ./repair-ysf-dashboard-null.sh --install
 ```
-
-### YSF reflector TG number on the status card
-
-This independent component displays the YSF host TG number below the room name in the
-YSF Net card. Install the YSF dashboard null repair first.
-
-~~~
-sudo ./manage-dvswitch-mods.sh --check dashboard-ysf-target-id
-sudo ./manage-dvswitch-mods.sh --install dashboard-ysf-target-id
-~~~
 
 ---
 
