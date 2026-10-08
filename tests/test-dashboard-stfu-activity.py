@@ -38,12 +38,14 @@ fixtures = {
     ),
     "localtx": (
         "<?php\n$" + "dvsModsTarget = dvsModsTargetDisplay($listElem[1], $listElem[4], $listElem[6], $listElem[0]);\n"
-        + '$listElem[5] == "LNet" && ($listElem[1] == "D-Star" || startsWith($listElem[1], "DMR") || $listElem[1] == "YSF" || $listElem[1]== "P25" || $listElem[1]== "NXDN")) {\n'
+        + 'if ($listElem[5] == "LNet" && ($listElem[1] == "D-Star" || startsWith($listElem[1], "DMR") || $listElem[1] == "YSF" || $listElem[1]== "P25" || $listElem[1]== "NXDN")) {\n'
+        + '    echo "row";\n}\n'
     ),
     "status": (
         "<?php\n"
+        + '            if ($existingCondition) { echo "existing"; }\n'
         + '            elseif ($listElem[2] && $listElem[6] == null && $abinfo[\'tlv\'][\'ambe_mode\']== "DSTAR" && getActualMode($lastHeard, $mmdvmconfigs) === \'D-Star\') {\n'
-        + '                    echo "<td style=\\"background:#0b0; color:#030;\\">Listening</td>";\n'
+        + '                    echo "<td style=\\"background:#0b0; color:#030;\\">Listening</td>";\n}\n'
         + '$testMMDVModeYSF = getConfigItem("System Fusion Network", "Enable", $mmdvmconfigs);\n'
     ),
 }
