@@ -1,7 +1,7 @@
 <?php
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Jeff Milne, KE2HNI
-// DVSwitch-Mods: STFU activity feed v5
+// DVSwitch-Mods: STFU activity feed v6
 
 /** Parse recent STFU ODMR traffic into DVSwitch's activity-row structure. */
 function dvsModsStfuActivityRows($paths = null)
@@ -94,23 +94,47 @@ function dvsModsStfuTargetDisplay($rawTarget, $listPath = null)
 }
 
 /** Render an STFU status card separately from the BM/TGIF DMR Master card. */
-function dvsModsStfuRenderCard($abinfo, $lastHeard, $logPaths = null, $listPath = null, $savedTargetPath = null)
+function dvsModsStfuStartupTarget($iniPath = null)
+{
+    if ($iniPath === null) { $iniPath = '/opt/MMDVM_Bridge/DVSwitch.ini'; }
+    if (!is_file($iniPath) || !is_readable($iniPath)) { return ''; }
+    $inStfu = false;
+    foreach ((array)file($iniPath, FILE_IGNORE_NEW_LINES) as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === ';' || $line[0] === '#') { continue; }
+        if (preg_match('/^\[\s*([^\]]+)\s*\]$/', $line, $section)) {
+            $inStfu = strcasecmp(trim($section[1]), 'STFU') === 0;
+            continue;
+        }
+        if (!$inStfu) { continue; }
+        $value = preg_replace('/[;#].*$/', '', $line);
+        if (preg_match('/^\s*StartTG\s*=\s*([0-9]+)\s*$/iD', $value, $match) && $match[1] !== '0') {
+            return $match[1];
+        }
+    }
+    return '';
+}
+
+function dvsModsStfuRenderCard($abinfo, $lastHeard, $logPaths = null, $listPath = null, $savedTargetPath = null, $startupIniPath = null)
 {
     $latest = null;
-    foreach (dvsModsStfuActivityRows($logPaths) as $row) {
-        if (isset($row[1], $row[5]) && $row[1] === 'STFU' && $row[5] === 'Net') { $latest = $row; break; }
-    }
     // STFU's private per-mode state survives reboot but is not readable by
     // Apache. Mode Buttons publishes this single value as a read-only snapshot.
-    // Keep log-derived history as the fallback for nodes without Mode Buttons.
-    if ($latest === null) {
-        if ($savedTargetPath === null) { $savedTargetPath = '/var/lib/dvswitch-mode-buttons/stfu-target'; }
-        if (is_file($savedTargetPath) && !is_link($savedTargetPath) && is_readable($savedTargetPath)) {
-            $savedTarget = trim((string)@file_get_contents($savedTargetPath));
-            if (preg_match('/^(?:TG\\s*)?([0-9]+)$/iD', $savedTarget, $match) && $match[1] !== '0') {
-                $latest = array('', 'STFU', '', '', 'TG '.$match[1], 'Net');
-            }
+    if ($savedTargetPath === null) { $savedTargetPath = '/var/lib/dvswitch-mode-buttons/stfu-target'; }
+    if (is_file($savedTargetPath) && !is_link($savedTargetPath) && is_readable($savedTargetPath)) {
+        $savedTarget = trim((string)@file_get_contents($savedTargetPath));
+        if (preg_match('/^(?:TG\\s*)?([0-9]+)$/iD', $savedTarget, $match) && $match[1] !== '0') {
+            $latest = array('', 'STFU', '', '', 'TG '.$match[1], 'Net');
         }
+    }
+    if ($latest === null) {
+        foreach (dvsModsStfuActivityRows($logPaths) as $row) {
+            if (isset($row[1], $row[5]) && $row[1] === 'STFU' && $row[5] === 'Net') { $latest = $row; break; }
+        }
+    }
+    if ($latest === null) {
+        $startupTarget = dvsModsStfuStartupTarget($startupIniPath);
+        if ($startupTarget !== '') { $latest = array('', 'STFU', '', '', 'TG '.$startupTarget, 'Net'); }
     }
     // In STFU mode, show the selected target from the live bridge status.
     // Activity rows remain sourced from STFU.log, so tuning alone does not

@@ -152,6 +152,8 @@ require("null, '---', '---'" in HELPER.read_text(), "STFU rows do not use the st
 require("STFU Net</th>" in HELPER.read_text(), "STFU Net card label was regressed")
 require("$liveMode === 'STFU'" in HELPER.read_text() and "$abinfo['last_tune']" in HELPER.read_text(), "STFU card does not retain the live selected target")
 require("/var/lib/dvswitch-mode-buttons/stfu-target" in HELPER.read_text(), "STFU card does not read the optional saved-target snapshot")
+require("STFU activity feed v6" in HELPER.read_text(), "repo-root STFU helper is not the intended v6 helper")
+require("STFU activity feed v[123456]" in installer_text, "installer does not accept the v6 helper during upgrade")
 require("if ($mode !== 'STFU') { return; }" not in HELPER.read_text(), "STFU card is hidden outside STFU mode")
 dmr_source = DMR_PATCHER.read_text()
 dmr_helper = dmr_source.split("helper = r'''", 1)[1].split("'''", 1)[0]
