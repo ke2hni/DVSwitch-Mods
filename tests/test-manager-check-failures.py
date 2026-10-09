@@ -39,7 +39,7 @@ require('apt-get update && sudo apt-get install -y build-essential' in source,
 require('apt-get update && apt-get install -y build-essential' not in source,
         "manager must not install packages without explicit user action")
 
-with tempfile.TemporaryDirectory(prefix="dvsm-manager-check-") as temporary:
+with tempfile.TemporaryDirectory(prefix=".dvsm-manager-check-", dir=ROOT) as temporary:
     root = Path(temporary)
     fake_bin = root / "bin"
     fake_bin.mkdir()
@@ -81,7 +81,7 @@ exit 0
     output = result.stdout + result.stderr
     require(result.returncode == 0, "check_all harness failed: " + output)
     require("FAIL: Required command not found: make" in output,
-            "failed child's diagnostic was lost")
+            "failed child's diagnostic was lost; harness output was:\n" + output)
     require("REPAIR READY: second component was checked" in output,
             "check_all stopped before checking the later component")
     require("Failed or blocked:" in output and "first — missing a required command" in output,
