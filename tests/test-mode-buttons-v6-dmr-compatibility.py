@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Version: 1.0.0
 # SPDX-License-Identifier: MIT
 
 """Ensure DVSwitch-Mods recognizes the current Mode Buttons DMR card."""

@@ -1,3 +1,4 @@
+# Version: 1.0.0
 [Unit]
 Description=Record the selected BM/TGIF network for Gateway Activity
 After=local-fs.target mmdvm_bridge.service

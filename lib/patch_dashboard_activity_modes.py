@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Version: 1.0.0
 # SPDX-License-Identifier: MIT
 
 """Preserve MMDVM milliseconds and label Gateway DMR rows from BM/TGIF events."""

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Version: 1.0.0
 # SPDX-License-Identifier: MIT
 
 """Exercise RX Monitor position install, idempotency, and surgical uninstall."""

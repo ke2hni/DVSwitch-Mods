@@ -1,3 +1,4 @@
+<!-- Version: 1.0.0 -->
 <div align="center">
 
 Not required but highly suggested to install my DVSwitch Mode Buttons Repository after installing this repository. [https://github.com/ke2hni/DVSwitch-Mode-Buttons](https://github.com/ke2hni/DVSwitch-Mode-Buttons)

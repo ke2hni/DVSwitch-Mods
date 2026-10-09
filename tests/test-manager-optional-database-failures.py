@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Version: 1.0.0
 # SPDX-License-Identifier: MIT
 
 """Exercise the manager's required-database gate after updater warnings."""

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Version: 1.0.0
 # SPDX-License-Identifier: MIT
 """Show the YSF talkgroup number below its friendly room name on the status card."""
 

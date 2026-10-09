@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Version: 1.0.0
 """Check dark-theme contrast for current and legacy Buttons DMR labels."""
 
 from pathlib import Path

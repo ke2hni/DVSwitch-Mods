@@ -1,4 +1,5 @@
 <?php
+// Version: 1.0.0
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Jeff Milne, KE2HNI
 // DVSwitch-Mods: activity Target display helper v4

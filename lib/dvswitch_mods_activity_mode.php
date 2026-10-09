@@ -1,4 +1,5 @@
 <?php
+// Version: 1.0.0
 // DVSwitch-Mods: DMR network activity labels v1
 // SPDX-License-Identifier: MIT
 

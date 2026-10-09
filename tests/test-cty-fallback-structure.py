@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Version: 1.0.0
 """Static regression checks for CTY.DAT fallback integration."""
 from pathlib import Path
 

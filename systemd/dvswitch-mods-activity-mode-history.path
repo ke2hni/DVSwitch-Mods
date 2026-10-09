@@ -1,3 +1,4 @@
+# Version: 1.0.0
 [Unit]
 Description=Watch MMDVM_Bridge DMR network selection for Gateway Activity labels
 

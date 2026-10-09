@@ -1,3 +1,4 @@
+Version: 1.0.0
 DVSwitch-Mods STFU selected-target card update
 
 Overlay these files into the existing DVSwitch-Mods repository. Then run on a

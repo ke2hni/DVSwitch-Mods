@@ -1,3 +1,4 @@
+Version: 1.0.0
 DVSwitch-Mods dashboard-targets 1.2.0 event-time test package
 
 This package restores the D-Star event-time reflector lookup from the

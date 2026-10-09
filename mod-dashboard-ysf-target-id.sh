@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Version: 1.0.0
 # SPDX-License-Identifier: MIT
 # Add the YSF reflector TG number below its friendly name on the dashboard status card.
 set -Eeuo pipefail

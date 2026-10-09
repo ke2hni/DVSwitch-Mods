@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Version: 1.0.0
 # SPDX-License-Identifier: MIT
 """Add STFU log events to the existing Gateway, Local, and TRX views."""
 

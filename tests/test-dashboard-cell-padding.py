@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Version: 1.0.0
 """Regression tests for cell-padding upgrades after FCC Name updates."""
 from __future__ import annotations
 

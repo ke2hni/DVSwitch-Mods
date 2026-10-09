@@ -1,4 +1,5 @@
 <?php
+// Version: 1.0.0
 // SPDX-License-Identifier: MIT
 $path = tempnam(sys_get_temp_dir(), 'dvs-custom-callsigns-');
 file_put_contents($path, "# test descriptions\n9999 = Announcement\nH4MLNK = YSF Link\nN0CALL = Announcement\nAMERICALNK = America Link\nTABTEST\tLegacy Tab Entry\nBAD = \nINVALID DESC = ignored\n");

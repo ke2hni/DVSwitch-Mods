@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Version: 1.0.0
 """Regression coverage for recovery after one shared dashboard file rollback."""
 
 from __future__ import annotations

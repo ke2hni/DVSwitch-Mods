@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Version: 1.0.0
 """Regression tests for surgical FCC Gateway Activity patching."""
 from __future__ import annotations
 

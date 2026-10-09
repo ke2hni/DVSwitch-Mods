@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Version: 1.0.0
 # SPDX-License-Identifier: MIT
 
 """Static regression checks for DMR/Mode-Buttons YSF dashboard compatibility."""

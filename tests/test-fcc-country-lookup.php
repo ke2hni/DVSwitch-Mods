@@ -1,4 +1,5 @@
 <?php
+// Version: 1.0.0
 // SPDX-License-Identifier: MIT
 // Regression coverage for CTY.DAT parsing used by the dashboard country fallback.
 
