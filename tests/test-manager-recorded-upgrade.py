@@ -79,9 +79,11 @@ preflight_recorded_backups()''',
 
     original_backup = "install-original"
     (backup_root / original_backup).mkdir()
+    (backup_root / "install-prior").mkdir()
     state_file = state_dir / "active-installs.tsv"
     state_file.write_text(
-        f"dashboard-fcc-first-names\tmod-dashboard-fcc-first-names.sh\t{backup_root}\t{original_backup}\t--uninstall\n",
+        f"dashboard-fcc-first-names\tmod-dashboard-fcc-first-names.sh\t{backup_root}\t{original_backup}\t--uninstall\n"
+        f"another-component\tanother.sh\t{backup_root}\tinstall-prior\t--restore\n",
         encoding="utf-8",
     )
 
@@ -129,7 +131,10 @@ preflight_recorded_backups()''',
             "manager did not verify the upgraded component")
     require(version_file.read_text(encoding="utf-8").strip() == "new",
             "recorded component's installer was not run")
-    record = state_file.read_text(encoding="utf-8").strip().split("\t")
+    records = state_file.read_text(encoding="utf-8").strip().splitlines()
+    require(records[0].startswith("another-component\t"),
+            "upgraded component was not moved to the newest position in uninstall order")
+    record = records[1].split("\t")
     require(record[3] == "install-upgrade", "active manager backup record was not replaced")
     require((backup_root / original_backup).is_dir(), "previous backup was unexpectedly deleted")
     require(call_log.read_text(encoding="utf-8").splitlines() == ["check", "install", "check"],
@@ -144,8 +149,10 @@ preflight_recorded_backups()''',
     require(second.returncode == 0, "idempotent second Install All failed: " + second.stderr)
     require("installer created no new backup" in second.stdout,
             "manager did not retain the record for an already-current component")
-    require(state_file.read_text(encoding="utf-8").strip().split("\t")[3] == "install-upgrade",
-            "idempotent run changed the active backup record")
+    records_after_second = state_file.read_text(encoding="utf-8").strip().splitlines()
+    require(records_after_second[0].startswith("another-component\t") and
+            records_after_second[1].split("\t")[3] == "install-upgrade",
+            "idempotent run changed the active backup record or ordering")
     require(call_log.read_text(encoding="utf-8").splitlines() == [
         "check", "install", "check", "check", "install"
     ], "second Install All did not recheck and run the current component installer")

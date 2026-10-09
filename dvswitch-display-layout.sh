@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-VERSION="1.0"
+VERSION="1.1"
 ROOT="/usr/share/dvswitch"
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
@@ -48,11 +48,40 @@ restore_dashboard_files_from(){
   [ -f "$src/localtx.php" ] || die "Backup missing localtx.php"
   [ -f "$src/system.php" ] || die "Backup missing system.php"
 
+  # Refuse a full snapshot restore if another mod changed any tracked file.
+  check_layout_snapshot_pair "$INDEX_FILE" "$src/index.php" \
+    '<td valign="top" style="border:none; height: 480px; background-color:#fafafa;">' \
+    '<td valign="top" style="border:none; height: 480px; background-color:#fafafa; width:100%;">' \
+  check_layout_snapshot_pair "$CSS_FILE" "$src/css.php" \
+    'width: 900px;' 'width: min(96vw, 1200px);' \
+    'white-space: nowrap;' 'white-space: normal;'
+  check_layout_snapshot_pair "$LH_FILE" "$src/lh.php" 'width:640px;' 'width:min(95%,1400px);'
+  check_layout_snapshot_pair "$LOCALTX_FILE" "$src/localtx.php" 'width:640px;' 'width:min(95%,1400px);'
+  check_layout_snapshot_pair "$SYSTEM_FILE" "$src/system.php" \
+    'width:855px' 'width:min(95%,1400px)' \
+    'margin-left:6px;margin-right:0px' 'margin-left:auto;margin-right:auto'
+
   cp -a "$src/index.php" "$INDEX_FILE" || die "Could not restore index.php"
   cp -a "$src/css.php" "$CSS_FILE" || die "Could not restore css.php"
   cp -a "$src/lh.php" "$LH_FILE" || die "Could not restore lh.php"
   cp -a "$src/localtx.php" "$LOCALTX_FILE" || die "Could not restore localtx.php"
   cp -a "$src/system.php" "$SYSTEM_FILE" || die "Could not restore system.php"
+}
+
+check_layout_snapshot_pair(){
+  target="$1" snapshot="$2"
+  shift 2
+  candidate=$(mktemp) || die "Could not prepare restore validation for $target"
+  cp -a "$snapshot" "$candidate" || { rm -f "$candidate"; die "Could not read snapshot for $target"; }
+  while [ "$#" -ge 2 ]; do
+    old="$1" new="$2"; shift 2
+    sed -i "s|$old|$new|g" "$candidate" || { rm -f "$candidate"; die "Could not validate layout snapshot for $target"; }
+  done
+  if ! cmp -s "$target" "$snapshot" && ! cmp -s "$target" "$candidate"; then
+    rm -f "$candidate"
+    die "Refusing whole-file restore because $target has unrelated or customized changes. Remove the later component or restore manually."
+  fi
+  rm -f "$candidate"
 }
 
 ensure_original_backup(){

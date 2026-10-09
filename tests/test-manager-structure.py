@@ -55,6 +55,10 @@ def main() -> None:
 
     require('UNINSTALL_ACTION="--uninstall"' in master,
             "MMDVM/FCC complete-uninstall action is unavailable")
+    require('dashboard-cell-padding) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-cell-padding.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-cell-padding"; UNINSTALL_ACTION="--restore"' in master,
+            "cell-padding does not use its supported backup restore action")
+    require('dashboard-hostname-title) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-hostname-title.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-hostname-title"; UNINSTALL_ACTION="--restore"' in master,
+            "hostname-title does not use its supported backup restore action")
     require("strict reverse" in master,
             "reverse-order uninstall safety notice is missing")
     require("last_state_line" in master and "remove_last_state_line" in master,

@@ -128,9 +128,10 @@ everything, changes nothing, and prints the correct installation order.
 The P25 audio-announcement check builds a temporary candidate and therefore
 needs `make` and a C++ compiler. If either is missing, `--check all` reports the
 P25 component as blocked and continues checking the remaining components; it
-does not install packages. The standard `--install` path installs Debian's
-`build-essential` package before running component checks, which provides
-`make` and `c++` for that build.
+does not install packages. If an install requires `make` or `c++` and either is
+missing, the manager stops before changing components and prints the explicit
+Debian command to install `build-essential`. Run that command yourself, then
+retry the install.
 
 ### 4. Install or update every applicable standard repair and modification
 
@@ -608,7 +609,9 @@ Protected backups are stored under:
 /var/backups/dvswitch-mods/
 ```
 
-Individual scripts can restore their named `install-YYYYMMDD-HHMMSS` backup:
+Individual scripts can restore their named `install-YYYYMMDD-HHMMSS` backup. Dashboard
+restore actions that use whole-file snapshots first verify that the current file
+contains only the mod's known edits; they stop if another mod changed the file:
 
 ```bash
 sudo ./SCRIPT_NAME.sh --restore install-YYYYMMDD-HHMMSS

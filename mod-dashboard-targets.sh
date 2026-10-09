@@ -123,6 +123,25 @@ run_install() {
     printf 'PASS: activity Target display modification installed atomically.\nBackup: %s\n' "$DVSM_TRANSACTION_DIR"
 }
 
+validate_target_restore_state() {
+    local directory=$1 temp lh_backup="" localtx_backup="" target backup existed
+    while IFS=$'\t' read -r existed target backup; do
+        case "$target" in
+            "$LH_TARGET") [[ "$existed" == 1 ]] && lh_backup=$backup ;;
+            "$LOCALTX_TARGET") [[ "$existed" == 1 ]] && localtx_backup=$backup ;;
+            "$HELPER_TARGET") : ;;
+        esac
+    done < "$directory/MANIFEST"
+    [[ -n "$lh_backup" || -n "$localtx_backup" ]] || return 0
+    temp=$(mktemp -d "/tmp/.dvswitch-target-restore.XXXXXX") || die "Could not prepare restore validation."
+    if [[ -n "$lh_backup" ]]; then cp -- "$lh_backup" "$temp/lh.php"; else cp -- "$LH_TARGET" "$temp/lh.php"; fi
+    if [[ -n "$localtx_backup" ]]; then cp -- "$localtx_backup" "$temp/localtx.php"; else cp -- "$LOCALTX_TARGET" "$temp/localtx.php"; fi
+    if ! python3 "$PATCHER" --lh "$temp/lh.php" --localtx "$temp/localtx.php"; then rm -rf -- "$temp"; die "Cannot verify the current activity files against this Target backup; restore would risk removing another mod's edits."; fi
+    if [[ -n "$lh_backup" ]] && ! cmp -s "$temp/lh.php" "$LH_TARGET"; then rm -rf -- "$temp"; die "Refusing Target restore because lh.php has changes beyond this mod's patch. Remove later dashboard edits first."; fi
+    if [[ -n "$localtx_backup" ]] && ! cmp -s "$temp/localtx.php" "$LOCALTX_TARGET"; then rm -rf -- "$temp"; die "Refusing Target restore because localtx.php has changes beyond this mod's patch. Remove later dashboard edits first."; fi
+    rm -rf -- "$temp"
+}
+
 run_restore() {
     local name=$1
     preflight
@@ -138,6 +157,7 @@ run_restore() {
             exit bad
         }
     ' "$directory/MANIFEST" || die "Backup manifest is not a supported Target-modification backup."
+    validate_target_restore_state "$directory"
     . "$TRANSACTION_LIBRARY"
     dvsm_restore_backup_set "$directory"
     php -l "$LH_TARGET" >/dev/null

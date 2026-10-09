@@ -33,9 +33,11 @@ require('if output=$("$CHILD_SCRIPT" --check 2>&1); then' in check_all,
 require("if check_requested \"$2\"; then" in main,
         "main must return an expected nonzero check result without the unexpected-failure trap")
 require("ensure_build_dependencies\n    preflight_recorded_backups" in install_requested,
-        "installation must provision build dependencies before component checks")
-require('apt-get install -y build-essential' in source,
-        "manager no longer installs the package that provides make and c++")
+        "installation must verify build dependencies before component checks")
+require('apt-get update && sudo apt-get install -y build-essential' in source,
+        "manager must show the explicit install command when dependencies are missing")
+require('apt-get update && apt-get install -y build-essential' not in source,
+        "manager must not install packages without explicit user action")
 
 with tempfile.TemporaryDirectory(prefix="dvsm-manager-check-") as temporary:
     root = Path(temporary)

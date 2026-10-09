@@ -489,11 +489,29 @@ run_uninstall() {
     printf 'PASS: FCC first-name dashboard modification and weekly updater uninstalled.\nSafety backup: %s\n' "$DVSM_TRANSACTION_DIR"
 }
 
+validate_fcc_restore_state() {
+    local directory=$1 existed target backup temp lh_backup=""
+    while IFS=$'\t' read -r existed target backup; do
+        if [[ "$target" == "$LH_TARGET" && "$existed" == 1 ]]; then lh_backup=$backup; fi
+    done < "$directory/MANIFEST"
+    [[ -z "$lh_backup" ]] && return 0
+    require_file "$lh_backup"
+    [[ -f "$LH_TARGET" && ! -L "$LH_TARGET" ]] || die "Dashboard activity file is unavailable for restore validation."
+    temp=$(mktemp -d "$WORK_ROOT/.dvswitch-fcc-restore.XXXXXX") || die "Could not prepare FCC restore validation."
+    cp -- "$lh_backup" "$temp/lh.php"
+    local restore_patcher="$PATCHER_TARGET"
+    [[ -f "$restore_patcher" && ! -L "$restore_patcher" ]] || restore_patcher="$PATCHER"
+    if ! python3 "$restore_patcher" --lh "$temp/lh.php"; then rm -rf -- "$temp"; die "Cannot verify lh.php against this FCC backup; restore would risk removing another mod's edits."; fi
+    if ! cmp -s "$temp/lh.php" "$LH_TARGET"; then rm -rf -- "$temp"; die "Refusing FCC restore because lh.php has changes beyond this FCC patch. Remove later dashboard edits first."; fi
+    rm -rf -- "$temp"
+}
+
 run_restore() {
     preflight
     local name=$1 directory="$BACKUP_ROOT/$1"
     [[ "$name" =~ ^install-[0-9]{8}-[0-9]{6}(-[0-9]+)?$ ]] || die "Invalid backup name."
     [[ -d "$directory" && ! -L "$directory" ]] || die "Backup not found: $name"
+    validate_fcc_restore_state "$directory"
     . "$TRANSACTION_LIBRARY"
     systemctl disable --now "$TIMER_UNIT" >/dev/null 2>&1 || true
     dvsm_restore_backup_set "$directory"

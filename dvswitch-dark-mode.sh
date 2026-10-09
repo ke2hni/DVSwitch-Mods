@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-VERSION="1.1"
+VERSION="1.2"
 ROOT="/usr/share/dvswitch"
 ORIGINAL_BACKUP_DIR="$ROOT/.dvs-dashboard-original-backup"
 CSS_FILE="$ROOT/css/dvs-theme.css"
@@ -540,6 +540,8 @@ restore_latest(){
   latest="$(find "$ROOT" -maxdepth 1 -type d -name '.dvs-dashboard-theme-backup-*' | sort | tail -n 1)"
   [ -n "$latest" ] || die "No dashboard run backup directory found in $ROOT"
 
+  validate_theme_restore_index "$latest/index.php"
+
   copy_dashboard_file_set "$latest" "$ROOT"
 
   if [ -f "$latest/css/dvs-theme.css" ]; then
@@ -564,6 +566,8 @@ restore_original(){
   [ -d "$ORIGINAL_BACKUP_DIR" ] || die "No original factory backup found at $ORIGINAL_BACKUP_DIR"
   [ -f "$ORIGINAL_BACKUP_DIR/index.php" ] || die "Original backup is missing index.php"
 
+  validate_theme_restore_index "$ORIGINAL_BACKUP_DIR/index.php"
+
   mkdir -p "$BACKUP_DIR" || die "Could not create pre-restore run backup dir"
   copy_dashboard_file_set "$ROOT" "$BACKUP_DIR"
   mkdir -p "$BACKUP_DIR/css" "$BACKUP_DIR/scripts" || die "Could not create pre-restore theme backup paths"
@@ -577,6 +581,23 @@ restore_original(){
   log "Restored original factory dashboard files from: $ORIGINAL_BACKUP_DIR"
   log "Removed theme overlay files: $CSS_FILE and $JS_FILE"
   log "Log file: $LOG_FILE"
+}
+
+validate_theme_restore_index(){
+  snapshot="$1"
+  candidate=$(mktemp) || die "Could not prepare theme restore validation"
+  cp -a "$snapshot" "$candidate" || { rm -f "$candidate"; die "Could not read theme index snapshot"; }
+  if ! grep -q 'css/dvs-theme.css' "$candidate"; then
+    sed -i '/<link href="css\/featherlight.css" type="text\/css" rel="stylesheet" \/>/i <link href="css/dvs-theme.css" type="text/css" rel="stylesheet" />' "$candidate" || { rm -f "$candidate"; die "Could not validate theme CSS include"; }
+  fi
+  if ! grep -q 'scripts/dvs-theme.js' "$candidate"; then
+    sed -i '/<script src="scripts\/featherlight.js" type="text\/javascript" charset="utf-8"><\/script>/a \    <script src="scripts/dvs-theme.js" type="text/javascript"></script>' "$candidate" || { rm -f "$candidate"; die "Could not validate theme JS include"; }
+  fi
+  if ! cmp -s "$INDEX_FILE" "$candidate"; then
+    rm -f "$candidate"
+    die "Refusing whole-file restore because index.php contains edits beyond this theme overlay. Remove the later component or restore manually."
+  fi
+  rm -f "$candidate"
 }
 
 case "${1:-menu}" in

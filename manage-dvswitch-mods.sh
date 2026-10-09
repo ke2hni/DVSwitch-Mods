@@ -9,7 +9,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.2.5"
+readonly SCRIPT_VERSION="1.2.6"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly STATE_DIR="/var/lib/dvswitch-mods/manager"
 readonly STATE_FILE="$STATE_DIR/active-installs.tsv"
@@ -139,9 +139,9 @@ ensure_build_dependencies() {
     command -v make >/dev/null 2>&1 || missing+=(make)
     command -v c++ >/dev/null 2>&1 || missing+=(g++)
     ((${#missing[@]} == 0)) && return 0
-    require_root; require_command apt-get
-    printf 'Installing missing build dependencies: %s\n' "${missing[*]}"
-    apt-get update && apt-get install -y build-essential
+    printf 'ERROR: Missing build dependencies: %s\n' "${missing[*]}" >&2
+    printf 'Install them explicitly with: sudo apt-get update && sudo apt-get install -y build-essential\n' >&2
+    return 1
 }
 require_regular() { [[ -f "$1" && ! -L "$1" ]] || die "Required regular file is unavailable: $1"; }
 
@@ -171,9 +171,9 @@ select_component() {
         dashboard-ysf-target-id) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-ysf-target-id.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-ysf-target-id" ;;
         dashboard-fcc-first-names) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-fcc-first-names.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-fcc-first-names"; UNINSTALL_ACTION="--uninstall" ;;
         dashboard-targets) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-targets.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-targets" ;;
-        dashboard-cell-padding) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-cell-padding.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-cell-padding" ;;
+        dashboard-cell-padding) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-cell-padding.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-cell-padding"; UNINSTALL_ACTION="--restore" ;;
         dashboard-activity-modes) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-activity-modes.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-activity-modes" ;;
-        dashboard-hostname-title) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-hostname-title.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-hostname-title" ;;
+        dashboard-hostname-title) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-hostname-title.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-hostname-title"; UNINSTALL_ACTION="--restore" ;;
         dashboard-stfu-status) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-stfu-status.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-stfu-status"; UNINSTALL_ACTION="--uninstall" ;;
         dashboard-stfu-activity) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-stfu-activity.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-stfu-activity"; UNINSTALL_ACTION="--uninstall" ;;
         dashboard-rx-monitor-left) CHILD_SCRIPT="$SCRIPT_DIR/mod-dashboard-rx-monitor-left.sh"; BACKUP_ROOT="/var/backups/dvswitch-mods/dashboard-rx-monitor-left"; UNINSTALL_ACTION="--uninstall" ;;
@@ -282,9 +282,8 @@ record_install() {
     local component=$1 script=$2 root=$3 backup=$4 action=$5 temporary replaced
     [[ "$component" != *$'\t'* && "$script" != *$'\t'* && "$root" != *$'\t'* && "$backup" != *$'\t'* ]] || die "Invalid state value."
     temporary=$(mktemp --tmpdir="$STATE_DIR" .active-installs.XXXXXX)
-    awk -F '\t' -v OFS='\t' -v wanted="$component" -v replacement="$component\t$script\t$root\t$backup\t$action" \
-        'BEGIN { replaced=0 } $1 == wanted { if (!replaced) { print replacement; replaced=1 } next } { print } END { if (!replaced) print replacement }' \
-        "$STATE_FILE" > "$temporary"
+    awk -F '\t' -v wanted="$component" '$1 != wanted { print }' "$STATE_FILE" > "$temporary"
+    printf '%s\t%s\t%s\t%s\t%s\n' "$component" "$script" "$root" "$backup" "$action" >> "$temporary"
     chown root:root "$temporary"
     chmod 0600 "$temporary"
     mv -fT -- "$temporary" "$STATE_FILE"
