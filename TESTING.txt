@@ -32,7 +32,7 @@ lib/dvswitch_mods_target_display.php.
 
 FCC first names and country fallback: run these checks on pi4test before other nodes.
 
-cd ~/DVSwitch-Mods && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-fcc-first-names.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-fcc-installed-updater-fixed.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-fcc-installed-updater.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-cty-fallback-structure.py && php tests/test-fcc-country-lookup.php && sudo ./mod-dashboard-fcc-first-names.sh --check
+cd ~/DVSwitch-Mods && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-fcc-builder-version-comment.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-fcc-first-names.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-fcc-installed-updater-fixed.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-fcc-installed-updater.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-cty-fallback-structure.py && php tests/test-fcc-country-lookup.php && sudo ./mod-dashboard-fcc-first-names.sh --check
 
 If checks pass, first confirm `--check` reports the CTY.DAT state. Then install
 and compare the deployed sources:

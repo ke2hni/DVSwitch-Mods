@@ -169,6 +169,28 @@ transaction_library_supported() {
     done
 }
 
+# Version comments are repository metadata, not a change to the installed
+# builder's behavior. Accept an older deployed copy when that is the only
+# difference; code changes still require an explicit supported structure.
+builder_matches_supported() {
+    python3 - "$1" "$2" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+def without_version_comment(path):
+    data = Path(path).read_bytes()
+    return re.sub(rb"(?m)^# Version: [^\r\n]*(?:\r?\n|$)", b"", data)
+
+try:
+    source = without_version_comment(sys.argv[1])
+    installed = without_version_comment(sys.argv[2])
+except OSError:
+    raise SystemExit(1)
+raise SystemExit(0 if source == installed else 1)
+PY
+}
+
 updater_release_state() {
     local state
     state=$(updater_state)
@@ -185,7 +207,7 @@ updater_release_state() {
         return
     fi
     if patcher_structure_supported "$PATCHER_TARGET"; then
-        cmp -s "$BUILDER" "$BUILDER_TARGET" || die "Installed FCC builder does not match the supported previous release."
+        builder_matches_supported "$BUILDER" "$BUILDER_TARGET" || die "Installed FCC builder does not match the supported previous release."
         unit_file_matches "$SERVICE_SOURCE" "$SERVICE_TARGET" || die "Installed FCC systemd service does not match the supported previous release."
         timer_file_matches_supported "$TIMER_SOURCE" "$TIMER_TARGET" || die "Installed FCC timer does not match the supported previous release."
         [[ "$(stat -c '%U:%G:%a' "$UPDATER_TARGET")" == root:root:755 ]] || die "Incorrect updater ownership or mode."
