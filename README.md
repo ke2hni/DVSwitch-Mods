@@ -93,7 +93,9 @@ The menu provides three installation choices:
 The Dark Mode and Display Layout installers do not require the standard
 component chain. STFU status, STFU activity, and RX Monitor position are
 included at the end of the standard component installation and uninstall
-order. Option 0 exits without changing anything.
+order. Option 0 exits without changing anything. The interactive menu does not
+have an uninstall choice; use the manager's command-line uninstall commands
+described in [Status, backups, and removal](#-status-backups-and-removal).
 
 The standalone installers can also be run directly:
 
@@ -577,31 +579,50 @@ their backups are maintained by the standalone scripts.
 
 ## ↩️ Status, backups, and removal
 
-List the changes installed and recorded by the manager:
+The interactive menu installs components; it has no uninstall option.
+Uninstallation is done from the command line and applies only to standard
+components installed and recorded by the manager. Review the active records
+before removing anything:
 
 ```bash
 sudo ./manage-dvswitch-mods.sh --status
 ```
 
+On a test node, remove all manager-recorded standard components with:
+
+```bash
+sudo ./manage-dvswitch-mods.sh --uninstall all
+sudo ./manage-dvswitch-mods.sh --status
+```
+
+The manager restores each component from its protected backup in strict reverse
+installation order. A successful run ends with
+`PASS: all manager-recorded installations were uninstalled in reverse order.`
+The follow-up `--status` should report that there are no active manager-recorded
+installations. If a restore fails or its backup is unavailable, the manager
+stops and retains that component's active record so the problem can be reviewed.
+
+This removes only standard components recorded by the manager. It does not
+uninstall DVSwitch itself, the separate DVSwitch Mode Buttons repository, or
+the standalone Dark Mode and Widescreen Display Layout changes. Those two
+standalone installers have their own restore commands below.
+
 The status file records the currently active reversible backup for each
 component. An upgrade replaces that component's active record with the new
 backup; older backup directories are retained for manual recovery.
 
-Remove everything installed by the manager in safe reverse order:
-
-```bash
-sudo ./manage-dvswitch-mods.sh --uninstall all
-```
-
-Remove the most recently installed individual component:
+To remove one component, first run `--status` and use the last (newest) active
+record shown there. For example, replace `COMPONENT` with that component's exact
+name:
 
 ```bash
 sudo ./manage-dvswitch-mods.sh --uninstall COMPONENT
 ```
 
-Because several components modify the same files, individual removal is
-allowed only in reverse installation order. The manager identifies which later
-component must be removed first.
+Because several components can edit the same dashboard files, an individual
+component can be removed only when it is the newest active record. If another
+component must be removed first, the manager reports which one; use
+`--uninstall all` to let it safely unwind the complete recorded stack.
 
 Protected backups are stored under:
 
