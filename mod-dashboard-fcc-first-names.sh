@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.4.1"
+readonly SCRIPT_VERSION="1.4.2"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PATCHER="$SCRIPT_DIR/lib/patch_dashboard_first_names.py"
 readonly BUILDER="$SCRIPT_DIR/lib/build_fcc_first_names.py"
@@ -443,21 +443,60 @@ run_remove_updater() {
     "$UPDATER_TARGET" --remove-updater
 }
 
-uninstall_backup_file() {
-    local directory=$1 target=$2 result
-    result=$(awk -F '\t' -v wanted="$target" '$1 == "1" && $2 == wanted { print $3 }' "$directory/MANIFEST")
-    [[ -n "$result" && "$result" != *$'\n'* && "$result" == "$directory/"* ]] || die "Backup is not a complete original FCC Name installation backup: $target"
-    require_file "$result"
-    printf '%s' "$result"
+manifest_target_row() {
+    local directory=$1 target=$2
+    awk -F '\t' -v wanted="$target" '$2 == wanted { print $1 "\t" $3; count++ } END { if (count != 1) exit 1 }' "$directory/MANIFEST"
+}
+
+resolve_uninstall_backup() {
+    local requested=$1 recorded="$BACKUP_ROOT/$1" row existed backup candidate candidate_row candidate_existed candidate_backup
+    local candidate_name probe selected=""
+    [[ -f "$recorded/MANIFEST" && ! -L "$recorded/MANIFEST" ]] || die "FCC uninstall backup manifest is unavailable: $recorded/MANIFEST"
+
+    if row=$(manifest_target_row "$recorded" "$LH_TARGET"); then
+        IFS=$'\t' read -r existed backup <<< "$row"
+        [[ "$existed" == 1 && -n "$backup" && "$backup" != *$'\n'* && "$backup" == "$recorded/"* ]] || die "Recorded FCC backup does not contain a usable original lh.php: $recorded"
+        require_file "$backup"
+        validate_fcc_restore_state "$recorded"
+        UNINSTALL_DIRECTORY=$recorded
+        UNINSTALL_ORIGINAL_LH=$backup
+        return 0
+    fi
+
+    [[ -d "$WORK_ROOT" && ! -L "$WORK_ROOT" ]] || die "Required work root is unavailable: $WORK_ROOT"
+    [[ -n "$WORK_DIR" ]] || WORK_DIR=$(mktemp -d "$WORK_ROOT/.dvswitch-fccnames.XXXXXX")
+    probe="$WORK_DIR/lh.php"
+    for candidate in "$BACKUP_ROOT"/install-*; do
+        [[ -d "$candidate" && ! -L "$candidate" ]] || continue
+        candidate_name=${candidate##*/}
+        [[ "$candidate_name" < "$requested" ]] || continue
+        [[ -f "$candidate/MANIFEST" && ! -L "$candidate/MANIFEST" ]] || continue
+        if ! candidate_row=$(manifest_target_row "$candidate" "$LH_TARGET"); then continue; fi
+        IFS=$'\t' read -r candidate_existed candidate_backup <<< "$candidate_row"
+        [[ "$candidate_existed" == 1 && -n "$candidate_backup" && "$candidate_backup" != *$'\n'* && "$candidate_backup" == "$candidate/"* ]] || continue
+        [[ -f "$candidate_backup" && ! -L "$candidate_backup" ]] || continue
+        if grep -Eq '^// DVSwitch-Mods: FCC first-name activity columns v[12]$' "$candidate_backup"; then continue; fi
+        cp -- "$candidate_backup" "$probe"
+        if python3 "$PATCHER" --lh "$probe" >/dev/null 2>&1 && cmp -s "$probe" "$LH_TARGET"; then
+            selected=$candidate
+            UNINSTALL_ORIGINAL_LH=$candidate_backup
+        fi
+    done
+
+    [[ -n "$selected" ]] || die "Recorded FCC backup has no original lh.php, and no earlier protected baseline matches the current FCC-edited file. No FCC files were changed."
+    UNINSTALL_DIRECTORY=$selected
+    printf 'NOTICE: Verified earlier FCC baseline %s against the current lh.php; using it to restore the complete pre-install state.\n' "$selected"
 }
 
 run_uninstall() {
     preflight
-    local name=$1 directory="$BACKUP_ROOT/$1" original_lh target custom_temporary=""
+    local name=$1 directory original_lh target custom_temporary=""
     [[ "$name" =~ ^install-[0-9]{8}-[0-9]{6}(-[0-9]+)?$ ]] || die "Invalid backup name."
+    directory="$BACKUP_ROOT/$name"
     [[ -d "$directory" && ! -L "$directory" ]] || die "Backup not found: $name"
-    require_file "$directory/MANIFEST"
-    original_lh=$(uninstall_backup_file "$directory" "$LH_TARGET")
+    resolve_uninstall_backup "$name"
+    directory=$UNINSTALL_DIRECTORY
+    original_lh=$UNINSTALL_ORIGINAL_LH
     [[ -n "$WORK_DIR" ]] || WORK_DIR=$(mktemp -d "$WORK_ROOT/.dvswitch-fcc-firstnames.XXXXXX")
     install -d -m 0700 "$WORK_DIR/original"
     cp -- "$original_lh" "$WORK_DIR/original/lh.php"

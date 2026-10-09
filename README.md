@@ -601,6 +601,10 @@ installation order. A successful run ends with
 The follow-up `--status` should report that there are no active manager-recorded
 installations. If a restore fails or its backup is unavailable, the manager
 stops and retains that component's active record so the problem can be reviewed.
+If an FCC upgrade backup does not contain `lh.php`, its uninstaller checks older
+FCC backups and uses one only when its pre-FCC snapshot reproduces the current
+file exactly after applying the FCC patch. If no matching baseline is available,
+it stops without changing FCC files or removing that active record.
 
 This removes only standard components recorded by the manager. It does not
 uninstall DVSwitch itself, the separate DVSwitch Mode Buttons repository, or
