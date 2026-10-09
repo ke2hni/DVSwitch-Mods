@@ -39,6 +39,7 @@ with tempfile.TemporaryDirectory(prefix="fcc-unit-whitespace-") as directory:
         return result.returncode == 0
 
     assert matches("[Unit]\nDescription=Test\n[Service]\nExecStart=/bin/true\n\n"), "trailing blank line should be ignored"
+    assert matches("[Unit]\n# Version: 1.0.0\nDescription=Test\n[Service]\nExecStart=/bin/true\n"), "Version comment should be ignored"
     assert not matches("[Unit]\nDescription=Test\n[Service]\nExecStart=/bin/false\n"), "meaningful unit change was ignored"
     assert not matches("[Unit]\nDescription=Test\n\n[Service]\nExecStart=/bin/true\n"), "interior blank-line difference was ignored"
 

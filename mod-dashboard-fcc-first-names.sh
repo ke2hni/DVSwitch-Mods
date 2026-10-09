@@ -126,7 +126,10 @@ from pathlib import Path
 import sys
 
 def normalized(path):
-    lines = Path(path).read_bytes().splitlines()
+    lines = [
+        line for line in Path(path).read_bytes().splitlines()
+        if not line.startswith(b"# Version: ")
+    ]
     while lines and not lines[-1].strip():
         lines.pop()
     return b"\n".join(lines) + (b"\n" if lines else b"")
