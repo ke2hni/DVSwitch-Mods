@@ -185,12 +185,28 @@ def without_version_comment(path):
     data = Path(path).read_bytes()
     return re.sub(rb"(?m)^# Version: [^\r\n]*(?:\r?\n|$)", b"", data)
 
+def without_entity_fallback(data):
+    # The preceding supported builder only emitted EN first_name (row 8).
+    # Accept that exact release so existing installations can upgrade.
+    data = data.replace(
+        b'def ascii_entity_name(value: str) -> str:\n'
+        b'    """Keep an FCC organization/entity name when no personal first name exists."""\n'
+        b'    value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")\n'
+        b'    value = " ".join(value.strip().split())\n'
+        b'    value = "".join(ch for ch in value if ch.isalnum() or ch in " .\'-")\n'
+        b'    return value[:40].strip()\n\n\n', b""
+    )
+    return data.replace(
+        b'first = ascii_name(row[8]) or ascii_entity_name(row[7])',
+        b'first = ascii_name(row[8])',
+    )
+
 try:
     source = without_version_comment(sys.argv[1])
     installed = without_version_comment(sys.argv[2])
 except OSError:
     raise SystemExit(1)
-raise SystemExit(0 if source == installed else 1)
+raise SystemExit(0 if source == installed or without_entity_fallback(source) == installed else 1)
 PY
 }
 

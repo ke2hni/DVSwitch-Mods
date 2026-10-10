@@ -2,7 +2,7 @@
 # Version: 1.0.0
 # SPDX-License-Identifier: MIT
 
-"""Ensure the FCC check accepts a Version-comment-only builder difference."""
+"""Ensure the FCC check accepts only known-safe installed builder variants."""
 from pathlib import Path
 import subprocess
 import tempfile
@@ -29,7 +29,24 @@ with tempfile.TemporaryDirectory(prefix="fcc-builder-version-") as directory:
         return result.returncode == 0
 
     assert matches(), "a Version-comment-only difference was rejected"
+    current = (ROOT / "lib/build_fcc_first_names.py").read_text(encoding="utf-8")
+    entity_function = '''def ascii_entity_name(value: str) -> str:
+    """Keep an FCC organization/entity name when no personal first name exists."""
+    value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    value = " ".join(value.strip().split())
+    value = "".join(ch for ch in value if ch.isalnum() or ch in " .'-")
+    return value[:40].strip()
+
+
+'''
+    previous = current.replace(entity_function, "").replace(
+        "first = ascii_name(row[8]) or ascii_entity_name(row[7])",
+        "first = ascii_name(row[8])",
+    )
+    installed.write_text(previous)
+    repository.write_text(current)
+    assert matches(), "the supported previous builder release was rejected"
     installed.write_text(common.replace("return 0", "return 1"))
     assert not matches(), "a builder code difference was accepted"
 
-print("PASS: FCC builder compatibility ignores only the Version comment")
+print("PASS: FCC builder compatibility accepts version metadata and the supported previous release")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Version: 1.0.0
+# Version: 1.1.0
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Jeff Milne, KE2HNI
 
@@ -30,6 +30,14 @@ def ascii_name(value: str) -> str:
     value = " ".join(value.strip().split())
     if value.isupper() or value.islower():
         value = value.title()
+    value = "".join(ch for ch in value if ch.isalnum() or ch in " .'-")
+    return value[:40].strip()
+
+
+def ascii_entity_name(value: str) -> str:
+    """Keep an FCC organization/entity name when no personal first name exists."""
+    value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    value = " ".join(value.strip().split())
     value = "".join(ch for ch in value if ch.isalnum() or ch in " .'-")
     return value[:40].strip()
 
@@ -91,7 +99,7 @@ def build(archive: Path, output: Path, minimum: int = MIN_PRODUCTION_RECORDS) ->
                     en_rows += 1
                     if len(row) < 10:
                         continue
-                    first = ascii_name(row[8])
+                    first = ascii_name(row[8]) or ascii_entity_name(row[7])
                     if first:
                         updates.append((first, row[1].strip()))
                     if len(updates) >= 50_000:

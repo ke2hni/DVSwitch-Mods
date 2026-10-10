@@ -316,7 +316,9 @@ intentionally left unchanged. DVSwitch's
 worldwide `DMRIds.dat` supplies the complete meaningful name or description,
 including international operators and entries such as club names. Blank,
 placeholder, conflicting, or malformed DMR names fall back to the FCC first-name
-database; `---` is shown only when neither source supplies usable data. The mod also
+database; active FCC club or organization licenses without a personal first name
+use the FCC entity name as their fallback. `---` is shown only when neither source
+supplies usable data. The mod also
 installs a self-contained weekly FCC database updater and randomized systemd
 timer.
 
