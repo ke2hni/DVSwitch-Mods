@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-VERSION="1.2.3"
+VERSION="1.2.4"
 ROOT="/usr/share/dvswitch"
 CSS_FILE="${CSS_FILE:-$ROOT/css/css.php}"
 LH_FILE="${LH_FILE:-$ROOT/include/lh.php}"
@@ -17,7 +17,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-VERSION = "1.2.3"
+VERSION = "1.2.4"
 css_path, lh_path = map(Path, sys.argv[1:3])
 action = sys.argv[3]
 backup_root = Path(sys.argv[4])
@@ -79,7 +79,22 @@ for path in targets:
         print(f"ERROR: missing file: {path}")
         raise SystemExit(1)
 
-data = {path: path.read_text() for path in targets}
+data = {}
+newline_by_path = {}
+for path in targets:
+    raw = path.read_bytes()
+    if b"\r" in raw.replace(b"\r\n", b""):
+        print(f"ERROR: refusing mixed line endings in {path}")
+        raise SystemExit(1)
+    newline = b"\r\n" if b"\r\n" in raw else b"\n"
+    newline_by_path[path] = newline
+    data[path] = raw.decode("utf-8").replace("\r\n", "\n")
+
+def encoded_content(path, content):
+    encoded = content.encode("utf-8")
+    if newline_by_path[path] == b"\r\n":
+        encoded = encoded.replace(b"\n", b"\r\n")
+    return encoded
 states = []
 for path, replacements in targets.items():
     for old, new, expected in replacements:
@@ -141,7 +156,7 @@ if action in ("--restore", "restore"):
             os.close(fd)
             temp = Path(name)
             shutil.copystat(path, temp)
-            temp.write_text(changed)
+            temp.write_bytes(encoded_content(path, changed))
             temporary.append((temp, path))
         for temp, path in temporary:
             os.replace(temp, path)
@@ -179,7 +194,7 @@ try:
         os.close(fd)
         temp = Path(name)
         shutil.copystat(path, temp)
-        temp.write_text(changed)
+        temp.write_bytes(encoded_content(path, changed))
         temporary.append((temp, path))
     for temp, path in temporary:
         os.replace(temp, path)

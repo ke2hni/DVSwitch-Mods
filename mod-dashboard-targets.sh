@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-readonly SCRIPT_VERSION="1.2.0"
+readonly SCRIPT_VERSION="1.2.1"
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly LH_TARGET="/usr/share/dvswitch/include/lh.php"
 readonly LOCALTX_TARGET="/usr/share/dvswitch/include/localtx.php"
@@ -29,6 +29,22 @@ usage() {
 
 require_regular_file() { [[ -f "$1" && ! -L "$1" ]] || die "Required regular file not found: $1"; }
 file_hash() { sha256sum "$1" | awk '{print $1}'; }
+
+same_content_ignoring_line_endings() {
+    python3 - "$1" "$2" <<'PY'
+from pathlib import Path
+import sys
+
+def normalized(path):
+    data = Path(path).read_bytes()
+    if b"\r" in data.replace(b"\r\n", b""):
+        return None
+    return data.replace(b"\r\n", b"\n")
+
+left, right = map(normalized, sys.argv[1:3])
+raise SystemExit(0 if left is not None and left == right else 1)
+PY
+}
 
 preflight() {
     [[ $EUID -eq 0 ]] || die "Run this command with sudo."
@@ -137,8 +153,20 @@ validate_target_restore_state() {
     if [[ -n "$lh_backup" ]]; then cp -- "$lh_backup" "$temp/lh.php"; else cp -- "$LH_TARGET" "$temp/lh.php"; fi
     if [[ -n "$localtx_backup" ]]; then cp -- "$localtx_backup" "$temp/localtx.php"; else cp -- "$LOCALTX_TARGET" "$temp/localtx.php"; fi
     if ! python3 "$PATCHER" --lh "$temp/lh.php" --localtx "$temp/localtx.php"; then rm -rf -- "$temp"; die "Cannot verify the current activity files against this Target backup; restore would risk removing another mod's edits."; fi
-    if [[ -n "$lh_backup" ]] && ! cmp -s "$temp/lh.php" "$LH_TARGET"; then rm -rf -- "$temp"; die "Refusing Target restore because lh.php has changes beyond this mod's patch. Remove later dashboard edits first."; fi
-    if [[ -n "$localtx_backup" ]] && ! cmp -s "$temp/localtx.php" "$LOCALTX_TARGET"; then rm -rf -- "$temp"; die "Refusing Target restore because localtx.php has changes beyond this mod's patch. Remove later dashboard edits first."; fi
+    if [[ -n "$lh_backup" ]] && ! cmp -s "$temp/lh.php" "$LH_TARGET"; then
+        if ! same_content_ignoring_line_endings "$temp/lh.php" "$LH_TARGET"; then
+            rm -rf -- "$temp"
+            die "Refusing Target restore because lh.php has changes beyond this mod's patch. Remove later dashboard edits first."
+        fi
+        printf 'NOTICE: lh.php differs from the verified Target state only in line endings; accepting the safe restore.\n'
+    fi
+    if [[ -n "$localtx_backup" ]] && ! cmp -s "$temp/localtx.php" "$LOCALTX_TARGET"; then
+        if ! same_content_ignoring_line_endings "$temp/localtx.php" "$LOCALTX_TARGET"; then
+            rm -rf -- "$temp"
+            die "Refusing Target restore because localtx.php has changes beyond this mod's patch. Remove later dashboard edits first."
+        fi
+        printf 'NOTICE: localtx.php differs from the verified Target state only in line endings; accepting the safe restore.\n'
+    fi
     rm -rf -- "$temp"
 }
 

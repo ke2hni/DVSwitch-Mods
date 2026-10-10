@@ -9,7 +9,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.2.7"
+readonly SCRIPT_VERSION="1.2.8"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly STATE_DIR="/var/lib/dvswitch-mods/manager"
 readonly STATE_FILE="$STATE_DIR/active-installs.tsv"
@@ -101,14 +101,16 @@ show_menu() {
         "1) Install all standard DVSwitch repairs and modifications" \
         "2) Install/launch the Dark Mode dashboard installer" \
         "3) Install/launch the Widescreen Display Layout installer" \
+        "4) Uninstall all manager-recorded standard components" \
         "0) Exit" \
         ""
-    printf 'Choose an option [0/1/2/3]: '
+    printf 'Choose an option [0/1/2/3/4]: '
     read -r choice
     case "$choice" in
         1) initialize_state; install_requested all ;;
         2) run_optional_mod_installer "DARK MODE" "$DARK_MODE_SCRIPT" ;;
         3) run_optional_mod_installer "DISPLAY LAYOUT" "$DISPLAY_LAYOUT_SCRIPT" ;;
+        4) initialize_state; uninstall_requested all ;;
         0) exit 0 ;;
         *) die "Invalid choice" ;;
     esac

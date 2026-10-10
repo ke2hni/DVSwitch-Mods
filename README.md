@@ -80,7 +80,7 @@ Run the manager without arguments:
 sudo ./manage-dvswitch-mods.sh
 ```
 
-The menu provides three installation choices:
+The menu provides three installation choices and an uninstall choice:
 
 1. **Standard DVSwitch repairs and modifications** — runs the complete
    dependency-ordered installation and records its reversible backups.
@@ -89,13 +89,14 @@ The menu provides three installation choices:
    backups.
 3. **Widescreen Display Layout** — launches the standalone responsive-layout
    installer. It creates its own protected and per-run backups.
+4. **Uninstall all standard components** — restores every standard component
+   recorded by this manager in reverse installation order.
 
 The Dark Mode and Display Layout installers do not require the standard
 component chain. STFU status, STFU activity, and RX Monitor position are
 included at the end of the standard component installation and uninstall
-order. Option 0 exits without changing anything. The interactive menu does not
-have an uninstall choice; use the manager's command-line uninstall commands
-described in [Status, backups, and removal](#-status-backups-and-removal).
+order. Option 0 exits without changing anything. The standalone Dark Mode and
+Widescreen installers are managed separately and are not removed by option 4.
 
 The standalone installers can also be run directly:
 
@@ -579,14 +580,16 @@ their backups are maintained by the standalone scripts.
 
 ## ↩️ Status, backups, and removal
 
-The interactive menu installs components; it has no uninstall option.
-Uninstallation is done from the command line and applies only to standard
+Option 4 in the interactive menu, or the command line, uninstalls all standard
 components installed and recorded by the manager. Review the active records
 before removing anything:
 
 ```bash
 sudo ./manage-dvswitch-mods.sh --status
 ```
+
+To start the same reverse-order uninstall from the menu, run
+`sudo ./manage-dvswitch-mods.sh` and choose option 4.
 
 On a test node, remove all manager-recorded standard components with:
 
@@ -601,6 +604,9 @@ installation order. A successful run ends with
 The follow-up `--status` should report that there are no active manager-recorded
 installations. If a restore fails or its backup is unavailable, the manager
 stops and retains that component's active record so the problem can be reviewed.
+Dashboard cell-padding preserves each file's existing line-ending style. The
+Target restore guard also accepts a verified file when only its LF/CRLF style
+differs; it still stops on any content difference.
 If an FCC upgrade backup does not contain `lh.php`, its uninstaller checks older
 FCC backups and uses one only when its pre-FCC snapshot reproduces the current
 file exactly after applying the FCC patch. If no matching baseline is available,

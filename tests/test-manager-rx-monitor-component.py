@@ -25,7 +25,9 @@ def main() -> None:
     component_list = manager.split("readonly -a COMPONENTS=(", 1)[1].split(")", 1)[0]
     require(component_list.rstrip().endswith("dashboard-stfu-status\n    dashboard-stfu-activity\n    dashboard-rx-monitor-left"),
             "STFU status/activity and RX Monitor are not appended to the standard component order")
-    require('Choose an option [0/1/2/3]:' in manager and '"4) Install STFU status cards' not in manager
+    require('Choose an option [0/1/2/3/4]:' in manager and
+            '"4) Uninstall all manager-recorded standard components"' in manager and
+            '"5) Move RX Monitor' not in manager
             and '"5) Move RX Monitor' not in manager,
             "STFU or RX Monitor was incorrectly added as a dedicated menu option")
     require("1) initialize_state; install_requested all ;;" in manager,

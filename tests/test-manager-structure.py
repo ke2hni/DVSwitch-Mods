@@ -61,6 +61,10 @@ def main() -> None:
             "hostname-title does not use its supported backup restore action")
     require("strict reverse" in master,
             "reverse-order uninstall safety notice is missing")
+    require('"4) Uninstall all manager-recorded standard components"' in master and
+            '4) initialize_state; uninstall_requested all ;;' in master and
+            'Choose an option [0/1/2/3/4]:' in master,
+            "interactive menu does not expose the recorded reverse-order uninstall")
     require("last_state_line" in master and "remove_last_state_line" in master,
             "recorded LIFO uninstall implementation is missing")
     require('component_is_recorded "$COMPONENT"' in master and

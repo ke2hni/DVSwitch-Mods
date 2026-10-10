@@ -72,4 +72,36 @@ with tempfile.TemporaryDirectory(prefix="dvsm-targeted-restore-") as tmp:
     require("unrelated CSS edit" in css.read_text() and "unrelated activity edit" in lh.read_text(),
             "cell-padding restore erased unrelated edits")
 
+    # The live DVSwitch files can use CRLF. The cell-padding tool must not
+    # normalize them to LF, since later full-file restore checks use byte cmp.
+    crlf_css = root / "crlf-css.php"
+    crlf_lh = root / "crlf-lh.php"
+    original_css = (cell_backups / backup_name / "css.php").read_bytes()
+    original_lh = (cell_backups / backup_name / "lh.php").read_bytes()
+    crlf_css.write_bytes(original_css.replace(b"\n", b"\r\n"))
+    crlf_lh.write_bytes(original_lh.replace(b"\n", b"\r\n"))
+    crlf_backups = root / "crlf-backups"
+    crlf_env = os.environ | {
+        "CSS_FILE": str(crlf_css), "LH_FILE": str(crlf_lh),
+        "BACKUP_ROOT": str(crlf_backups),
+    }
+    crlf_installed = subprocess.run(
+        ["bash", str(ROOT / "mod-dashboard-cell-padding.sh"), "--install"],
+        env=crlf_env, text=True, capture_output=True,
+    )
+    require(crlf_installed.returncode == 0,
+            "cell-padding install failed on CRLF files: " + crlf_installed.stdout + crlf_installed.stderr)
+    crlf_backup_name = next(crlf_backups.iterdir()).name
+    for path in (crlf_css, crlf_lh):
+        raw = path.read_bytes()
+        require(b"\r\n" in raw and b"\n" not in raw.replace(b"\r\n", b""),
+                f"cell-padding install changed line endings in {path.name}")
+    crlf_restored = run("mod-dashboard-cell-padding.sh", "--restore", crlf_backup_name, crlf_env)
+    require(crlf_restored.returncode == 0,
+            "cell-padding restore failed on CRLF files: " + crlf_restored.stdout + crlf_restored.stderr)
+    for path in (crlf_css, crlf_lh):
+        raw = path.read_bytes()
+        require(b"\r\n" in raw and b"\n" not in raw.replace(b"\r\n", b""),
+                f"cell-padding restore changed line endings in {path.name}")
+
 print("PASS: hostname-title and cell-padding manager restores reverse only owned edits")
