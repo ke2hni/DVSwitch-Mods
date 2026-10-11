@@ -1,5 +1,5 @@
 <!-- Version: 1.0.4 -->
-Not required but highly suggested to install my DVSwitch Mode Buttons Repository after installing this repository. [https://github.com/ke2hni/DVSwitch-Mode-Buttons](https://github.com/ke2hni/DVSwitch-Mode-Buttons)
+>Not required but highly suggested to install my DVSwitch Mode Buttons Repository after installing this repository. [https://github.com/ke2hni/DVSwitch-Mode-Buttons](https://github.com/ke2hni/DVSwitch-Mode-Buttons)
 
 <div align="center">
 This was tested on a fresh install of DVSwitch and a fresh configuration, then a reboot after DVSwitch was installed & configured.
