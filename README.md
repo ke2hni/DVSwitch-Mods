@@ -3,8 +3,6 @@
 This was tested on a fresh install of DVSwitch and a fresh configuration, then a reboot after DVSwitch was installed & configured.
 This has not been tested on an already modified installation of DVSwitch.  You could attempt an install and if any errors occur you could paste the error and the zip of this repository into AI/ChatGPT and it could help you fix any installation errors.  
 
-Not required but highly suggested to install my DVSwitch Mode Buttons Repository after installing this repository. [https://github.com/ke2hni/DVSwitch-Mode-Buttons](https://github.com/ke2hni/DVSwitch-Mode-Buttons)
-
 # 🛠️ DVSwitch-Mods
 
 ### Tested repairs and optional dashboard improvements for DVSwitch
@@ -15,6 +13,9 @@ Not required but highly suggested to install my DVSwitch Mode Buttons Repository
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 </div>
+
+Not required but highly suggested to install my DVSwitch Mode Buttons Repository after installing this repository. [https://github.com/ke2hni/DVSwitch-Mode-Buttons](https://github.com/ke2hni/DVSwitch-Mode-Buttons)
+
 
 > [!IMPORTANT]
 > These scripts repair or modify files already installed by DVSwitch. They do
