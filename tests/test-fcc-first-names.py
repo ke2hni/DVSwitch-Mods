@@ -95,7 +95,9 @@ with tempfile.TemporaryDirectory() as directory:
     require(b"\r\n" in raw and b"\n" not in raw.replace(b"\r\n", b""), "CRLF was not preserved")
     legend = localtx.read_text(encoding="utf-8")
     require(patcher.LEGEND_MARKER in legend and "/etc/dvswitch-mods/callsign-lookup.tsv" in legend, "manual callsign legend was not added")
-    require(legend.count("width:3ch;text-align:right") == 2, "legend terms do not share an aligned equals-sign column")
+    require("Name entered manually and saved in the local callsign names file" in legend and ">file location</span>" in legend,
+            "manual callsign legend does not explain the marker and file path")
+    require(legend.count("width:3ch;text-align:right") == 2, "equals signs do not align across the --- and * legend rows")
     require(patcher.patch_legend_text(legend) == legend, "aligned legend patch is not idempotent")
 
 legacy_legend = ('<div><b>Legend:</b> <b>---</b> = no data<br>\n  <b>*</b> = Name entered and saved by you in the local callsign file. '
@@ -105,7 +107,7 @@ upgraded_legend = patcher.patch_legend_text(legacy_legend)
 require(patcher.LEGEND_MARKER in upgraded_legend and "manual callsign names legend v1" not in upgraded_legend,
         "existing manual callsign legend marker was not upgraded")
 require(upgraded_legend.count("width:3ch;text-align:right") == 2,
-        "existing legend terms were not aligned during upgrade")
+        "existing legend --- and * terms were not aligned during upgrade")
 require(patcher.patch_legend_text(upgraded_legend) == upgraded_legend,
         "upgraded existing legend is not idempotent")
 styled_v2_legend = ('<div><b>Legend:</b> <b style="display:inline-block;width:3ch;text-align:right;">---</b> = no data<br>\n  '
@@ -125,6 +127,8 @@ wrapped_v3_legend = ('<div><b>Legend:</b> <span style="display:inline-block;widt
 upgraded_v3_legend = patcher.patch_legend_text(wrapped_v3_legend)
 require(patcher.LEGEND_MARKER in upgraded_v3_legend and '<b>Legend:</b><br>\n' in upgraded_v3_legend,
         "v3 legend heading was not moved above its aligned rows")
+require("Name entered manually and saved in the local callsign names file" in upgraded_v3_legend,
+        "v3 legend wording was not updated")
 require(patcher.patch_legend_text(upgraded_v3_legend) == upgraded_v3_legend,
         "upgraded v3 legend is not idempotent")
 

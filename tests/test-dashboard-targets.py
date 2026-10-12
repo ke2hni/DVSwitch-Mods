@@ -54,6 +54,8 @@ for name, original in (("lh.php", lh), ("localtx.php", localtx)):
     require(changed.count(patcher.LEGEND) == (1 if name == "localtx.php" else 0), name + " legend count incorrect")
     if name == "localtx.php":
         require('margin:3px 0 0 14px;' in patcher.LEGEND, "Local Activity legend 14px alignment is missing")
+        require("No name found in the local DMR ID or FCC data; country shown when available." in patcher.LEGEND,
+                "Local Activity legend still uses misleading country wording")
     require(patcher.patch_text(changed, name) == changed, name + " patch not idempotent")
     if name == "localtx.php":
         with_manual_names = fcc_patcher.patch_legend_text(changed)

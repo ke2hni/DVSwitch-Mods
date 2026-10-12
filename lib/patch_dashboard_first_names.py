@@ -67,19 +67,32 @@ def patch_legend_text(text: str) -> str:
     if LEGEND_MARKER in block:
         if block.count(LEGEND_MARKER) != 1 or '/etc/dvswitch-mods/callsign-lookup.tsv' not in block:
             raise PatchError("incomplete or duplicated manual callsign legend")
-        return text
+        # Re-run formatting so wording/alignment improvements update installed legends.
     elif previous_marker is not None:
         if block.count(previous_marker) != 1 or '/etc/dvswitch-mods/callsign-lookup.tsv' not in block:
             raise PatchError("incomplete or duplicated previous manual callsign legend")
+        replacement = ('<br>\n  <span style="display:inline-block;width:3ch;text-align:right;"><b>*</b></span> = '
+                       'Name entered manually and saved in the local callsign names file '
+                       '(<span title="Manual callsign names are stored in /etc/dvswitch-mods/callsign-lookup.tsv.">file location</span>)')
+        old_manual_line = re.compile(r'<br>\s*<b\b[^>]*>\*</b>\s*=.*?(?=<span title=)', re.S)
+        if old_manual_line.search(block):
+            block = old_manual_line.sub(replacement, block, count=1)
+        else:
+            aligned_manual_line = re.compile(r'<br>\s*<span style="display:inline-block;width:\d+ch;text-align:right;"><b\b[^>]*>\*</b></span>\s*=.*?(?=<span title=)', re.S)
+            if not aligned_manual_line.search(block):
+                raise PatchError("previous manual callsign legend row is ambiguous")
+            block = aligned_manual_line.sub(replacement, block, count=1)
         block = block.replace(previous_marker, LEGEND_MARKER, 1)
     else:
-        extra = ('<br>\n  <b>*</b> = Name entered and saved by you in the local callsign file. '
-                 '<span title="Manually entered callsign names are stored in /etc/dvswitch-mods/callsign-lookup.tsv.">Database</span>\n  '
+        extra = ('<br>\n  <b>*</b> = Name entered manually and saved in the local callsign names file '
+                 '(<span title="Manual callsign names are stored in /etc/dvswitch-mods/callsign-lookup.tsv.">file location</span>)'
+                 '<br>\n  '
                  + LEGEND_MARKER + '\n')
         block = block.replace('</div>', extra + '</div>', 1)
 
     # Keep the heading separate so it does not shift the first legend row.
-    block = re.sub(r'(<b\b[^>]*>\s*Legend:\s*</b>)\s*', r'\1<br>\n  ', block, count=1, flags=re.I)
+    block = re.sub(r'(<b\b[^>]*>\s*Legend:\s*</b>)(?:[ \t\r\n]*<br>[ \t\r\n]*)*', r'\1<br>\n', block, count=1, flags=re.I)
+    block = re.sub(r'(?m)^[ \t]*(?=<span style="display:inline-block;width:\d+ch;text-align:right;">)', '  ', block)
 
     # Wrap each bold legend term in a fixed-width span. Keeping the bold term
     # itself unchanged preserves compatibility with the Target legend patcher.
@@ -106,6 +119,7 @@ def patch_legend_text(text: str) -> str:
         bold_term = f'<b{attrs}>{match.group("label")}</b>'
         return f'<span style="display:inline-block;width:{width}ch;text-align:right;">{bold_term}</span>{match.group("space")}='
     block = term_pattern.sub(align_term, block)
+    block = re.sub(r'(?m)^ {1,2}(?=<span style="display:inline-block;width:\d+ch;text-align:right;">)', '  ', block)
     return text[:found[0].start()] + block + text[found[0].end():]
 
 
@@ -113,7 +127,7 @@ def unpatch_legend_text(text: str) -> str:
     import re
     if LEGEND_MARKER not in text:
         return text
-    pattern = re.compile(r'<br>\n  <b>\*</b> = Name entered and saved by you in the local callsign file\. <span title="Manually entered callsign names are stored in /etc/dvswitch-mods/callsign-lookup\.tsv\."\s*>Database</span>\n  ' + re.escape(LEGEND_MARKER) + r'\n')
+    pattern = re.compile(r'<br>\n  <b>\*</b> = Name entered manually and saved in the local callsign names file \(<span title="Manual callsign names are stored in /etc/dvswitch-mods/callsign-lookup\.tsv\."\s*>file location</span>\)<br>\n  ' + re.escape(LEGEND_MARKER) + r'\n')
     updated, count = pattern.subn('', text, count=1)
     if count != 1 or LEGEND_MARKER in updated:
         raise PatchError("manual callsign legend was changed; refusing unsafe removal")
