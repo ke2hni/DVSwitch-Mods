@@ -45,15 +45,15 @@ require(changed.count(patcher.MARKER) == 1, "marker missing")
 require(changed.count(patcher.INCLUDE) == 1, "helper include missing")
 require(changed.count("dvsModsFccFirstName($listElem[2])") == 1, "FCC lookup missing")
 require(changed.count("dvsModsCustomCallsignDescription($listElem[2])") == 1, "custom description lookup missing")
-require("($dvsModsCustomDescription !== false) ? $dvsModsCustomDescription : dvsModsFccFirstName" in changed, "custom description does not take precedence over database names")
+require(changed.index("$dvsModsFirstName = dvsModsFccFirstName") < changed.index("dvsModsManualCallsignName($listElem[2])") < changed.index("dvsModsCustomCallsignDescription($listElem[2])"), "FCC/DMR database name does not take precedence over manual and custom fallback names")
+require("$dvsModsNameHtml = '<button type=\"button\"" in changed and "fetch('callsign-lookup.php'" in changed, "unknown name marker is not clickable with a local save action")
+require(patcher.MARKER.endswith("v3"), "FCC patch version was not advanced for manual names")
 require(changed.count("dvsModsDmrIdCallsign($listElem[2])") == 1, "DMR resolver missing")
 require(changed.count("width:12ch;min-width:12ch;max-width:12ch") == 1, "Name-cell width and wrap limit missing")
 require(changed.count("overflow-wrap:anywhere") == 1, "Name-cell overflow wrapping missing")
 require("width:640px" not in changed, "fixture unexpectedly contained layout width")
 require(patcher.patch_text(changed) == changed, "patch is not idempotent")
-old_base_block = "$dvsModsFirstName = dvsModsFccFirstName($listElem[2]);\n                $dvsModsCountry = ($dvsModsFirstName === '---') ? dvsModsFccCountry($listElem[2]) : '';\n                $dvsModsNameHtml = htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, \"UTF-8\");\n                if ($dvsModsCountry !== '') { $dvsModsNameHtml .= '<br>'.htmlspecialchars($dvsModsCountry, ENT_QUOTES | ENT_SUBSTITUTE, \"UTF-8\"); }"
-new_custom_block = "$dvsModsCustomDescription = dvsModsCustomCallsignDescription($listElem[2]);\n                $dvsModsFirstName = ($dvsModsCustomDescription !== false) ? $dvsModsCustomDescription : dvsModsFccFirstName($listElem[2]);\n                $dvsModsCountry = ($dvsModsFirstName === '---') ? dvsModsFccCountry($listElem[2]) : '';\n                $dvsModsNameHtml = htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, \"UTF-8\");\n                if ($dvsModsCountry !== '') { $dvsModsNameHtml .= '<br>'.htmlspecialchars($dvsModsCountry, ENT_QUOTES | ENT_SUBSTITUTE, \"UTF-8\"); }"
-legacy_country_upgrade = changed.replace(new_custom_block, old_base_block, 1)
+legacy_country_upgrade = changed.replace(patcher.NAME_BLOCK, patcher.OLD_NAME_BLOCK, 1).replace(patcher.MARKER, patcher.PREVIOUS_MARKER, 1)
 require(legacy_country_upgrade != changed, "failed to prepare legacy country-fallback fixture")
 require(patcher.patch_text(legacy_country_upgrade) == changed, "existing country-fallback installation was not upgraded")
 
@@ -65,6 +65,11 @@ require(patcher.patch_text(legacy_width_style) == changed, "installed 10ch FCC N
 
 legacy = changed.replace(patcher.MARKER, patcher.LEGACY_MARKER, 1)
 require(patcher.patch_text(legacy) == changed, "legacy marker was not upgraded")
+
+legacy_name = changed.replace(patcher.NAME_BLOCK, patcher.OLD_LEGACY_NAME, 1)
+legacy_name = legacy_name.replace("$dvsModsNameHtml.'</b></td>';", "htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, \"UTF-8\").'</b></td>';", 1)
+legacy_name = legacy_name.replace(patcher.MARKER, patcher.LEGACY_MARKER, 1)
+require(patcher.patch_text(legacy_name) == changed, "legacy FCC Name block was not upgraded")
 
 targeted = changed.replace(
     "if (strlen($listElem[4]) == 1)",
@@ -83,9 +88,13 @@ else:
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory) / "lh.php"
     path.write_bytes(fixture.replace("\n", "\r\n").encode())
-    patcher.patch_file(path)
+    localtx = Path(directory) / "localtx.php"
+    localtx.write_text('<div><b>Legend:</b> <b>---</b> = no data</div>', encoding="utf-8")
+    subprocess.run(["python3", str(ROOT / "lib/patch_dashboard_first_names.py"), "--lh", str(path), "--localtx", str(localtx)], check=True)
     raw = path.read_bytes()
     require(b"\r\n" in raw and b"\n" not in raw.replace(b"\r\n", b""), "CRLF was not preserved")
+    legend = localtx.read_text(encoding="utf-8")
+    require(patcher.LEGEND_MARKER in legend and "/etc/dvswitch-mods/callsign-lookup.tsv" in legend, "manual callsign legend was not added")
 
 installer = (ROOT / "mod-dashboard-fcc-first-names.sh").read_text()
 require('cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die' not in installer,
@@ -98,15 +107,19 @@ for entry in ("9999 = Announcement", "H4MLNK = YSF Link", "N0CALL = Announcement
 require('readonly CALLSIGN_DESCRIPTIONS_TARGET="/etc/dvswitch-mods/callsign-descriptions.tsv"' in installer, "custom file install path missing")
 require('if [[ ! -e "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then' in installer, "installer does not preserve existing user descriptions")
 require('cp -a -- "$CALLSIGN_DESCRIPTIONS_TARGET" "$custom_temporary"' in installer, "uninstall does not preserve a user's custom descriptions")
-require('"$CALLSIGN_DESCRIPTIONS_TARGET"; do backup_target "$target"; done' in installer, "uninstall safety backup omits custom descriptions")
+require('"$CALLSIGN_DESCRIPTIONS_TARGET" "$CALLSIGN_NAMES_TARGET"; do backup_target "$target"; done' in installer, "uninstall safety backup omits user TSV files")
 require('Custom callsign descriptions: editable file present' in installer, "--check does not report custom file state")
-require("--localtx" not in installer, "FCC installer still invokes Local Activity patching")
+require('readonly CALLSIGN_NAMES_TARGET="/etc/dvswitch-mods/callsign-lookup.tsv"' in installer, "manual callsign names file path missing")
+require('readonly LOCALTX_TARGET="/usr/share/dvswitch/include/localtx.php"' in installer, "legend dashboard file target missing")
+require('dvsModsSaveManualCallsignName($_POST[\'callsign\'] ?? \'\', $_POST[\'name\'] ?? \'\')' in (ROOT / "lib/dvswitch_mods_callsign_name_save.php").read_text(), "server-side manual name endpoint is missing")
+require("--localtx" in installer, "FCC installer does not patch the legend")
 require('require_file "$LH_TARGET"' in installer, "FCC installer does not require Gateway Activity")
-require("LOCALTX_TARGET" not in installer, "FCC installer still owns Local Activity")
+require('stage_install_component "$WORK_DIR/localtx.php" "$LOCALTX_TARGET"' in installer, "FCC installer does not install its legend patch")
 php = shutil.which("php")
 if php:
     subprocess.run([php, str(ROOT / "tests/test-fcc-country-lookup.php")], check=True)
     subprocess.run([php, str(ROOT / "tests/test-fcc-custom-descriptions.php")], check=True)
+    subprocess.run([php, str(ROOT / "tests/test-fcc-manual-callsign-names.php")], check=True)
 else:
     print("SKIP: PHP country/custom-description runtime cases (php unavailable)")
 print("PASS: surgical FCC Gateway Activity patcher tests")

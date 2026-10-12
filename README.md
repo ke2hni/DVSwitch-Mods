@@ -314,8 +314,9 @@ the Repairs section.
 
 ### 5. Worldwide DMR/FCC names
 
-**What it adds:** A Name column to Gateway Activity only. Local Activity is
-intentionally left unchanged. DVSwitch's
+**What it adds:** A Name column to Gateway Activity, a clickable `---` prompt
+for entering missing names, and a legend tooltip that shows where names are
+stored. DVSwitch's
 worldwide `DMRIds.dat` supplies the complete meaningful name or description,
 including international operators and entries such as club names. Blank,
 placeholder, conflicting, or malformed DMR names fall back to the FCC first-name
@@ -325,8 +326,14 @@ supplies usable data. The mod also
 installs a self-contained weekly FCC database updater and randomized systemd
 timer.
 
-If no usable FCC/DMR name is available, the dashboard can show the callsign's
-DXCC country from CTY.DAT. During installation, the installer downloads and
+If no usable FCC/DMR name is available, the dashboard checks the user-entered
+name file at `/etc/dvswitch-mods/callsign-lookup.tsv`. A saved name is marked
+with `*`. The local FCC/DMR databases always take precedence, so the manual name
+and asterisk stop appearing if a database later supplies a name. When no local
+name is available, the dashboard can show the callsign's DXCC country from
+CTY.DAT. The `---` marker is clickable and opens a small name-entry prompt; the
+entry is saved locally without querying QRZ, QRZCQ, or another service. During
+installation, the installer downloads and
 validates CTY.DAT when no valid copy is present, so the first install is ready
 without a separate updater command. The weekly updater refreshes CTY.DAT and
 keeps the previous file if a later refresh fails. The country line is omitted
@@ -352,7 +359,8 @@ The installer copies the starter custom-description file from
 `/etc/dvswitch-mods/callsign-descriptions.tsv` once. Edit the installed file to
 add exact identifiers in `CALLSIGN = DESCRIPTION` format, with spaces around
 `=`. One identifier goes on each line. Existing tab-separated entries remain
-supported. A matching custom description takes precedence over FCC/DMR names and the
+supported. FCC/DMR names take precedence. When neither database nor the manual
+name file has an entry, a matching custom description is shown before the
 CTY.DAT country fallback. Upgrades preserve the installed file and its edits;
 the file is also retained on uninstall. To adopt newer starter entries from
 GitHub later, compare the repository file with the installed file and merge the
@@ -360,6 +368,11 @@ entries instead of replacing your edited copy blindly.
 
 Starter entries: `9999` (NXDN Announcement), `H4LNK` (YSF Link), `N0CALL`
 (P25 Announcement), and `AMERICALNK` (America Link).
+
+Manual names are stored separately in `/etc/dvswitch-mods/callsign-lookup.tsv`
+as `CALLSIGN = NAME`, one entry per line. Hover over **Database** in the
+dashboard legend to see the file path. The manual-name file is retained during
+upgrades and uninstall so its entries can be reviewed or reused.
 
 Manual FCC update:
 

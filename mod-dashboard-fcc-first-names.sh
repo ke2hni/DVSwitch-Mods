@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.4.2"
+readonly SCRIPT_VERSION="1.5.0"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PATCHER="$SCRIPT_DIR/lib/patch_dashboard_first_names.py"
 readonly BUILDER="$SCRIPT_DIR/lib/build_fcc_first_names.py"
@@ -15,9 +15,13 @@ readonly UPDATER_SOURCE="$SCRIPT_DIR/lib/dvswitch_fcc_first_names_update.sh"
 readonly SERVICE_SOURCE="$SCRIPT_DIR/systemd/dvswitch-fcc-first-names-update.service"
 readonly TIMER_SOURCE="$SCRIPT_DIR/systemd/dvswitch-fcc-first-names-update.timer"
 readonly LH_TARGET="/usr/share/dvswitch/include/lh.php"
+readonly LOCALTX_TARGET="/usr/share/dvswitch/include/localtx.php"
 readonly HELPER_TARGET="/usr/share/dvswitch/include/dvswitch_mods_fcc_first_names.php"
+readonly CALLSIGN_NAME_SAVE_SOURCE="$SCRIPT_DIR/lib/dvswitch_mods_callsign_name_save.php"
+readonly CALLSIGN_NAME_SAVE_TARGET="/usr/share/dvswitch/callsign-lookup.php"
 readonly CALLSIGN_DESCRIPTIONS_SOURCE="$SCRIPT_DIR/data/callsign-descriptions.tsv"
 readonly CALLSIGN_DESCRIPTIONS_TARGET="/etc/dvswitch-mods/callsign-descriptions.tsv"
+readonly CALLSIGN_NAMES_TARGET="/etc/dvswitch-mods/callsign-lookup.tsv"
 readonly DATABASE_TARGET="/var/lib/mmdvm/dvswitch-mods-fcc-first-names.dat"
 readonly CTY_DATABASE_TARGET="/var/lib/mmdvm/dvswitch-mods-cty.dat"
 readonly UPDATER_TARGET="/usr/local/sbin/dvswitch-fcc-first-names-update"
@@ -85,11 +89,11 @@ dashboard_health() {
 preflight() {
     check_platform
     for command in awk chmod chown cmp cp curl date grep install mktemp mv php python3 rm sha256sum stat systemctl; do require_command "$command"; done
-    require_file "$PATCHER"; require_file "$BUILDER"; require_file "$HELPER_SOURCE"; require_file "$CALLSIGN_DESCRIPTIONS_SOURCE"; require_file "$TRANSACTION_LIBRARY"
+    require_file "$PATCHER"; require_file "$BUILDER"; require_file "$HELPER_SOURCE"; require_file "$CALLSIGN_NAME_SAVE_SOURCE"; require_file "$CALLSIGN_DESCRIPTIONS_SOURCE"; require_file "$TRANSACTION_LIBRARY"
     require_file "$UPDATER_SOURCE"; require_file "$SERVICE_SOURCE"; require_file "$TIMER_SOURCE"
-    require_file "$LH_TARGET"
+    require_file "$LH_TARGET"; require_file "$LOCALTX_TARGET"
     if [[ -e "$CALLSIGN_DESCRIPTIONS_TARGET" || -L "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then require_file "$CALLSIGN_DESCRIPTIONS_TARGET"; fi
-    php -l "$LH_TARGET" >/dev/null; php -l "$HELPER_SOURCE" >/dev/null
+    php -l "$LH_TARGET" >/dev/null; php -l "$LOCALTX_TARGET" >/dev/null; php -l "$HELPER_SOURCE" >/dev/null; php -l "$CALLSIGN_NAME_SAVE_SOURCE" >/dev/null
     dashboard_health || die "Apache or the HTTPS dashboard is not healthy."
 }
 
@@ -297,12 +301,13 @@ prepare_dashboard() {
     [[ -d "$WORK_ROOT" && ! -L "$WORK_ROOT" ]] || die "Required work root is unavailable: $WORK_ROOT"
     [[ -n "$WORK_DIR" ]] || WORK_DIR=$(mktemp -d "$WORK_ROOT/.dvswitch-fcc-firstnames.XXXXXX")
     cp -- "$LH_TARGET" "$WORK_DIR/lh.php"
-    python3 "$PATCHER" --lh "$WORK_DIR/lh.php"
-    php -l "$WORK_DIR/lh.php" >/dev/null
-    local lh_hash
-    lh_hash=$(file_hash "$WORK_DIR/lh.php")
-    python3 "$PATCHER" --lh "$WORK_DIR/lh.php"
-    [[ "$lh_hash" == "$(file_hash "$WORK_DIR/lh.php")" ]] || die "Dashboard patch is not idempotent."
+    cp -- "$LOCALTX_TARGET" "$WORK_DIR/localtx.php"
+    python3 "$PATCHER" --lh "$WORK_DIR/lh.php" --localtx "$WORK_DIR/localtx.php"
+    php -l "$WORK_DIR/lh.php" >/dev/null; php -l "$WORK_DIR/localtx.php" >/dev/null
+    local lh_hash localtx_hash
+    lh_hash=$(file_hash "$WORK_DIR/lh.php"); localtx_hash=$(file_hash "$WORK_DIR/localtx.php")
+    python3 "$PATCHER" --lh "$WORK_DIR/lh.php" --localtx "$WORK_DIR/localtx.php"
+    [[ "$lh_hash" == "$(file_hash "$WORK_DIR/lh.php")" && "$localtx_hash" == "$(file_hash "$WORK_DIR/localtx.php")" ]] || die "Dashboard patch is not idempotent."
 }
 
 build_database() {
@@ -369,10 +374,10 @@ stage_install_component() {
 
 run_check() {
     preflight; prepare_dashboard
-    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php"; then
-        printf 'ALREADY MODIFIED: Gateway Activity worldwide DMR/FCC Name column is installed; Local Activity was not modified.\n'
+    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php"; then
+        printf 'ALREADY MODIFIED: Gateway Activity worldwide DMR/FCC names, manual name entry, country fallback, and legend are installed.\n'
     else
-        printf 'MODIFICATION READY:\nBefore lh.php:      %s\nAfter lh.php:       %s\nLocal Activity:    unchanged\n' "$(file_hash "$LH_TARGET")" "$(file_hash "$WORK_DIR/lh.php")"
+        printf 'MODIFICATION READY:\nGateway Activity before: %s\nGateway Activity after:  %s\nLocal Activity before:   %s\nLocal Activity after:    %s\n' "$(file_hash "$LH_TARGET")" "$(file_hash "$WORK_DIR/lh.php")" "$(file_hash "$LOCALTX_TARGET")" "$(file_hash "$WORK_DIR/localtx.php")"
     fi
     if [[ -f "$DATABASE_TARGET" && ! -L "$DATABASE_TARGET" ]]; then
         local database_count database_checksum
@@ -396,6 +401,7 @@ run_check() {
         printf 'FCC weekly updater: not installed; --install will add it.\n'
     fi
     if [[ -f "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then printf 'Custom callsign descriptions: editable file present at %s.\n' "$CALLSIGN_DESCRIPTIONS_TARGET"; else printf 'MODIFICATION READY: --install will create the editable custom callsign file at %s.\n' "$CALLSIGN_DESCRIPTIONS_TARGET"; fi
+    if [[ -f "$CALLSIGN_NAMES_TARGET" ]]; then printf 'Manual callsign names: editable file present at %s.\n' "$CALLSIGN_NAMES_TARGET"; else printf 'MODIFICATION READY: --install will create the manual callsign names file at %s.\n' "$CALLSIGN_NAMES_TARGET"; fi
     printf 'PASS: supported activity-table structure. No files changed.\n'
 }
 
@@ -403,7 +409,7 @@ run_install() {
     preflight; prepare_dashboard
     local cty_ready=0
     if validate_cty "$CTY_DATABASE_TARGET"; then cty_ready=1; fi
-    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$DATABASE_TARGET" ]] && [[ -f "$CALLSIGN_DESCRIPTIONS_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_release_state)" == current ]] && [[ $cty_ready -eq 1 ]]; then
+    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$CALLSIGN_NAME_SAVE_TARGET" ]] && cmp -s "$CALLSIGN_NAME_SAVE_SOURCE" "$CALLSIGN_NAME_SAVE_TARGET" && [[ -f "$CALLSIGN_NAMES_TARGET" ]] && [[ "$(stat -c '%U:%G:%a' "$CALLSIGN_NAMES_TARGET")" == "root:www-data:660" ]] && [[ -f "$DATABASE_TARGET" ]] && [[ -f "$CALLSIGN_DESCRIPTIONS_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_release_state)" == current ]] && [[ $cty_ready -eq 1 ]]; then
         printf 'PASS: worldwide DMR/FCC dashboard Name modification is already installed. No files changed.\n'; return
     fi
     if [[ $cty_ready -eq 0 ]]; then prepare_cty_candidate; fi
@@ -418,11 +424,22 @@ run_install() {
     INSTALL_ACTIVE=1
     stage_updater_components
     stage_install_component "$WORK_DIR/lh.php" "$LH_TARGET" root root 0644
+    stage_install_component "$WORK_DIR/localtx.php" "$LOCALTX_TARGET" root root 0644
     stage_install_component "$HELPER_SOURCE" "$HELPER_TARGET" root root 0644
+    stage_install_component "$CALLSIGN_NAME_SAVE_SOURCE" "$CALLSIGN_NAME_SAVE_TARGET" root root 0644
     if [[ ! -e "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then
         backup_target "$CALLSIGN_DESCRIPTIONS_TARGET"
         install -d -o root -g root -m 0755 "$(dirname "$CALLSIGN_DESCRIPTIONS_TARGET")"
         dvsm_install_new_candidate "$CALLSIGN_DESCRIPTIONS_SOURCE" "$CALLSIGN_DESCRIPTIONS_TARGET" root root 0644
+    fi
+    if [[ ! -e "$CALLSIGN_NAMES_TARGET" ]]; then
+        backup_target "$CALLSIGN_NAMES_TARGET"
+        install -d -o root -g root -m 0755 "$(dirname "$CALLSIGN_NAMES_TARGET")"
+        install -o root -g www-data -m 0660 /dev/null "$CALLSIGN_NAMES_TARGET"
+    elif [[ ! -f "$CALLSIGN_NAMES_TARGET" || -L "$CALLSIGN_NAMES_TARGET" ]]; then
+        die "Refusing unsupported manual callsign names file: $CALLSIGN_NAMES_TARGET"
+    else
+        chown root:www-data "$CALLSIGN_NAMES_TARGET"; chmod 0660 "$CALLSIGN_NAMES_TARGET"
     fi
     if [[ $database_ready -eq 0 ]]; then stage_install_component "$WORK_DIR/fcc-first-names.dat" "$DATABASE_TARGET" root www-data 0644; fi
     if [[ -f "$WORK_DIR/cty.dat" && ! -L "$WORK_DIR/cty.dat" ]]; then
@@ -430,7 +447,7 @@ run_install() {
     elif ! validate_cty "$CTY_DATABASE_TARGET"; then
         die "No validated CTY.DAT is available to complete the installation."
     fi
-    php -l "$LH_TARGET" >/dev/null; php -l "$HELPER_TARGET" >/dev/null
+    php -l "$LH_TARGET" >/dev/null; php -l "$LOCALTX_TARGET" >/dev/null; php -l "$HELPER_TARGET" >/dev/null; php -l "$CALLSIGN_NAME_SAVE_TARGET" >/dev/null
     python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null
     validate_cty "$CTY_DATABASE_TARGET" || die "Installed CTY.DAT failed validation."
     if [[ $SYSTEMD_CHANGED -eq 1 ]]; then systemctl daemon-reload; fi
@@ -491,7 +508,7 @@ resolve_uninstall_backup() {
         IFS=$'\t' read -r candidate_existed candidate_backup <<< "$candidate_row"
         [[ "$candidate_existed" == 1 && -n "$candidate_backup" && "$candidate_backup" != *$'\n'* && "$candidate_backup" == "$candidate/"* ]] || continue
         [[ -f "$candidate_backup" && ! -L "$candidate_backup" ]] || continue
-        if grep -Eq '^// DVSwitch-Mods: FCC first-name activity columns v[12]$' "$candidate_backup"; then continue; fi
+        if grep -Eq '^// DVSwitch-Mods: FCC first-name activity columns v[123]$' "$candidate_backup"; then continue; fi
         cp -- "$candidate_backup" "$probe"
         if python3 "$PATCHER" --lh "$probe" >/dev/null 2>&1 && cmp -s "$probe" "$LH_TARGET"; then
             selected=$candidate
@@ -506,7 +523,7 @@ resolve_uninstall_backup() {
 
 run_uninstall() {
     preflight
-    local name=$1 directory original_lh target custom_temporary=""
+    local name=$1 directory original_lh target custom_temporary="" callsign_names_temporary=""
     [[ "$name" =~ ^install-[0-9]{8}-[0-9]{6}(-[0-9]+)?$ ]] || die "Invalid backup name."
     directory="$BACKUP_ROOT/$name"
     [[ -d "$directory" && ! -L "$directory" ]] || die "Backup not found: $name"
@@ -521,9 +538,13 @@ run_uninstall() {
         custom_temporary="$WORK_DIR/callsign-descriptions.tsv"
         cp -a -- "$CALLSIGN_DESCRIPTIONS_TARGET" "$custom_temporary"
     fi
+    if [[ -f "$CALLSIGN_NAMES_TARGET" && ! -L "$CALLSIGN_NAMES_TARGET" ]]; then
+        callsign_names_temporary="$WORK_DIR/callsign-lookup.tsv"
+        cp -a -- "$CALLSIGN_NAMES_TARGET" "$callsign_names_temporary"
+    fi
     . "$TRANSACTION_LIBRARY"
     dvsm_transaction_begin "$BACKUP_ROOT"
-    for target in "$LH_TARGET" "$HELPER_TARGET" "$DATABASE_TARGET" "$CTY_DATABASE_TARGET" "$CALLSIGN_DESCRIPTIONS_TARGET"; do backup_target "$target"; done
+    for target in "$LH_TARGET" "$LOCALTX_TARGET" "$HELPER_TARGET" "$CALLSIGN_NAME_SAVE_TARGET" "$DATABASE_TARGET" "$CTY_DATABASE_TARGET" "$CALLSIGN_DESCRIPTIONS_TARGET" "$CALLSIGN_NAMES_TARGET"; do backup_target "$target"; done
     while IFS= read -r target; do backup_target "$target"; done < <(updater_targets)
     INSTALL_ACTIVE=1
     systemctl disable --now "$TIMER_UNIT" >/dev/null 2>&1 || true
@@ -535,9 +556,17 @@ run_uninstall() {
         cp -a -- "$custom_temporary" "$custom_restore"
         mv -fT -- "$custom_restore" "$CALLSIGN_DESCRIPTIONS_TARGET"
     fi
-    rm -f -- "$HELPER_TARGET" "$DATABASE_TARGET" "$CTY_DATABASE_TARGET"
+    if [[ -n "$callsign_names_temporary" ]]; then
+        install -d -o root -g root -m 0755 "$(dirname "$CALLSIGN_NAMES_TARGET")"
+        local names_restore
+        names_restore=$(mktemp --tmpdir="$(dirname "$CALLSIGN_NAMES_TARGET")" .dvswitch-callsign-names.XXXXXX)
+        cp -a -- "$callsign_names_temporary" "$names_restore"
+        chown root:www-data "$names_restore"; chmod 0660 "$names_restore"
+        mv -fT -- "$names_restore" "$CALLSIGN_NAMES_TARGET"
+    fi
+    rm -f -- "$HELPER_TARGET" "$CALLSIGN_NAME_SAVE_TARGET" "$DATABASE_TARGET" "$CTY_DATABASE_TARGET"
     while IFS= read -r target; do rm -f -- "$target"; done < <(updater_targets)
-    php -l "$LH_TARGET" >/dev/null
+    php -l "$LH_TARGET" >/dev/null; php -l "$LOCALTX_TARGET" >/dev/null
     systemctl daemon-reload
     systemctl reload apache2.service; dashboard_health
     INSTALL_ACTIVE=0
@@ -545,31 +574,48 @@ run_uninstall() {
 }
 
 validate_fcc_restore_state() {
-    local directory=$1 existed target backup temp lh_backup=""
+    local directory=$1 existed target backup temp lh_backup="" localtx_backup=""
     while IFS=$'\t' read -r existed target backup; do
         if [[ "$target" == "$LH_TARGET" && "$existed" == 1 ]]; then lh_backup=$backup; fi
+        if [[ "$target" == "$LOCALTX_TARGET" && "$existed" == 1 ]]; then localtx_backup=$backup; fi
     done < "$directory/MANIFEST"
     [[ -z "$lh_backup" ]] && return 0
     require_file "$lh_backup"
     [[ -f "$LH_TARGET" && ! -L "$LH_TARGET" ]] || die "Dashboard activity file is unavailable for restore validation."
     temp=$(mktemp -d "$WORK_ROOT/.dvswitch-fcc-restore.XXXXXX") || die "Could not prepare FCC restore validation."
     cp -- "$lh_backup" "$temp/lh.php"
+    if [[ -n "$localtx_backup" ]]; then require_file "$localtx_backup"; cp -- "$localtx_backup" "$temp/localtx.php"; fi
     local restore_patcher="$PATCHER_TARGET"
     [[ -f "$restore_patcher" && ! -L "$restore_patcher" ]] || restore_patcher="$PATCHER"
-    if ! python3 "$restore_patcher" --lh "$temp/lh.php"; then rm -rf -- "$temp"; die "Cannot verify lh.php against this FCC backup; restore would risk removing another mod's edits."; fi
-    if ! cmp -s "$temp/lh.php" "$LH_TARGET"; then rm -rf -- "$temp"; die "Refusing FCC restore because lh.php has changes beyond this FCC patch. Remove later dashboard edits first."; fi
+    if [[ -n "$localtx_backup" ]]; then
+        if ! python3 "$restore_patcher" --lh "$temp/lh.php" --localtx "$temp/localtx.php"; then rm -rf -- "$temp"; die "Cannot verify dashboard files against this FCC backup; restore would risk removing another mod's edits."; fi
+    elif ! python3 "$restore_patcher" --lh "$temp/lh.php"; then rm -rf -- "$temp"; die "Cannot verify lh.php against this FCC backup; restore would risk removing another mod's edits."; fi
+    if ! cmp -s "$temp/lh.php" "$LH_TARGET" || { [[ -n "$localtx_backup" ]] && ! cmp -s "$temp/localtx.php" "$LOCALTX_TARGET"; }; then rm -rf -- "$temp"; die "Refusing FCC restore because dashboard files have changes beyond this FCC patch. Remove later dashboard edits first."; fi
     rm -rf -- "$temp"
 }
 
 run_restore() {
     preflight
-    local name=$1 directory="$BACKUP_ROOT/$1"
+    local name=$1 directory="$BACKUP_ROOT/$1" callsign_names_temporary=""
     [[ "$name" =~ ^install-[0-9]{8}-[0-9]{6}(-[0-9]+)?$ ]] || die "Invalid backup name."
     [[ -d "$directory" && ! -L "$directory" ]] || die "Backup not found: $name"
     validate_fcc_restore_state "$directory"
+    if [[ -f "$CALLSIGN_NAMES_TARGET" && ! -L "$CALLSIGN_NAMES_TARGET" ]]; then
+        [[ -n "$WORK_DIR" ]] || WORK_DIR=$(mktemp -d "$WORK_ROOT/.dvswitch-fcc-restore.XXXXXX")
+        callsign_names_temporary="$WORK_DIR/callsign-lookup.tsv"
+        cp -a -- "$CALLSIGN_NAMES_TARGET" "$callsign_names_temporary"
+    fi
     . "$TRANSACTION_LIBRARY"
     systemctl disable --now "$TIMER_UNIT" >/dev/null 2>&1 || true
     dvsm_restore_backup_set "$directory"
+    if [[ -n "$callsign_names_temporary" ]]; then
+        install -d -o root -g root -m 0755 "$(dirname "$CALLSIGN_NAMES_TARGET")"
+        local names_restore
+        names_restore=$(mktemp --tmpdir="$(dirname "$CALLSIGN_NAMES_TARGET")" .dvswitch-callsign-names.XXXXXX)
+        cp -a -- "$callsign_names_temporary" "$names_restore"
+        chown root:www-data "$names_restore"; chmod 0660 "$names_restore"
+        mv -fT -- "$names_restore" "$CALLSIGN_NAMES_TARGET"
+    fi
     if [[ -f "$UPDATER_TARGET" && ! -L "$UPDATER_TARGET" ]] && ! awk -F '\t' -v wanted="$PATCHER_TARGET" '$2 == wanted { found=1 } END { exit(found ? 0 : 1) }' "$directory/MANIFEST"; then
         rm -f -- "$PATCHER_TARGET"
     fi

@@ -110,7 +110,9 @@ function dvsModsFccFirstName($rawCallsign) {
     if (!preg_match('/^[A-Z0-9]{3,10}$/', $callsign)) { return '---'; }
     if (isset($cache[$callsign])) { return $cache[$callsign]; }
 
-    $path = '/var/lib/mmdvm/dvswitch-mods-fcc-first-names.dat';
+    global $dvsModsFccFirstNamesPath;
+    $path = isset($dvsModsFccFirstNamesPath) && is_string($dvsModsFccFirstNamesPath)
+        ? $dvsModsFccFirstNamesPath : '/var/lib/mmdvm/dvswitch-mods-fcc-first-names.dat';
     $recordSize = 52;
     $size = @filesize($path);
     if ($size === false || $size < $recordSize || ($size % $recordSize) !== 0) {
@@ -172,6 +174,61 @@ function dvsModsCustomCallsignDescription($rawCallsign) {
     }
     $callsign = strtoupper(trim((string)$rawCallsign));
     return array_key_exists($callsign, $descriptions) ? $descriptions[$callsign] : false;
+}
+
+/** Return a user-entered fallback name for a callsign without an FCC/DMR name. */
+function dvsModsManualCallsignName($rawCallsign) {
+    static $names = null;
+    if ($names === null) {
+        $names = array();
+        global $dvsModsManualCallsignNamesPath;
+        $path = isset($dvsModsManualCallsignNamesPath) && is_string($dvsModsManualCallsignNamesPath)
+            ? $dvsModsManualCallsignNamesPath : '/etc/dvswitch-mods/callsign-lookup.tsv';
+        if (is_readable($path) && ($handle = @fopen($path, 'rb')) !== false) {
+            while (($line = fgets($handle)) !== false) {
+                $line = trim($line);
+                if ($line === '' || $line[0] === '#') { continue; }
+                $separator = strpos($line, '=');
+                if ($separator === false) { $separator = strpos($line, "\t"); }
+                if ($separator === false) { continue; }
+                $callsign = dvsModsNormalizeLookupCallsign(substr($line, 0, $separator));
+                $name = trim(substr($line, $separator + 1));
+                if (!preg_match('/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{3,10}$/D', $callsign) || $name === '' || strlen($name) > 100 || preg_match('/[\x00-\x1F\x7F]/', $name)) { continue; }
+                $names[$callsign] = $name;
+            }
+            fclose($handle);
+        }
+    }
+    $callsign = dvsModsNormalizeLookupCallsign($rawCallsign);
+    return array_key_exists($callsign, $names) ? $names[$callsign] : false;
+}
+
+/** Save a manually entered name only while the FCC/DMR database has no name. */
+function dvsModsSaveManualCallsignName($rawCallsign, $rawName, $path = '/etc/dvswitch-mods/callsign-lookup.tsv') {
+    $callsign = dvsModsNormalizeLookupCallsign($rawCallsign);
+    $name = trim((string)$rawName);
+    if (!preg_match('/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{3,10}$/D', $callsign)) { return 'Invalid callsign.'; }
+    if ($name === '' || strlen($name) > 100 || preg_match('/[\x00-\x1F\x7F=]/', $name)) { return 'Enter a name of 1 to 100 characters without tabs or line breaks.'; }
+    if (dvsModsFccFirstName($callsign) !== '---') { return 'A name is already available in the local FCC/DMR databases.'; }
+    $handle = @fopen($path, 'c+');
+    if ($handle === false) { return 'The local callsign names file is unavailable.'; }
+    if (!flock($handle, LOCK_EX)) { fclose($handle); return 'Could not lock the local callsign names file.'; }
+    rewind($handle);
+    $lines = array();
+    while (($line = fgets($handle)) !== false) {
+        $trimmed = trim($line);
+        $separator = strpos($trimmed, '=');
+        if ($separator === false) { $separator = strpos($trimmed, "\t"); }
+        if ($trimmed !== '' && $trimmed[0] !== '#' && $separator !== false && dvsModsNormalizeLookupCallsign(substr($trimmed, 0, $separator)) === $callsign) { continue; }
+        $lines[] = rtrim($line, "\r\n");
+    }
+    $lines[] = $callsign.' = '.$name;
+    $contents = implode("\n", $lines)."\n";
+    rewind($handle);
+    $written = ftruncate($handle, 0) && fwrite($handle, $contents) === strlen($contents) && fflush($handle);
+    flock($handle, LOCK_UN);
+    fclose($handle);
+    return $written ? true : 'Could not save the local callsign name.';
 }
 
 /** Resolve a callsign to its CTY.DAT DXCC entity, including prefix exceptions. */
