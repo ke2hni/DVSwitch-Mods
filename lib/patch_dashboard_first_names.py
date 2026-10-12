@@ -15,8 +15,9 @@ MARKER = "// DVSwitch-Mods: FCC first-name activity columns v3"
 PREVIOUS_LEGEND_MARKERS = (
     "<!-- DVSwitch-Mods: manual callsign names legend v1 -->",
     "<!-- DVSwitch-Mods: manual callsign names legend v2 -->",
+    "<!-- DVSwitch-Mods: manual callsign names legend v3 -->",
 )
-LEGEND_MARKER = "<!-- DVSwitch-Mods: manual callsign names legend v3 -->"
+LEGEND_MARKER = "<!-- DVSwitch-Mods: manual callsign names legend v4 -->"
 INCLUDE = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_fcc_first_names.php';"
 NAME_CELL_STYLE_OLD = 'style="font-weight:bold;color:#464646;"'
 NAME_CELL_STYLE_PREVIOUS = 'style="font-weight:bold;color:#464646;white-space:normal;overflow-wrap:anywhere;word-break:normal;max-width:10ch;"'
@@ -77,12 +78,18 @@ def patch_legend_text(text: str) -> str:
                  + LEGEND_MARKER + '\n')
         block = block.replace('</div>', extra + '</div>', 1)
 
+    # Keep the heading separate so it does not shift the first legend row.
+    block = re.sub(r'(<b\b[^>]*>\s*Legend:\s*</b>)\s*', r'\1<br>\n  ', block, count=1, flags=re.I)
+
     # Wrap each bold legend term in a fixed-width span. Keeping the bold term
     # itself unchanged preserves compatibility with the Target legend patcher.
     term_pattern = re.compile(r'(<b\b(?P<attrs>[^>]*)>)(?P<label>[^<]*)</b>(?P<space>\s*)=')
     terms = list(term_pattern.finditer(block))
     if not terms:
-        raise PatchError("Local Activity legend has no term/equal-sign rows to align")
+        already_aligned = re.search(r'<span style="display:inline-block;width:\d+ch;text-align:right;"><b\b[^>]*>[^<]*</b></span>\s*=', block)
+        if not already_aligned:
+            raise PatchError("Local Activity legend has no term/equal-sign rows to align")
+        return text[:found[0].start()] + block + text[found[0].end():]
     width = max(len(html.unescape(re.sub(r'<[^>]*>', '', match.group('label'))).strip()) for match in terms)
     def align_term(match):
         attrs = match.group('attrs')
