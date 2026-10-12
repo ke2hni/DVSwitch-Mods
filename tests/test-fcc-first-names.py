@@ -108,6 +108,16 @@ require(upgraded_legend.count("width:3ch;text-align:right") == 2,
         "existing legend terms were not aligned during upgrade")
 require(patcher.patch_legend_text(upgraded_legend) == upgraded_legend,
         "upgraded existing legend is not idempotent")
+styled_v2_legend = ('<div><b>Legend:</b> <b style="display:inline-block;width:3ch;text-align:right;">---</b> = no data<br>\n  '
+                    '<b style="display:inline-block;width:3ch;text-align:right;">*</b> = Name entered and saved by you in the local callsign file. '
+                    '<span title="Manually entered callsign names are stored in /etc/dvswitch-mods/callsign-lookup.tsv.">Database</span>\n  '
+                    '<!-- DVSwitch-Mods: manual callsign names legend v2 -->\n</div>')
+upgraded_v2_legend = patcher.patch_legend_text(styled_v2_legend)
+require(patcher.LEGEND_MARKER in upgraded_v2_legend and '<b>---</b>' in upgraded_v2_legend
+        and '<b>*</b>' in upgraded_v2_legend,
+        "v2 legend did not upgrade while preserving Target-mod-compatible bold tags")
+require(patcher.patch_legend_text(upgraded_v2_legend) == upgraded_v2_legend,
+        "upgraded v2 legend is not idempotent")
 
 installer = (ROOT / "mod-dashboard-fcc-first-names.sh").read_text()
 require('cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die' not in installer,

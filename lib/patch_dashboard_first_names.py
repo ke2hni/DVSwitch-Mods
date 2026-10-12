@@ -12,8 +12,11 @@ from pathlib import Path
 LEGACY_MARKER = "// DVSwitch-Mods: FCC first-name activity columns v1"
 PREVIOUS_MARKER = "// DVSwitch-Mods: FCC first-name activity columns v2"
 MARKER = "// DVSwitch-Mods: FCC first-name activity columns v3"
-PREVIOUS_LEGEND_MARKER = "<!-- DVSwitch-Mods: manual callsign names legend v1 -->"
-LEGEND_MARKER = "<!-- DVSwitch-Mods: manual callsign names legend v2 -->"
+PREVIOUS_LEGEND_MARKERS = (
+    "<!-- DVSwitch-Mods: manual callsign names legend v1 -->",
+    "<!-- DVSwitch-Mods: manual callsign names legend v2 -->",
+)
+LEGEND_MARKER = "<!-- DVSwitch-Mods: manual callsign names legend v3 -->"
 INCLUDE = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_fcc_first_names.php';"
 NAME_CELL_STYLE_OLD = 'style="font-weight:bold;color:#464646;"'
 NAME_CELL_STYLE_PREVIOUS = 'style="font-weight:bold;color:#464646;white-space:normal;overflow-wrap:anywhere;word-break:normal;max-width:10ch;"'
@@ -50,7 +53,10 @@ NAME_BLOCK = '''$dvsModsFirstName = dvsModsFccFirstName($listElem[2]);
 def patch_legend_text(text: str) -> str:
     import re
     import html
-    if text.count(LEGEND_MARKER) > 1 or text.count(PREVIOUS_LEGEND_MARKER) > 1 or (LEGEND_MARKER in text and PREVIOUS_LEGEND_MARKER in text):
+    if text.count(LEGEND_MARKER) > 1 or any(text.count(marker) > 1 for marker in PREVIOUS_LEGEND_MARKERS):
+        raise PatchError("duplicated or mixed manual callsign legend markers")
+    previous_marker = next((marker for marker in PREVIOUS_LEGEND_MARKERS if marker in text), None)
+    if LEGEND_MARKER in text and previous_marker is not None:
         raise PatchError("duplicated or mixed manual callsign legend markers")
     pattern = re.compile(r'(<div\b[^>]*>\s*<b>Legend:</b>.*?</div>)', re.I | re.S)
     found = list(pattern.finditer(text))
@@ -60,19 +66,19 @@ def patch_legend_text(text: str) -> str:
     if LEGEND_MARKER in block:
         if block.count(LEGEND_MARKER) != 1 or '/etc/dvswitch-mods/callsign-lookup.tsv' not in block:
             raise PatchError("incomplete or duplicated manual callsign legend")
-    elif PREVIOUS_LEGEND_MARKER in block:
-        if block.count(PREVIOUS_LEGEND_MARKER) != 1 or '/etc/dvswitch-mods/callsign-lookup.tsv' not in block:
+        return text
+    elif previous_marker is not None:
+        if block.count(previous_marker) != 1 or '/etc/dvswitch-mods/callsign-lookup.tsv' not in block:
             raise PatchError("incomplete or duplicated previous manual callsign legend")
-        block = block.replace(PREVIOUS_LEGEND_MARKER, LEGEND_MARKER, 1)
+        block = block.replace(previous_marker, LEGEND_MARKER, 1)
     else:
         extra = ('<br>\n  <b>*</b> = Name entered and saved by you in the local callsign file. '
                  '<span title="Manually entered callsign names are stored in /etc/dvswitch-mods/callsign-lookup.tsv.">Database</span>\n  '
                  + LEGEND_MARKER + '\n')
         block = block.replace('</div>', extra + '</div>', 1)
 
-    # Give each bold legend term the same width, so every equals sign and
-    # description begins in the same column. Strip our prior inline style
-    # before reapplying it to keep upgrades idempotent.
+    # Wrap each bold legend term in a fixed-width span. Keeping the bold term
+    # itself unchanged preserves compatibility with the Target legend patcher.
     term_pattern = re.compile(r'(<b\b(?P<attrs>[^>]*)>)(?P<label>[^<]*)</b>(?P<space>\s*)=')
     terms = list(term_pattern.finditer(block))
     if not terms:
@@ -86,11 +92,12 @@ def patch_legend_text(text: str) -> str:
             style = re.sub(r';{2,}', ';', style).strip().strip(';')
             if style:
                 style += ';'
-            style += f'display:inline-block;width:{width}ch;text-align:right;'
-            attrs = attrs[:style_match.start()] + f' style={style_match.group(1)}{style}{style_match.group(1)}' + attrs[style_match.end():]
-        else:
-            attrs += f' style="display:inline-block;width:{width}ch;text-align:right;"'
-        return f'<b{attrs}>{match.group("label")}</b>{match.group("space")}='
+            if style:
+                attrs = attrs[:style_match.start()] + f' style={style_match.group(1)}{style}{style_match.group(1)}' + attrs[style_match.end():]
+            else:
+                attrs = attrs[:style_match.start()] + attrs[style_match.end():]
+        bold_term = f'<b{attrs}>{match.group("label")}</b>'
+        return f'<span style="display:inline-block;width:{width}ch;text-align:right;">{bold_term}</span>{match.group("space")}='
     block = term_pattern.sub(align_term, block)
     return text[:found[0].start()] + block + text[found[0].end():]
 

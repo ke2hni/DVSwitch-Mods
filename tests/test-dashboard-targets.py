@@ -24,6 +24,10 @@ spec = importlib.util.spec_from_file_location("target_patcher", PATCHER_PATH)
 patcher = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
 spec.loader.exec_module(patcher)
+fcc_spec = importlib.util.spec_from_file_location("fcc_patcher", ROOT / "lib/patch_dashboard_first_names.py")
+fcc_patcher = importlib.util.module_from_spec(fcc_spec)
+assert fcc_spec.loader is not None
+fcc_spec.loader.exec_module(fcc_patcher)
 
 lh = r'''<?php
 // DVSwitch-Mods: FCC first-name activity columns v2
@@ -51,6 +55,12 @@ for name, original in (("lh.php", lh), ("localtx.php", localtx)):
     if name == "localtx.php":
         require('margin:3px 0 0 14px;' in patcher.LEGEND, "Local Activity legend 14px alignment is missing")
     require(patcher.patch_text(changed, name) == changed, name + " patch not idempotent")
+    if name == "localtx.php":
+        with_manual_names = fcc_patcher.patch_legend_text(changed)
+        require(patcher.CUSTOM_LEGEND_BLOCK.search(with_manual_names) is not None,
+                "FCC manual-name legend no longer matches the Target-mod legend anchor")
+        require(patcher.patch_text(with_manual_names, name) == with_manual_names,
+                "Target mod no longer accepts the FCC manual-name legend")
     current_target = patcher.block(name)[1]
     padded_target = patcher.cell_padding_block(name)
     for target_cell in (current_target, padded_target):
