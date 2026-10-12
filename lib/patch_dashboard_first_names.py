@@ -64,6 +64,20 @@ def patch_legend_text(text: str) -> str:
     if len(found) != 1:
         raise PatchError(f"unsupported or ambiguous Local Activity legend: {len(found)} matches")
     block = found[0].group(1)
+    # Migrate wording from the existing Target/FCC combined legend. The Target
+    # installer preserves this block because the FCC mod owns its extra row.
+    block = block.replace(
+        "No usable worldwide DMR ID or FCC name data available, Maybe an International Callsign.",
+        "No name found in the local DMR ID or FCC data; country shown when available.",
+    ).replace(
+        "no usable worldwide DMR or FCC name data available",
+        "No name found in the local DMR ID or FCC data; country shown when available.",
+    )
+    old_manual_description = ('Name entered and saved by you in the local callsign file. '
+                              '<span title="Manually entered callsign names are stored in /etc/dvswitch-mods/callsign-lookup.tsv.">Database</span>')
+    new_manual_description = ('Name entered manually and saved in the local callsign names file '
+                              '(<span title="Manual callsign names are stored in /etc/dvswitch-mods/callsign-lookup.tsv.">file location</span>)')
+    block = block.replace(old_manual_description, new_manual_description)
     if LEGEND_MARKER in block:
         if block.count(LEGEND_MARKER) != 1 or '/etc/dvswitch-mods/callsign-lookup.tsv' not in block:
             raise PatchError("incomplete or duplicated manual callsign legend")

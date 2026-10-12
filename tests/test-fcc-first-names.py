@@ -132,6 +132,23 @@ require("Name entered manually and saved in the local callsign names file" in up
 require(patcher.patch_legend_text(upgraded_v3_legend) == upgraded_v3_legend,
         "upgraded v3 legend is not idempotent")
 
+# This is the combined legend shape left behind when the Target installer sees
+# its marker and preserves the FCC-owned manual-name row.
+installed_combined_legend = ('''<div style="margin:3px 0 0 14px;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
+  <b>Legend:</b> <span style="display:inline-block;width:3ch;text-align:right;"><b>---</b></span> = No usable worldwide DMR ID or FCC name data available, Maybe an International Callsign.<br>
+  <span style="display:inline-block;width:3ch;text-align:right;"><b>*</b></span> = Name entered and saved by you in the local callsign file. <span title="Manually entered callsign names are stored in /etc/dvswitch-mods/callsign-lookup.tsv.">Database</span>
+  <!-- DVSwitch-Mods: manual callsign names legend v3 -->
+</div>''')
+fixed_combined_legend = patcher.patch_legend_text(installed_combined_legend)
+require("Maybe an International Callsign" not in fixed_combined_legend and "No name found in the local DMR ID or FCC data; country shown when available." in fixed_combined_legend,
+        "combined installed legend kept the old --- description")
+require("Name entered by you in the local callsign file" not in fixed_combined_legend and ">file location</span>" in fixed_combined_legend,
+        "combined installed legend kept the old manual-name wording")
+require(fixed_combined_legend.count("width:3ch;text-align:right") == 2,
+        "combined installed legend does not align the --- and * rows")
+require(patcher.patch_legend_text(fixed_combined_legend) == fixed_combined_legend,
+        "combined installed legend migration is not idempotent")
+
 installer = (ROOT / "mod-dashboard-fcc-first-names.sh").read_text()
 require('cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die' not in installer,
         "FCC dashboard installer still blocks a structurally compatible transaction helper revision")
