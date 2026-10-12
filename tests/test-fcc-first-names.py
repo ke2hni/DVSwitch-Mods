@@ -95,6 +95,19 @@ with tempfile.TemporaryDirectory() as directory:
     require(b"\r\n" in raw and b"\n" not in raw.replace(b"\r\n", b""), "CRLF was not preserved")
     legend = localtx.read_text(encoding="utf-8")
     require(patcher.LEGEND_MARKER in legend and "/etc/dvswitch-mods/callsign-lookup.tsv" in legend, "manual callsign legend was not added")
+    require(legend.count("width:3ch;text-align:right") == 2, "legend terms do not share an aligned equals-sign column")
+    require(patcher.patch_legend_text(legend) == legend, "aligned legend patch is not idempotent")
+
+legacy_legend = ('<div><b>Legend:</b> <b>---</b> = no data<br>\n  <b>*</b> = Name entered and saved by you in the local callsign file. '
+                 '<span title="Manually entered callsign names are stored in /etc/dvswitch-mods/callsign-lookup.tsv.">Database</span>\n  '
+                 '<!-- DVSwitch-Mods: manual callsign names legend v1 -->\n</div>')
+upgraded_legend = patcher.patch_legend_text(legacy_legend)
+require(patcher.LEGEND_MARKER in upgraded_legend and "manual callsign names legend v1" not in upgraded_legend,
+        "existing manual callsign legend marker was not upgraded")
+require(upgraded_legend.count("width:3ch;text-align:right") == 2,
+        "existing legend terms were not aligned during upgrade")
+require(patcher.patch_legend_text(upgraded_legend) == upgraded_legend,
+        "upgraded existing legend is not idempotent")
 
 installer = (ROOT / "mod-dashboard-fcc-first-names.sh").read_text()
 require('cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die' not in installer,
