@@ -165,7 +165,7 @@ function dvsModsCustomCallsignDescription($rawCallsign) {
                     if ($separator === false) { continue; }
                     $callsign = strtoupper(trim(substr($line, 0, $separator)));
                     $description = trim(substr($line, $separator + 1));
-                    if (!preg_match('/^[A-Z0-9]{1,16}$/D', $callsign) || $description === '' || strlen($description) > 80 || preg_match('/[\x00-\x1F\x7F]/', $description)) { continue; }
+                    if (!preg_match('/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/D', $callsign) || strlen($callsign) > 16 || $description === '' || strlen($description) > 80 || preg_match('/[\x00-\x1F\x7F]/', $description)) { continue; }
                     $descriptions[$callsign] = $description;
                 }
                 fclose($handle);
@@ -236,11 +236,16 @@ function dvsModsSaveManualCallsignName($rawCallsign, $rawName, $path = '/etc/dvs
 function dvsModsSaveCustomCallsignDescription($rawCallsign, $rawDescription, $path = '/etc/dvswitch-mods/callsign-descriptions.tsv') {
     $callsign = strtoupper(trim((string)$rawCallsign));
     $description = trim((string)$rawDescription);
-    if (!preg_match('/^[A-Z0-9]{1,16}$/D', $callsign)) { return 'Invalid callsign or identifier.'; }
+    if (!preg_match('/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/D', $callsign) || strlen($callsign) > 16) { return 'Invalid callsign or identifier.'; }
     if ($description === '' || strlen($description) > 80 || preg_match('/[\x00-\x1F\x7F=]/', $description)) {
         return 'Enter a description of 1 to 80 characters without tabs, line breaks, or equals signs.';
     }
-    if (dvsModsFccFirstName($callsign) !== '---') { return 'A name is already available in the local FCC/DMR databases.'; }
+    // Only check FCC/DMR when the exact displayed identifier is a callsign.
+    // A suffix such as AL-LINK is a dashboard/custom identifier, not AL.
+    if (preg_match('/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{3,10}$/D', $callsign)
+        && dvsModsFccFirstName($callsign) !== '---') {
+        return 'A name is already available in the local FCC/DMR databases.';
+    }
     $handle = @fopen($path, 'c+');
     if ($handle === false) { return 'The local callsign descriptions file is unavailable.'; }
     if (!flock($handle, LOCK_EX)) { fclose($handle); return 'Could not lock the local callsign descriptions file.'; }

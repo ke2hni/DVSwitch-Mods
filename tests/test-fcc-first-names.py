@@ -46,9 +46,10 @@ require(changed.count(patcher.INCLUDE) == 1, "helper include missing")
 require(changed.count("dvsModsFccFirstName($listElem[2])") == 1, "FCC lookup missing")
 require(changed.count("dvsModsCustomCallsignDescription($listElem[2])") == 1, "custom description lookup missing")
 require(changed.index("$dvsModsFirstName = dvsModsFccFirstName") < changed.index("dvsModsCustomCallsignDescription($listElem[2])") < changed.index("dvsModsManualCallsignName($listElem[2])"), "lookup precedence is not FCC/DMR, custom descriptions, then manual names")
-require("$dvsModsNameHtml = '<button type=\"button\"" in changed and "fetch(&#39;callsign-lookup.php&#39;" in changed and "&#39;data-callsign&#39;" in changed, "unknown name marker is not clickable with a local save action")
+require("$dvsModsNameHtml = '<button type=\"button\"" in changed and "fetch(&#39;callsign-lookup.php&#39;" in changed and "&#39;data-callsign&#39;" in changed and "&#39;data-identifier&#39;" in changed, "unknown name marker is not clickable with separate callsign and exact-identifier values")
+require("var k=t===&#39;1&#39;?c:i" in changed and "encodeURIComponent(k)" in changed, "custom-description save does not retain the exact dashboard identifier")
 require("operator name (callsign-lookup.tsv)" in changed and "custom description (callsign-descriptions.tsv)" in changed and "&amp;type=&#39;+encodeURIComponent(t)" in changed, "unknown marker does not offer separate operator-name and custom-description saves")
-require(patcher.MARKER.endswith("v4"), "FCC patch version was not advanced for separate entry types and lookup precedence")
+require(patcher.MARKER.endswith("v5"), "FCC patch version was not advanced for exact custom identifiers")
 require(changed.count("dvsModsDmrIdCallsign($listElem[2])") == 1, "DMR resolver missing")
 require(changed.count("width:12ch;min-width:12ch;max-width:12ch") == 1, "Name-cell width and wrap limit missing")
 require(changed.count("overflow-wrap:anywhere") == 1, "Name-cell overflow wrapping missing")
@@ -60,6 +61,9 @@ require(patcher.patch_text(legacy_country_upgrade) == changed, "existing country
 previous_manual_install = changed.replace(patcher.NAME_BLOCK, patcher.PREVIOUS_NAME_BLOCK, 1).replace(patcher.MARKER, patcher.PREVIOUS_MARKER, 1)
 require(patcher.patch_text(previous_manual_install) == changed,
         "existing manual-name installation was not upgraded to separate custom-description saves and corrected precedence")
+previous_exact_identifier_install = changed.replace(patcher.NAME_BLOCK, patcher.PREVIOUS_NAME_BLOCK, 1).replace(patcher.MARKER, patcher.PREVIOUS_NAME_MARKER, 1)
+require(patcher.patch_text(previous_exact_identifier_install) == changed,
+        "existing v4 manual-entry installation was not upgraded to preserve exact custom identifiers")
 
 legacy_name_style = changed.replace(patcher.NAME_CELL_STYLE_NEW, patcher.NAME_CELL_STYLE_OLD, 1)
 require(patcher.patch_text(legacy_name_style) == changed, "installed FCC Name-cell style was not upgraded")

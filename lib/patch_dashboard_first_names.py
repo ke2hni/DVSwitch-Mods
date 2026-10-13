@@ -12,7 +12,8 @@ from pathlib import Path
 LEGACY_MARKER = "// DVSwitch-Mods: FCC first-name activity columns v1"
 OLDER_MARKER = "// DVSwitch-Mods: FCC first-name activity columns v2"
 PREVIOUS_MARKER = "// DVSwitch-Mods: FCC first-name activity columns v3"
-MARKER = "// DVSwitch-Mods: FCC first-name activity columns v4"
+PREVIOUS_NAME_MARKER = "// DVSwitch-Mods: FCC first-name activity columns v4"
+MARKER = "// DVSwitch-Mods: FCC first-name activity columns v5"
 PREVIOUS_LEGEND_MARKERS = (
     "<!-- DVSwitch-Mods: manual callsign names legend v1 -->",
     "<!-- DVSwitch-Mods: manual callsign names legend v2 -->",
@@ -53,7 +54,8 @@ NAME_BLOCK = '''$dvsModsFirstName = dvsModsFccFirstName($listElem[2]);
                 $dvsModsNameHtml = htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8");
                 if ($dvsModsFirstName === '---') {
                     $dvsModsEntryCallsign = htmlspecialchars(dvsModsNormalizeLookupCallsign($listElem[2]), ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8");
-                    $dvsModsNameHtml = '<button type="button" title="Click to add a name or custom description for this missing entry" data-callsign="'.$dvsModsEntryCallsign.'" style="padding:0;border:0;border-bottom:1px dotted currentColor;background:none;color:inherit;text-decoration:none;cursor:pointer;font:inherit" onclick="var c=this.getAttribute(&#39;data-callsign&#39;);var t=window.prompt(&#39;Add &#39;+c+&#39; as:\\n1 = operator name (callsign-lookup.tsv)\\n2 = custom description (callsign-descriptions.tsv)\\nCancel = do not add&#39;,&#39;1&#39;);if(t===null)return false;t=t.trim();if(t!==&#39;1&#39;&amp;&amp;t!==&#39;2&#39;){window.alert(&#39;Choose 1 or 2.&#39;);return false;}var label=t===&#39;1&#39;?&#39;operator name&#39;:&#39;custom description&#39;;var n=window.prompt(&#39;Enter the &#39;+label+&#39; for &#39;+c+&#39;:&#39;);if(n===null||!n.trim())return false;var b=this;b.disabled=true;fetch(&#39;callsign-lookup.php&#39;,{method:&#39;POST&#39;,credentials:&#39;same-origin&#39;,headers:{&#39;Content-Type&#39;:&#39;application/x-www-form-urlencoded;charset=UTF-8&#39;},body:&#39;callsign=&#39;+encodeURIComponent(c)+&#39;&amp;name=&#39;+encodeURIComponent(n)+&#39;&amp;type=&#39;+encodeURIComponent(t)}).then(function(r){return r.json().then(function(d){if(!r.ok||!d.ok)throw new Error(d.message||&#39;Could not save entry.&#39;);window.location.reload();});}).catch(function(e){window.alert(e.message);b.disabled=false;});return false;">---</button>';
+                    $dvsModsEntryIdentifier = htmlspecialchars(strtoupper(trim((string)$listElem[2])), ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8");
+                    $dvsModsNameHtml = '<button type="button" title="Click to add a name or custom description for this missing entry" data-callsign="'.$dvsModsEntryCallsign.'" data-identifier="'.$dvsModsEntryIdentifier.'" style="padding:0;border:0;border-bottom:1px dotted currentColor;background:none;color:inherit;text-decoration:none;cursor:pointer;font:inherit" onclick="var c=this.getAttribute(&#39;data-callsign&#39;);var i=this.getAttribute(&#39;data-identifier&#39;);var t=window.prompt(&#39;Add &#39;+i+&#39; as:\\n1 = operator name (callsign-lookup.tsv)\\n2 = custom description (callsign-descriptions.tsv)\\nCancel = do not add&#39;,&#39;1&#39;);if(t===null)return false;t=t.trim();if(t!==&#39;1&#39;&amp;&amp;t!==&#39;2&#39;){window.alert(&#39;Choose 1 or 2.&#39;);return false;}var k=t===&#39;1&#39;?c:i;var label=t===&#39;1&#39;?&#39;operator name&#39;:&#39;custom description&#39;;var n=window.prompt(&#39;Enter the &#39;+label+&#39; for &#39;+k+&#39;:&#39;);if(n===null||!n.trim())return false;var b=this;b.disabled=true;fetch(&#39;callsign-lookup.php&#39;,{method:&#39;POST&#39;,credentials:&#39;same-origin&#39;,headers:{&#39;Content-Type&#39;:&#39;application/x-www-form-urlencoded;charset=UTF-8&#39;},body:&#39;callsign=&#39;+encodeURIComponent(k)+&#39;&amp;name=&#39;+encodeURIComponent(n)+&#39;&amp;type=&#39;+encodeURIComponent(t)}).then(function(r){return r.json().then(function(d){if(!r.ok||!d.ok)throw new Error(d.message||&#39;Could not save entry.&#39;);window.location.reload();});}).catch(function(e){window.alert(e.message);b.disabled=false;});return false;">---</button>';
                 }
                 if ($dvsModsCountry !== '') { $dvsModsNameHtml .= '<br>'.htmlspecialchars($dvsModsCountry, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8"); }'''
 PREVIOUS_NAME_BLOCK = '''$dvsModsFirstName = dvsModsFccFirstName($listElem[2]);
@@ -194,12 +196,13 @@ def once(text: str, old: str, new: str, description: str) -> str:
 
 
 def patch_text(text: str) -> str:
-    supported_markers = (MARKER, PREVIOUS_MARKER, OLDER_MARKER)
+    supported_markers = (MARKER, PREVIOUS_NAME_MARKER, PREVIOUS_MARKER, OLDER_MARKER)
     if sum(text.count(marker) for marker in supported_markers) == 1:
         required = (INCLUDE, "dvsModsFccFirstName($listElem[2])",
                     "dvsModsDmrIdCallsign($listElem[2])", "<th>Name</th>")
         if text.count(MARKER) == 0:
-            old_marker = PREVIOUS_MARKER if text.count(PREVIOUS_MARKER) == 1 else OLDER_MARKER
+            old_marker = next(marker for marker in (PREVIOUS_NAME_MARKER, PREVIOUS_MARKER, OLDER_MARKER)
+                              if text.count(marker) == 1)
             text = once(text, old_marker, MARKER, "FCC patch version marker")
         if any(text.count(token) != 1 for token in required):
             raise PatchError("incomplete FCC Gateway Activity modification")
@@ -228,11 +231,11 @@ def patch_text(text: str) -> str:
         if text.count(NAME_CELL_STYLE_OLD) == 1:
             return text.replace(NAME_CELL_STYLE_OLD, NAME_CELL_STYLE_NEW, 1)
         raise PatchError("unsupported or ambiguous FCC Name-cell style")
-    if any(text.count(marker) > 1 for marker in (MARKER, PREVIOUS_MARKER, OLDER_MARKER, LEGACY_MARKER)):
+    if any(text.count(marker) > 1 for marker in (MARKER, PREVIOUS_NAME_MARKER, PREVIOUS_MARKER, OLDER_MARKER, LEGACY_MARKER)):
         raise PatchError("duplicate FCC modification marker")
     if text.count(LEGACY_MARKER) == 1:
         return patch_text(text.replace(LEGACY_MARKER, OLDER_MARKER, 1))
-    if any(marker in text for marker in (MARKER, PREVIOUS_MARKER, OLDER_MARKER, LEGACY_MARKER)):
+    if any(marker in text for marker in (MARKER, PREVIOUS_NAME_MARKER, PREVIOUS_MARKER, OLDER_MARKER, LEGACY_MARKER)):
         raise PatchError("partial FCC modification marker")
     if not text.startswith("<?php\n"):
         raise PatchError("unsupported lh.php PHP anchor")

@@ -363,7 +363,10 @@ add exact identifiers in `CALLSIGN = DESCRIPTION` format, with spaces around
 `=`. One identifier goes on each line. Existing tab-separated entries remain
 supported. Lookup order is FCC/DMR name, custom description, manual operator
 name, then CTY.DAT country fallback. Upgrades preserve the installed file and
-its edits; the file is also retained on uninstall. To adopt newer starter
+its edits; the file is also retained on uninstall. Custom identifiers may
+contain internal hyphens; for example, use `AL-LINK = Alabama Link` when the
+dashboard displays `AL-LINK`. The custom-description prompt keeps that exact
+identifier. To adopt newer starter
 entries from GitHub later, compare the repository file with the installed file
 and merge entries instead of replacing your edited copy blindly.
 
