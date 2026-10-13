@@ -69,6 +69,11 @@ legacy_partial_name = patcher.OLD_COUNTRY_BLOCK.replace(
 legacy_existing_html = changed.replace(patcher.NAME_BLOCK, legacy_partial_name, 1).replace(patcher.MARKER, patcher.PREVIOUS_NAME_MARKER, 1)
 require(patcher.patch_text(legacy_existing_html) == changed,
         "legacy Name block with existing HTML output was not safely upgraded")
+legacy_without_known_boundary = legacy_existing_html.replace(
+    "if (strlen($listElem[4]) == 1) { $listElem[4] = str_pad($listElem[4], 8, \" \", STR_PAD_LEFT); }\n", "", 1)
+require(patcher.patch_text(legacy_without_known_boundary) == changed.replace(
+    "if (strlen($listElem[4]) == 1) { $listElem[4] = str_pad($listElem[4], 8, \" \", STR_PAD_LEFT); }\n", "", 1),
+        "legacy Name block upgrade incorrectly depends on a later activity-row boundary")
 
 legacy_name_style = changed.replace(patcher.NAME_CELL_STYLE_NEW, patcher.NAME_CELL_STYLE_OLD, 1)
 require(patcher.patch_text(legacy_name_style) == changed, "installed FCC Name-cell style was not upgraded")

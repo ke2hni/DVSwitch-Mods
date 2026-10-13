@@ -197,29 +197,21 @@ def once(text: str, old: str, new: str, description: str) -> str:
 
 def upgrade_legacy_name_region(text: str) -> str:
     """Replace an older owned Name block while preserving its existing cell output."""
-    import re
     anchor = OLD_LEGACY_NAME
     if text.count(anchor) != 1:
         raise PatchError("unsupported or ambiguous legacy FCC Gateway Activity Name block")
     start = text.rfind("\n", 0, text.index(anchor)) + 1
-    end_tokens = ["$dvsModsTarget = dvsModsTargetDisplay(", "if (strlen($listElem[4]) == 1)"]
-    boundaries = [text.find(token, start + len(anchor)) for token in end_tokens]
-    boundaries = [position for position in boundaries if position >= 0]
-    if not boundaries:
-        raise PatchError("unsupported legacy FCC Gateway Activity Name boundary")
-    end = min(boundaries)
-    region = text[start:end]
-    if "dvsModsFccFirstName($listElem[2])" not in region:
-        raise PatchError("legacy FCC Gateway Activity Name block is not recognized")
     output_lines = []
     offset = start
-    for line in text[start:end].splitlines(keepends=True):
+    for line in text[start:].splitlines(keepends=True):
         if "echo" in line and "</td>" in line and ("$dvsModsNameHtml" in line or "htmlspecialchars($dvsModsFirstName" in line):
             output_lines.append((offset, offset + len(line), line))
         offset += len(line)
     if len(output_lines) != 1:
         raise PatchError("unsupported or ambiguous legacy FCC Gateway Activity Name output")
     output_start, output_end, output_line = output_lines[0]
+    if "dvsModsFccFirstName($listElem[2])" not in text[start:output_start]:
+        raise PatchError("legacy FCC Gateway Activity Name block is not recognized")
     if "$dvsModsNameHtml" not in output_line:
         output_line = '''                echo '<td align="left" style="font-weight:bold;color:#464646;white-space:normal;overflow-wrap:anywhere;word-break:normal;width:12ch;min-width:12ch;max-width:12ch;">&nbsp;<b>'.$dvsModsNameHtml.'</b></td>';\n'''
     replacement = "                " + NAME_BLOCK + "\n" + output_line
