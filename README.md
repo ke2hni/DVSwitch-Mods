@@ -375,10 +375,14 @@ Starter entries currently include `9998`, `9999`, `MMDVM`, and `N0CALL`
 `SRVPROBA`, `SRVPROBB`, and `AMERICALNK`.
 
 Manual operator names are stored in `/etc/dvswitch-mods/callsign-lookup.tsv` as
-`CALLSIGN = NAME`, one entry per line. Hover over or keyboard-focus **file
-location** in the dashboard legend to display the full path. Both user files
-are retained during upgrades and uninstall so their entries can be reviewed or
-reused.
+`CALLSIGN = NAME`, one entry per line. The installer adds any missing entries
+from `data/callsign-lookup.tsv` without replacing the existing file or its
+contents. Existing callsign entries always keep their current value when a
+starter row has the same callsign. Re-running the installer adds no duplicates;
+`--check` reports how many starter entries are still missing without changing
+the file. Hover over or keyboard-focus **file location** in the dashboard
+legend to display the full path. Both user files are retained during upgrades
+and uninstall so their entries can be reviewed or reused.
 
 Manual FCC update:
 
