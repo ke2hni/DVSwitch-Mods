@@ -3,8 +3,8 @@
 # Format: CALLSIGN = DESCRIPTION. Keep one exact identifier per line.
 # Tab-separated CALLSIGN<TAB>DESCRIPTION entries are also supported.
 # Edit the installed copy at /etc/dvswitch-mods/callsign-descriptions.tsv.
-# Used when no FCC/DMR name is available; takes precedence over manual names
-# and CTY.DAT country fallback.
+# A matching description takes precedence over FCC/DMR names and CTY.DAT
+# country fallback.
 9998 = Announcement
 9999 = Announcement
 H4MLNK = YSF Link
@@ -15,3 +15,4 @@ EC0LINK = EchoLink
 XLX618 = US HemetHangout
 SRVPROBA = Server Probe A
 SRVPROBB = Server Probe B
+AL-LINK = Alabama Link YSF Reflector Dashboard
