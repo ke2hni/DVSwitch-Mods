@@ -64,6 +64,11 @@ require(patcher.patch_text(previous_manual_install) == changed,
 previous_exact_identifier_install = changed.replace(patcher.NAME_BLOCK, patcher.PREVIOUS_NAME_BLOCK, 1).replace(patcher.MARKER, patcher.PREVIOUS_NAME_MARKER, 1)
 require(patcher.patch_text(previous_exact_identifier_install) == changed,
         "existing v4 manual-entry installation was not upgraded to preserve exact custom identifiers")
+legacy_partial_name = patcher.OLD_COUNTRY_BLOCK.replace(
+    "\n                $dvsModsCountry", "\n                // retained prior dashboard formatting hook\n                $dvsModsCountry", 1)
+legacy_existing_html = changed.replace(patcher.NAME_BLOCK, legacy_partial_name, 1).replace(patcher.MARKER, patcher.PREVIOUS_NAME_MARKER, 1)
+require(patcher.patch_text(legacy_existing_html) == changed,
+        "legacy Name block with existing HTML output was not safely upgraded")
 
 legacy_name_style = changed.replace(patcher.NAME_CELL_STYLE_NEW, patcher.NAME_CELL_STYLE_OLD, 1)
 require(patcher.patch_text(legacy_name_style) == changed, "installed FCC Name-cell style was not upgraded")

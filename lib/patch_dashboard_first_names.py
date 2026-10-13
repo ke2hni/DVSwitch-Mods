@@ -195,6 +195,37 @@ def once(text: str, old: str, new: str, description: str) -> str:
     return text.replace(old, new, 1)
 
 
+def upgrade_legacy_name_region(text: str) -> str:
+    """Replace an older owned Name block while preserving its existing cell output."""
+    import re
+    anchor = OLD_LEGACY_NAME
+    if text.count(anchor) != 1:
+        raise PatchError("unsupported or ambiguous legacy FCC Gateway Activity Name block")
+    start = text.rfind("\n", 0, text.index(anchor)) + 1
+    end_tokens = ["$dvsModsTarget = dvsModsTargetDisplay(", "if (strlen($listElem[4]) == 1)"]
+    boundaries = [text.find(token, start + len(anchor)) for token in end_tokens]
+    boundaries = [position for position in boundaries if position >= 0]
+    if not boundaries:
+        raise PatchError("unsupported legacy FCC Gateway Activity Name boundary")
+    end = min(boundaries)
+    region = text[start:end]
+    if "dvsModsFccFirstName($listElem[2])" not in region:
+        raise PatchError("legacy FCC Gateway Activity Name block is not recognized")
+    output_lines = []
+    offset = start
+    for line in text[start:end].splitlines(keepends=True):
+        if "echo" in line and "</td>" in line and ("$dvsModsNameHtml" in line or "htmlspecialchars($dvsModsFirstName" in line):
+            output_lines.append((offset, offset + len(line), line))
+        offset += len(line)
+    if len(output_lines) != 1:
+        raise PatchError("unsupported or ambiguous legacy FCC Gateway Activity Name output")
+    output_start, output_end, output_line = output_lines[0]
+    if "$dvsModsNameHtml" not in output_line:
+        output_line = '''                echo '<td align="left" style="font-weight:bold;color:#464646;white-space:normal;overflow-wrap:anywhere;word-break:normal;width:12ch;min-width:12ch;max-width:12ch;">&nbsp;<b>'.$dvsModsNameHtml.'</b></td>';\n'''
+    replacement = "                " + NAME_BLOCK + "\n" + output_line
+    return text[:start] + replacement + text[output_end:]
+
+
 def patch_text(text: str) -> str:
     supported_markers = (MARKER, PREVIOUS_NAME_MARKER, PREVIOUS_MARKER, OLDER_MARKER)
     if sum(text.count(marker) for marker in supported_markers) == 1:
@@ -214,12 +245,7 @@ def patch_text(text: str) -> str:
             elif text.count(OLD_COUNTRY_BLOCK) == 1:
                 text = text.replace(OLD_COUNTRY_BLOCK, NAME_BLOCK, 1)
             elif text.count(OLD_LEGACY_NAME) == 1:
-                text = text.replace(OLD_LEGACY_NAME, NAME_BLOCK, 1)
-                old_output = "htmlspecialchars($dvsModsFirstName, ENT_QUOTES | ENT_SUBSTITUTE, \"UTF-8\").'</b></td>';"
-                new_output = "$dvsModsNameHtml.'</b></td>';"
-                if text.count(old_output) != 1:
-                    raise PatchError("unsupported legacy FCC Gateway Activity Name output")
-                text = text.replace(old_output, new_output, 1)
+                text = upgrade_legacy_name_region(text)
             else:
                 raise PatchError("unsupported or ambiguous existing Gateway Activity name block")
         if text.count(NAME_CELL_STYLE_NEW) == 1:
