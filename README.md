@@ -356,19 +356,20 @@ sudo ./mod-dashboard-fcc-first-names.sh --check
 sudo ./mod-dashboard-fcc-first-names.sh --install
 ```
 
-The installer copies the starter custom-description file from
+The installer adds missing starter custom-description entries from
 `data/callsign-descriptions.tsv` to
-`/etc/dvswitch-mods/callsign-descriptions.tsv` once. Edit the installed file to
-add exact identifiers in `CALLSIGN = DESCRIPTION` format, with spaces around
-`=`. One identifier goes on each line. Existing tab-separated entries remain
-supported. Lookup order is FCC/DMR name, custom description, manual operator
-name, then CTY.DAT country fallback. Upgrades preserve the installed file and
-its edits; the file is also retained on uninstall. Custom identifiers may
-contain internal hyphens; for example, use `AL-LINK = Alabama Link` when the
-dashboard displays `AL-LINK`. The custom-description prompt keeps that exact
-identifier. To adopt newer starter
-entries from GitHub later, compare the repository file with the installed file
-and merge entries instead of replacing your edited copy blindly.
+`/etc/dvswitch-mods/callsign-descriptions.tsv`. Edit the installed file to add
+exact identifiers in `CALLSIGN = DESCRIPTION` format, with spaces around `=`.
+One identifier goes on each line. Existing tab-separated entries remain
+supported. The installer preserves existing rows and values, including when a
+starter row uses the same identifier, and appends only identifiers not already
+present. `--check` reports how many starter descriptions are missing without
+changing the file; re-running installation does not add duplicates. Lookup
+order is FCC/DMR name, custom description, manual operator name, then CTY.DAT
+country fallback. Upgrades preserve the installed file and its edits; the file
+is also retained on uninstall. Custom identifiers may contain internal
+hyphens; for example, use `AL-LINK = Alabama Link` when the dashboard displays
+`AL-LINK`. The custom-description prompt keeps that exact identifier.
 
 Starter entries currently include `9998`, `9999`, `MMDVM`, and `N0CALL`
 (announcements), `H4MLNK` (YSF Link), `EC0LINK` (EchoLink), `XLX618`,

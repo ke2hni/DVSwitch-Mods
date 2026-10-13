@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.6.1"
+readonly SCRIPT_VERSION="1.6.2"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PATCHER="$SCRIPT_DIR/lib/patch_dashboard_first_names.py"
 readonly BUILDER="$SCRIPT_DIR/lib/build_fcc_first_names.py"
@@ -21,6 +21,7 @@ readonly CALLSIGN_NAME_SAVE_SOURCE="$SCRIPT_DIR/lib/dvswitch_mods_callsign_name_
 readonly CALLSIGN_NAME_SAVE_TARGET="/usr/share/dvswitch/callsign-lookup.php"
 readonly CALLSIGN_DESCRIPTIONS_SOURCE="$SCRIPT_DIR/data/callsign-descriptions.tsv"
 readonly CALLSIGN_DESCRIPTIONS_TARGET="/etc/dvswitch-mods/callsign-descriptions.tsv"
+readonly CALLSIGN_DESCRIPTIONS_MERGER="$SCRIPT_DIR/lib/merge_callsign_descriptions.py"
 readonly CALLSIGN_NAMES_TARGET="/etc/dvswitch-mods/callsign-lookup.tsv"
 readonly CALLSIGN_NAMES_STARTER_SOURCE="$SCRIPT_DIR/data/callsign-lookup.tsv"
 readonly CALLSIGN_NAMES_MERGER="$SCRIPT_DIR/lib/merge_callsign_lookup.py"
@@ -91,7 +92,7 @@ dashboard_health() {
 preflight() {
     check_platform
     for command in awk chmod chown cmp cp curl date grep install mktemp mv php python3 rm sha256sum stat systemctl; do require_command "$command"; done
-    require_file "$PATCHER"; require_file "$BUILDER"; require_file "$HELPER_SOURCE"; require_file "$CALLSIGN_NAME_SAVE_SOURCE"; require_file "$CALLSIGN_DESCRIPTIONS_SOURCE"; require_file "$CALLSIGN_NAMES_STARTER_SOURCE"; require_file "$CALLSIGN_NAMES_MERGER"; require_file "$TRANSACTION_LIBRARY"
+    require_file "$PATCHER"; require_file "$BUILDER"; require_file "$HELPER_SOURCE"; require_file "$CALLSIGN_NAME_SAVE_SOURCE"; require_file "$CALLSIGN_DESCRIPTIONS_SOURCE"; require_file "$CALLSIGN_DESCRIPTIONS_MERGER"; require_file "$CALLSIGN_NAMES_STARTER_SOURCE"; require_file "$CALLSIGN_NAMES_MERGER"; require_file "$TRANSACTION_LIBRARY"
     require_file "$UPDATER_SOURCE"; require_file "$SERVICE_SOURCE"; require_file "$TIMER_SOURCE"
     require_file "$LH_TARGET"; require_file "$LOCALTX_TARGET"
     if [[ -e "$CALLSIGN_DESCRIPTIONS_TARGET" || -L "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then require_file "$CALLSIGN_DESCRIPTIONS_TARGET"; fi
@@ -402,7 +403,9 @@ run_check() {
     else
         printf 'FCC weekly updater: not installed; --install will add it.\n'
     fi
-    if [[ -f "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then printf 'Custom callsign descriptions: editable file present at %s.\n' "$CALLSIGN_DESCRIPTIONS_TARGET"; else printf 'MODIFICATION READY: --install will create the editable custom callsign file at %s.\n' "$CALLSIGN_DESCRIPTIONS_TARGET"; fi
+    local starter_descriptions_missing
+    starter_descriptions_missing=$(python3 "$CALLSIGN_DESCRIPTIONS_MERGER" --check "$CALLSIGN_DESCRIPTIONS_TARGET" "$CALLSIGN_DESCRIPTIONS_SOURCE")
+    if [[ -f "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then printf 'Custom callsign descriptions: editable file present at %s. Starter entries to add: %s.\n' "$CALLSIGN_DESCRIPTIONS_TARGET" "$starter_descriptions_missing"; else printf 'MODIFICATION READY: --install will create %s and add %s starter descriptions.\n' "$CALLSIGN_DESCRIPTIONS_TARGET" "$starter_descriptions_missing"; fi
     local starter_names_missing
     starter_names_missing=$(python3 "$CALLSIGN_NAMES_MERGER" --check "$CALLSIGN_NAMES_TARGET" "$CALLSIGN_NAMES_STARTER_SOURCE")
     if [[ -f "$CALLSIGN_NAMES_TARGET" ]]; then printf 'Manual callsign names: editable file present at %s. Starter entries to add: %s.\n' "$CALLSIGN_NAMES_TARGET" "$starter_names_missing"; else printf 'MODIFICATION READY: --install will create %s and add %s starter names.\n' "$CALLSIGN_NAMES_TARGET" "$starter_names_missing"; fi
@@ -411,11 +414,12 @@ run_check() {
 
 run_install() {
     preflight; prepare_dashboard
-    local names_starter_missing
+    local names_starter_missing descriptions_starter_missing
     names_starter_missing=$(python3 "$CALLSIGN_NAMES_MERGER" --check "$CALLSIGN_NAMES_TARGET" "$CALLSIGN_NAMES_STARTER_SOURCE")
+    descriptions_starter_missing=$(python3 "$CALLSIGN_DESCRIPTIONS_MERGER" --check "$CALLSIGN_DESCRIPTIONS_TARGET" "$CALLSIGN_DESCRIPTIONS_SOURCE")
     local cty_ready=0
     if validate_cty "$CTY_DATABASE_TARGET"; then cty_ready=1; fi
-    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$CALLSIGN_NAME_SAVE_TARGET" ]] && cmp -s "$CALLSIGN_NAME_SAVE_SOURCE" "$CALLSIGN_NAME_SAVE_TARGET" && [[ -f "$CALLSIGN_NAMES_TARGET" ]] && [[ "$(stat -c '%U:%G:%a' "$CALLSIGN_NAMES_TARGET")" == "root:www-data:660" ]] && [[ "$names_starter_missing" == 0 ]] && [[ -f "$CALLSIGN_DESCRIPTIONS_TARGET" ]] && [[ "$(stat -c '%U:%G:%a' "$CALLSIGN_DESCRIPTIONS_TARGET")" == "root:www-data:660" ]] && [[ -f "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_release_state)" == current ]] && [[ $cty_ready -eq 1 ]]; then
+    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$CALLSIGN_NAME_SAVE_TARGET" ]] && cmp -s "$CALLSIGN_NAME_SAVE_SOURCE" "$CALLSIGN_NAME_SAVE_TARGET" && [[ -f "$CALLSIGN_NAMES_TARGET" ]] && [[ "$(stat -c '%U:%G:%a' "$CALLSIGN_NAMES_TARGET")" == "root:www-data:660" ]] && [[ "$names_starter_missing" == 0 ]] && [[ -f "$CALLSIGN_DESCRIPTIONS_TARGET" ]] && [[ "$(stat -c '%U:%G:%a' "$CALLSIGN_DESCRIPTIONS_TARGET")" == "root:www-data:660" ]] && [[ "$descriptions_starter_missing" == 0 ]] && [[ -f "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_release_state)" == current ]] && [[ $cty_ready -eq 1 ]]; then
         printf 'PASS: worldwide DMR/FCC dashboard Name modification is already installed. No files changed.\n'; return
     fi
     if [[ $cty_ready -eq 0 ]]; then prepare_cty_candidate; fi
@@ -433,16 +437,25 @@ run_install() {
     stage_install_component "$WORK_DIR/localtx.php" "$LOCALTX_TARGET" root root 0644
     stage_install_component "$HELPER_SOURCE" "$HELPER_TARGET" root root 0644
     stage_install_component "$CALLSIGN_NAME_SAVE_SOURCE" "$CALLSIGN_NAME_SAVE_TARGET" root root 0644
-    if [[ ! -e "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then
+    if [[ ! -e "$CALLSIGN_DESCRIPTIONS_TARGET" && ! -L "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then
         backup_target "$CALLSIGN_DESCRIPTIONS_TARGET"
         install -d -o root -g root -m 0755 "$(dirname "$CALLSIGN_DESCRIPTIONS_TARGET")"
-        dvsm_install_new_candidate "$CALLSIGN_DESCRIPTIONS_SOURCE" "$CALLSIGN_DESCRIPTIONS_TARGET" root root 0644
+        python3 "$CALLSIGN_DESCRIPTIONS_MERGER" --merge "$CALLSIGN_DESCRIPTIONS_TARGET" "$CALLSIGN_DESCRIPTIONS_SOURCE" >/dev/null
         chown root:www-data "$CALLSIGN_DESCRIPTIONS_TARGET"; chmod 0660 "$CALLSIGN_DESCRIPTIONS_TARGET"
     elif [[ ! -f "$CALLSIGN_DESCRIPTIONS_TARGET" || -L "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then
         die "Refusing unsupported custom callsign descriptions file: $CALLSIGN_DESCRIPTIONS_TARGET"
-    elif [[ "$(stat -c '%U:%G:%a' "$CALLSIGN_DESCRIPTIONS_TARGET")" != "root:www-data:660" ]]; then
-        backup_target "$CALLSIGN_DESCRIPTIONS_TARGET"
-        chown root:www-data "$CALLSIGN_DESCRIPTIONS_TARGET"; chmod 0660 "$CALLSIGN_DESCRIPTIONS_TARGET"
+    else
+        local current_descriptions_owner_mode
+        current_descriptions_owner_mode=$(stat -c '%U:%G:%a' "$CALLSIGN_DESCRIPTIONS_TARGET")
+        if [[ "$descriptions_starter_missing" != 0 || "$current_descriptions_owner_mode" != "root:www-data:660" ]]; then
+            backup_target "$CALLSIGN_DESCRIPTIONS_TARGET"
+        fi
+        if [[ "$descriptions_starter_missing" != 0 ]]; then
+            python3 "$CALLSIGN_DESCRIPTIONS_MERGER" --merge "$CALLSIGN_DESCRIPTIONS_TARGET" "$CALLSIGN_DESCRIPTIONS_SOURCE" >/dev/null
+        fi
+        if [[ "$current_descriptions_owner_mode" != "root:www-data:660" ]]; then
+            chown root:www-data "$CALLSIGN_DESCRIPTIONS_TARGET"; chmod 0660 "$CALLSIGN_DESCRIPTIONS_TARGET"
+        fi
     fi
     if [[ ! -e "$CALLSIGN_NAMES_TARGET" && ! -L "$CALLSIGN_NAMES_TARGET" ]]; then
         backup_target "$CALLSIGN_NAMES_TARGET"
