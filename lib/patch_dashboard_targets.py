@@ -16,13 +16,13 @@ MARKER = "// DVSwitch-Mods: cleaned activity Target display v3"
 INCLUDE = "include_once dirname(dirname(__FILE__)).'/include/dvswitch_mods_target_display.php';"
 LEGEND = '''<div style="margin:3px 0 0 14px;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
   <b>Legend:</b><br>
-  <b>---</b> = No name found in the local DMR ID or FCC data; country shown when available.
+  <b>---</b> = No name found in the local DMR ID or FCC data; country shown when available. Click --- to add an entry.
 </div>
 '''
 LEGACY_LEGENDS = (
     '''<div style="margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
   <b>Legend:</b><br>
-  <b>---</b> = No name found in the local DMR ID or FCC data; country shown when available.
+  <b>---</b> = No name found in the local DMR ID or FCC data; country shown when available. Click --- to add an entry.
 </div>
 ''',
     '''<div style="margin:3px auto 0 auto;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">

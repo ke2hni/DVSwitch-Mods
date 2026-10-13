@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.5.0"
+readonly SCRIPT_VERSION="1.6.0"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PATCHER="$SCRIPT_DIR/lib/patch_dashboard_first_names.py"
 readonly BUILDER="$SCRIPT_DIR/lib/build_fcc_first_names.py"
@@ -409,7 +409,7 @@ run_install() {
     preflight; prepare_dashboard
     local cty_ready=0
     if validate_cty "$CTY_DATABASE_TARGET"; then cty_ready=1; fi
-    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$CALLSIGN_NAME_SAVE_TARGET" ]] && cmp -s "$CALLSIGN_NAME_SAVE_SOURCE" "$CALLSIGN_NAME_SAVE_TARGET" && [[ -f "$CALLSIGN_NAMES_TARGET" ]] && [[ "$(stat -c '%U:%G:%a' "$CALLSIGN_NAMES_TARGET")" == "root:www-data:660" ]] && [[ -f "$DATABASE_TARGET" ]] && [[ -f "$CALLSIGN_DESCRIPTIONS_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_release_state)" == current ]] && [[ $cty_ready -eq 1 ]]; then
+    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$CALLSIGN_NAME_SAVE_TARGET" ]] && cmp -s "$CALLSIGN_NAME_SAVE_SOURCE" "$CALLSIGN_NAME_SAVE_TARGET" && [[ -f "$CALLSIGN_NAMES_TARGET" ]] && [[ "$(stat -c '%U:%G:%a' "$CALLSIGN_NAMES_TARGET")" == "root:www-data:660" ]] && [[ -f "$CALLSIGN_DESCRIPTIONS_TARGET" ]] && [[ "$(stat -c '%U:%G:%a' "$CALLSIGN_DESCRIPTIONS_TARGET")" == "root:www-data:660" ]] && [[ -f "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_release_state)" == current ]] && [[ $cty_ready -eq 1 ]]; then
         printf 'PASS: worldwide DMR/FCC dashboard Name modification is already installed. No files changed.\n'; return
     fi
     if [[ $cty_ready -eq 0 ]]; then prepare_cty_candidate; fi
@@ -431,6 +431,12 @@ run_install() {
         backup_target "$CALLSIGN_DESCRIPTIONS_TARGET"
         install -d -o root -g root -m 0755 "$(dirname "$CALLSIGN_DESCRIPTIONS_TARGET")"
         dvsm_install_new_candidate "$CALLSIGN_DESCRIPTIONS_SOURCE" "$CALLSIGN_DESCRIPTIONS_TARGET" root root 0644
+        chown root:www-data "$CALLSIGN_DESCRIPTIONS_TARGET"; chmod 0660 "$CALLSIGN_DESCRIPTIONS_TARGET"
+    elif [[ ! -f "$CALLSIGN_DESCRIPTIONS_TARGET" || -L "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then
+        die "Refusing unsupported custom callsign descriptions file: $CALLSIGN_DESCRIPTIONS_TARGET"
+    elif [[ "$(stat -c '%U:%G:%a' "$CALLSIGN_DESCRIPTIONS_TARGET")" != "root:www-data:660" ]]; then
+        backup_target "$CALLSIGN_DESCRIPTIONS_TARGET"
+        chown root:www-data "$CALLSIGN_DESCRIPTIONS_TARGET"; chmod 0660 "$CALLSIGN_DESCRIPTIONS_TARGET"
     fi
     if [[ ! -e "$CALLSIGN_NAMES_TARGET" ]]; then
         backup_target "$CALLSIGN_NAMES_TARGET"
@@ -508,7 +514,7 @@ resolve_uninstall_backup() {
         IFS=$'\t' read -r candidate_existed candidate_backup <<< "$candidate_row"
         [[ "$candidate_existed" == 1 && -n "$candidate_backup" && "$candidate_backup" != *$'\n'* && "$candidate_backup" == "$candidate/"* ]] || continue
         [[ -f "$candidate_backup" && ! -L "$candidate_backup" ]] || continue
-        if grep -Eq '^// DVSwitch-Mods: FCC first-name activity columns v[123]$' "$candidate_backup"; then continue; fi
+        if grep -Eq '^// DVSwitch-Mods: FCC first-name activity columns v[1234]$' "$candidate_backup"; then continue; fi
         cp -- "$candidate_backup" "$probe"
         if python3 "$PATCHER" --lh "$probe" >/dev/null 2>&1 && cmp -s "$probe" "$LH_TARGET"; then
             selected=$candidate
@@ -554,6 +560,7 @@ run_uninstall() {
         local custom_restore
         custom_restore=$(mktemp --tmpdir="$(dirname "$CALLSIGN_DESCRIPTIONS_TARGET")" .dvswitch-custom-callsigns.XXXXXX)
         cp -a -- "$custom_temporary" "$custom_restore"
+        chown root:root "$custom_restore"; chmod 0644 "$custom_restore"
         mv -fT -- "$custom_restore" "$CALLSIGN_DESCRIPTIONS_TARGET"
     fi
     if [[ -n "$callsign_names_temporary" ]]; then
@@ -596,7 +603,7 @@ validate_fcc_restore_state() {
 
 run_restore() {
     preflight
-    local name=$1 directory="$BACKUP_ROOT/$1" callsign_names_temporary=""
+    local name=$1 directory="$BACKUP_ROOT/$1" callsign_names_temporary="" custom_temporary=""
     [[ "$name" =~ ^install-[0-9]{8}-[0-9]{6}(-[0-9]+)?$ ]] || die "Invalid backup name."
     [[ -d "$directory" && ! -L "$directory" ]] || die "Backup not found: $name"
     validate_fcc_restore_state "$directory"
@@ -604,6 +611,11 @@ run_restore() {
         [[ -n "$WORK_DIR" ]] || WORK_DIR=$(mktemp -d "$WORK_ROOT/.dvswitch-fcc-restore.XXXXXX")
         callsign_names_temporary="$WORK_DIR/callsign-lookup.tsv"
         cp -a -- "$CALLSIGN_NAMES_TARGET" "$callsign_names_temporary"
+    fi
+    if [[ -f "$CALLSIGN_DESCRIPTIONS_TARGET" && ! -L "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then
+        [[ -n "$WORK_DIR" ]] || WORK_DIR=$(mktemp -d "$WORK_ROOT/.dvswitch-fcc-restore.XXXXXX")
+        custom_temporary="$WORK_DIR/callsign-descriptions.tsv"
+        cp -a -- "$CALLSIGN_DESCRIPTIONS_TARGET" "$custom_temporary"
     fi
     . "$TRANSACTION_LIBRARY"
     systemctl disable --now "$TIMER_UNIT" >/dev/null 2>&1 || true
@@ -615,6 +627,14 @@ run_restore() {
         cp -a -- "$callsign_names_temporary" "$names_restore"
         chown root:www-data "$names_restore"; chmod 0660 "$names_restore"
         mv -fT -- "$names_restore" "$CALLSIGN_NAMES_TARGET"
+    fi
+    if [[ -n "$custom_temporary" ]]; then
+        install -d -o root -g root -m 0755 "$(dirname "$CALLSIGN_DESCRIPTIONS_TARGET")"
+        local custom_restore
+        custom_restore=$(mktemp --tmpdir="$(dirname "$CALLSIGN_DESCRIPTIONS_TARGET")" .dvswitch-custom-callsigns.XXXXXX)
+        cp -a -- "$custom_temporary" "$custom_restore"
+        chown root:www-data "$custom_restore"; chmod 0660 "$custom_restore"
+        mv -fT -- "$custom_restore" "$CALLSIGN_DESCRIPTIONS_TARGET"
     fi
     if [[ -f "$UPDATER_TARGET" && ! -L "$UPDATER_TARGET" ]] && ! awk -F '\t' -v wanted="$PATCHER_TARGET" '$2 == wanted { found=1 } END { exit(found ? 0 : 1) }' "$directory/MANIFEST"; then
         rm -f -- "$PATCHER_TARGET"

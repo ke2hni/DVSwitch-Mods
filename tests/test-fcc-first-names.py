@@ -45,9 +45,10 @@ require(changed.count(patcher.MARKER) == 1, "marker missing")
 require(changed.count(patcher.INCLUDE) == 1, "helper include missing")
 require(changed.count("dvsModsFccFirstName($listElem[2])") == 1, "FCC lookup missing")
 require(changed.count("dvsModsCustomCallsignDescription($listElem[2])") == 1, "custom description lookup missing")
-require(changed.index("$dvsModsFirstName = dvsModsFccFirstName") < changed.index("dvsModsManualCallsignName($listElem[2])") < changed.index("dvsModsCustomCallsignDescription($listElem[2])"), "FCC/DMR database name does not take precedence over manual and custom fallback names")
+require(changed.index("$dvsModsFirstName = dvsModsFccFirstName") < changed.index("dvsModsCustomCallsignDescription($listElem[2])") < changed.index("dvsModsManualCallsignName($listElem[2])"), "lookup precedence is not FCC/DMR, custom descriptions, then manual names")
 require("$dvsModsNameHtml = '<button type=\"button\"" in changed and "fetch(&#39;callsign-lookup.php&#39;" in changed and "&#39;data-callsign&#39;" in changed, "unknown name marker is not clickable with a local save action")
-require(patcher.MARKER.endswith("v3"), "FCC patch version was not advanced for manual names")
+require("operator name (callsign-lookup.tsv)" in changed and "custom description (callsign-descriptions.tsv)" in changed and "&amp;type=&#39;+encodeURIComponent(t)" in changed, "unknown marker does not offer separate operator-name and custom-description saves")
+require(patcher.MARKER.endswith("v4"), "FCC patch version was not advanced for separate entry types and lookup precedence")
 require(changed.count("dvsModsDmrIdCallsign($listElem[2])") == 1, "DMR resolver missing")
 require(changed.count("width:12ch;min-width:12ch;max-width:12ch") == 1, "Name-cell width and wrap limit missing")
 require(changed.count("overflow-wrap:anywhere") == 1, "Name-cell overflow wrapping missing")
@@ -56,6 +57,9 @@ require(patcher.patch_text(changed) == changed, "patch is not idempotent")
 legacy_country_upgrade = changed.replace(patcher.NAME_BLOCK, patcher.OLD_NAME_BLOCK, 1).replace(patcher.MARKER, patcher.PREVIOUS_MARKER, 1)
 require(legacy_country_upgrade != changed, "failed to prepare legacy country-fallback fixture")
 require(patcher.patch_text(legacy_country_upgrade) == changed, "existing country-fallback installation was not upgraded")
+previous_manual_install = changed.replace(patcher.NAME_BLOCK, patcher.PREVIOUS_NAME_BLOCK, 1).replace(patcher.MARKER, patcher.PREVIOUS_MARKER, 1)
+require(patcher.patch_text(previous_manual_install) == changed,
+        "existing manual-name installation was not upgraded to separate custom-description saves and corrected precedence")
 
 legacy_name_style = changed.replace(patcher.NAME_CELL_STYLE_NEW, patcher.NAME_CELL_STYLE_OLD, 1)
 require(patcher.patch_text(legacy_name_style) == changed, "installed FCC Name-cell style was not upgraded")
@@ -89,14 +93,17 @@ with tempfile.TemporaryDirectory() as directory:
     path = Path(directory) / "lh.php"
     path.write_bytes(fixture.replace("\n", "\r\n").encode())
     localtx = Path(directory) / "localtx.php"
-    localtx.write_text('<div><b>Legend:</b> <b>---</b> = no data</div>', encoding="utf-8")
+    localtx.write_text('<div><b>Legend:</b> <b>---</b> = No usable worldwide DMR ID or FCC name data available, Maybe an International Callsign.</div>', encoding="utf-8")
     subprocess.run(["python3", str(ROOT / "lib/patch_dashboard_first_names.py"), "--lh", str(path), "--localtx", str(localtx)], check=True)
     raw = path.read_bytes()
     require(b"\r\n" in raw and b"\n" not in raw.replace(b"\r\n", b""), "CRLF was not preserved")
     legend = localtx.read_text(encoding="utf-8")
     require(patcher.LEGEND_MARKER in legend and "/etc/dvswitch-mods/callsign-lookup.tsv" in legend, "manual callsign legend was not added")
-    require("Name entered manually and saved in the local callsign names file" in legend and ">file location</span>" in legend,
+    require("Operator name entered manually and saved in the local callsign names file" in legend and ">file location</span>" in legend,
             "manual callsign legend does not explain the marker and file path")
+    require("dvsModsCallsignFileTip:hover:after" in legend and "data-tip=\"Manual operator names file: /etc/dvswitch-mods/callsign-lookup.tsv\"" in legend,
+        "manual callsign file path does not have a visible hover/focus popup")
+    require("Click --- to add an entry." in legend, "legend does not explain that --- is clickable")
     require(legend.count("width:3ch;text-align:right") == 2, "equals signs do not align across the --- and * legend rows")
     require(patcher.patch_legend_text(legend) == legend, "aligned legend patch is not idempotent")
 
@@ -127,7 +134,7 @@ wrapped_v3_legend = ('<div><b>Legend:</b> <span style="display:inline-block;widt
 upgraded_v3_legend = patcher.patch_legend_text(wrapped_v3_legend)
 require(patcher.LEGEND_MARKER in upgraded_v3_legend and '<b>Legend:</b><br>\n' in upgraded_v3_legend,
         "v3 legend heading was not moved above its aligned rows")
-require("Name entered manually and saved in the local callsign names file" in upgraded_v3_legend,
+require("Operator name entered manually and saved in the local callsign names file" in upgraded_v3_legend,
         "v3 legend wording was not updated")
 require(patcher.patch_legend_text(upgraded_v3_legend) == upgraded_v3_legend,
         "upgraded v3 legend is not idempotent")
@@ -148,6 +155,22 @@ require(fixed_combined_legend.count("width:3ch;text-align:right") == 2,
         "combined installed legend does not align the --- and * rows")
 require(patcher.patch_legend_text(fixed_combined_legend) == fixed_combined_legend,
         "combined installed legend migration is not idempotent")
+unpatched_combined_legend = patcher.unpatch_legend_text(fixed_combined_legend)
+require(patcher.LEGEND_MARKER not in unpatched_combined_legend and "dvsModsCallsignFileTip" not in unpatched_combined_legend,
+        "manual-name legend removal left its marker or tooltip styles behind")
+
+test7_legend = ('''<div style="margin:3px 0 0 14px;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">
+  <b>Legend:</b><br>
+  <span style="display:inline-block;width:3ch;text-align:right;"><b>---</b></span> = No name found in the local DMR ID or FCC data; country shown when available.<br>
+  <span style="display:inline-block;width:3ch;text-align:right;"><b>*</b></span> = Name entered manually and saved in the local callsign names file (<span title="Manual callsign names are stored in /etc/dvswitch-mods/callsign-lookup.tsv.">file location</span>)<br>
+  <!-- DVSwitch-Mods: manual callsign names legend v4 -->
+</div>''')
+upgraded_test7_legend = patcher.patch_legend_text(test7_legend)
+require("Click --- to add an entry." in upgraded_test7_legend and "dvsModsCallsignFileTip:hover:after" in upgraded_test7_legend
+        and "Operator name entered manually" in upgraded_test7_legend,
+        "Test7 combined legend was not upgraded with the click hint and visible path popup")
+require(patcher.patch_legend_text(upgraded_test7_legend) == upgraded_test7_legend,
+        "Test7 combined legend upgrade is not idempotent")
 
 installer = (ROOT / "mod-dashboard-fcc-first-names.sh").read_text()
 require('cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die' not in installer,
@@ -165,6 +188,11 @@ require('Custom callsign descriptions: editable file present' in installer, "--c
 require('readonly CALLSIGN_NAMES_TARGET="/etc/dvswitch-mods/callsign-lookup.tsv"' in installer, "manual callsign names file path missing")
 require('readonly LOCALTX_TARGET="/usr/share/dvswitch/include/localtx.php"' in installer, "legend dashboard file target missing")
 require('dvsModsSaveManualCallsignName($_POST[\'callsign\'] ?? \'\', $_POST[\'name\'] ?? \'\')' in (ROOT / "lib/dvswitch_mods_callsign_name_save.php").read_text(), "server-side manual name endpoint is missing")
+save_endpoint = (ROOT / "lib/dvswitch_mods_callsign_name_save.php").read_text()
+require('dvsModsSaveCustomCallsignDescription($_POST[\'callsign\'] ?? \'\', $_POST[\'name\'] ?? \'\')' in save_endpoint and "$_POST['type']" in save_endpoint,
+        "save endpoint does not route custom descriptions separately")
+require('chown root:www-data "$CALLSIGN_DESCRIPTIONS_TARGET"; chmod 0660 "$CALLSIGN_DESCRIPTIONS_TARGET"' in installer,
+        "installer does not grant the dashboard writer access to the custom-description TSV")
 require("--localtx" in installer, "FCC installer does not patch the legend")
 require('require_file "$LH_TARGET"' in installer, "FCC installer does not require Gateway Activity")
 require('stage_install_component "$WORK_DIR/localtx.php" "$LOCALTX_TARGET"' in installer, "FCC installer does not install its legend patch")

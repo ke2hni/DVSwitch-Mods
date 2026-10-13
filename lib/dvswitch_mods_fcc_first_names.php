@@ -210,6 +210,7 @@ function dvsModsSaveManualCallsignName($rawCallsign, $rawName, $path = '/etc/dvs
     if (!preg_match('/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{3,10}$/D', $callsign)) { return 'Invalid callsign.'; }
     if ($name === '' || strlen($name) > 100 || preg_match('/[\x00-\x1F\x7F=]/', $name)) { return 'Enter a name of 1 to 100 characters without tabs or line breaks.'; }
     if (dvsModsFccFirstName($callsign) !== '---') { return 'A name is already available in the local FCC/DMR databases.'; }
+    if (dvsModsCustomCallsignDescription($callsign) !== false) { return 'A custom description is already available for this callsign.'; }
     $handle = @fopen($path, 'c+');
     if ($handle === false) { return 'The local callsign names file is unavailable.'; }
     if (!flock($handle, LOCK_EX)) { fclose($handle); return 'Could not lock the local callsign names file.'; }
@@ -229,6 +230,37 @@ function dvsModsSaveManualCallsignName($rawCallsign, $rawName, $path = '/etc/dvs
     flock($handle, LOCK_UN);
     fclose($handle);
     return $written ? true : 'Could not save the local callsign name.';
+}
+
+/** Save a user-defined display description for an identifier without FCC/DMR data. */
+function dvsModsSaveCustomCallsignDescription($rawCallsign, $rawDescription, $path = '/etc/dvswitch-mods/callsign-descriptions.tsv') {
+    $callsign = strtoupper(trim((string)$rawCallsign));
+    $description = trim((string)$rawDescription);
+    if (!preg_match('/^[A-Z0-9]{1,16}$/D', $callsign)) { return 'Invalid callsign or identifier.'; }
+    if ($description === '' || strlen($description) > 80 || preg_match('/[\x00-\x1F\x7F=]/', $description)) {
+        return 'Enter a description of 1 to 80 characters without tabs, line breaks, or equals signs.';
+    }
+    if (dvsModsFccFirstName($callsign) !== '---') { return 'A name is already available in the local FCC/DMR databases.'; }
+    $handle = @fopen($path, 'c+');
+    if ($handle === false) { return 'The local callsign descriptions file is unavailable.'; }
+    if (!flock($handle, LOCK_EX)) { fclose($handle); return 'Could not lock the local callsign descriptions file.'; }
+    rewind($handle);
+    $lines = array();
+    while (($line = fgets($handle)) !== false) {
+        $trimmed = trim($line);
+        $separator = strpos($trimmed, '=');
+        if ($separator === false) { $separator = strpos($trimmed, "\t"); }
+        if ($trimmed !== '' && $trimmed[0] !== '#' && $separator !== false
+            && strtoupper(trim(substr($trimmed, 0, $separator))) === $callsign) { continue; }
+        $lines[] = rtrim($line, "\r\n");
+    }
+    $lines[] = $callsign.' = '.$description;
+    $contents = implode("\n", $lines)."\n";
+    rewind($handle);
+    $written = ftruncate($handle, 0) && fwrite($handle, $contents) === strlen($contents) && fflush($handle);
+    flock($handle, LOCK_UN);
+    fclose($handle);
+    return $written ? true : 'Could not save the local callsign description.';
 }
 
 /** Resolve a callsign to its CTY.DAT DXCC entity, including prefix exceptions. */

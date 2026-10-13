@@ -25,7 +25,14 @@ if (!is_array($origin) || !in_array(($origin['scheme'] ?? ''), array('http', 'ht
 }
 
 require_once __DIR__.'/include/dvswitch_mods_fcc_first_names.php';
-$result = dvsModsSaveManualCallsignName($_POST['callsign'] ?? '', $_POST['name'] ?? '');
+$type = $_POST['type'] ?? '1';
+if ($type === '1') {
+    $result = dvsModsSaveManualCallsignName($_POST['callsign'] ?? '', $_POST['name'] ?? '');
+} elseif ($type === '2') {
+    $result = dvsModsSaveCustomCallsignDescription($_POST['callsign'] ?? '', $_POST['name'] ?? '');
+} else {
+    dvsModsCallsignNameSaveReply(400, false, 'Choose an operator name or a custom description.');
+}
 if ($result !== true) { dvsModsCallsignNameSaveReply(400, false, $result); }
-dvsModsCallsignNameSaveReply(200, true, 'Name saved.');
+dvsModsCallsignNameSaveReply(200, true, $type === '1' ? 'Operator name saved.' : 'Custom description saved.');
 ?>
