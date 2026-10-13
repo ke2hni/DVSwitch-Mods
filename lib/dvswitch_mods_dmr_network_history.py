@@ -2,7 +2,7 @@
 # Version: 1.0.0
 # SPDX-License-Identifier: MIT
 
-"""Record timestamped BM/TGIF selections for Gateway Activity labels."""
+"""Record timestamped BM/TGIF/STFU selections for Gateway Activity labels."""
 
 from __future__ import annotations
 
@@ -22,7 +22,10 @@ LOCK_FILE = Path(os.environ.get(
 BRIDGE_INI = Path(os.environ.get(
     "DVS_MMDVM_BRIDGE_INI", "/opt/MMDVM_Bridge/MMDVM_Bridge.ini"
 ))
-NETWORKS = {"BM", "TGIF"}
+CURRENT_MODE_FILE = Path(os.environ.get(
+    "DVS_CURRENT_MODE_FILE", "/var/lib/dvswitch-mode-buttons/current-mode"
+))
+NETWORKS = {"BM", "TGIF", "STFU"}
 
 
 def read_history(path: Path) -> list[tuple[int, str]]:
@@ -59,6 +62,17 @@ def network_from_ini(path: Path) -> str | None:
     return None
 
 
+def selected_stfu_mode(path: Path) -> tuple[str, int] | None:
+    """Return STFU and the selected-mode file timestamp when STFU is active."""
+    try:
+        with path.open("rb") as state_file:
+            mode = state_file.read().decode("ascii").strip().upper()
+            stamp = os.fstat(state_file.fileno()).st_mtime_ns // 1_000_000
+    except (OSError, UnicodeError, ValueError):
+        return None
+    return (mode, stamp) if mode == "STFU" else None
+
+
 def write_history(path: Path, rows: list[tuple[int, str]]) -> None:
     path.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
     os.chmod(path.parent, 0o755)
@@ -85,7 +99,7 @@ def write_history(path: Path, rows: list[tuple[int, str]]) -> None:
 def record(network: str, timestamp_ms: int) -> bool:
     network = network.upper()
     if network not in NETWORKS:
-        raise ValueError("network must be BM or TGIF")
+        raise ValueError("mode must be BM, TGIF, or STFU")
     if timestamp_ms < 0:
         raise ValueError("timestamp must be a nonnegative epoch-millisecond value")
 
@@ -116,9 +130,9 @@ def record(network: str, timestamp_ms: int) -> bool:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
-    action.add_argument("--record", nargs=2, metavar=("BM|TGIF", "EPOCH_MS"))
-    action.add_argument("--current", action="store_true", help="record the current bridge network at INI modification time")
-    action.add_argument("--seed-current", action="store_true", help="seed the current bridge network from installation time")
+    action.add_argument("--record", nargs=2, metavar=("BM|TGIF|STFU", "EPOCH_MS"))
+    action.add_argument("--current", action="store_true", help="record selected STFU mode or current BM/TGIF bridge network")
+    action.add_argument("--seed-current", action="store_true", help="seed the selected STFU mode or current BM/TGIF network")
     args = parser.parse_args()
 
     if args.record:
@@ -127,21 +141,15 @@ def main() -> None:
             parser.error("EPOCH_MS must be an integer")
         stamp = int(raw_stamp)
     else:
-        network = network_from_ini(BRIDGE_INI)
+        selected = selected_stfu_mode(CURRENT_MODE_FILE)
+        if selected is not None:
+            network, stamp = selected
+        else:
+            network = network_from_ini(BRIDGE_INI)
+            stamp = time.time_ns() // 1_000_000
         if network is None:
             print("NOTICE: MMDVM_Bridge DMR address is not recognized as BM or TGIF; no history entry added.")
             return
-        if args.current:
-            try:
-                # The INI is atomically replaced before the bridge restarts.
-                # Let the watcher timestamp the transition at observation time
-                # so it cannot predate the button's successful switch event.
-                stamp = time.time_ns() // 1_000_000
-            except OSError:
-                print("NOTICE: MMDVM_Bridge.ini is unavailable; no history entry added.")
-                return
-        else:
-            stamp = time.time_ns() // 1_000_000
 
     changed = record(network, stamp)
     if changed:

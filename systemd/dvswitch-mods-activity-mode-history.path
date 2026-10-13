@@ -1,9 +1,10 @@
 # Version: 1.0.0
 [Unit]
-Description=Watch MMDVM_Bridge DMR network selection for Gateway Activity labels
+Description=Watch DMR network and STFU mode selection for Gateway Activity labels
 
 [Path]
 PathChanged=/opt/MMDVM_Bridge/MMDVM_Bridge.ini
+PathChanged=/var/lib/dvswitch-mode-buttons/current-mode
 Unit=dvswitch-mods-activity-mode-history.service
 
 [Install]

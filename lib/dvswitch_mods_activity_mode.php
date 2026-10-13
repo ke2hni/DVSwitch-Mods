@@ -17,7 +17,7 @@ function dvsModsActivityTimestampMs($timestamp)
     return ((int)$date->format('U') * 1000) + intdiv((int)$date->format('u'), 1000);
 }
 
-/** Find the latest BM/TGIF selection at or before the activity event. */
+/** Find the latest BM/TGIF/STFU selection at or before the activity event. */
 function dvsModsDmrNetworkAt($timestamp, $historyFile = null)
 {
     if ($historyFile === null) {
@@ -31,7 +31,7 @@ function dvsModsDmrNetworkAt($timestamp, $historyFile = null)
     if (!is_array($lines)) { return null; }
     foreach ($lines as $line) {
         $fields = explode("\t", $line, 2);
-        if (count($fields) !== 2 || !ctype_digit($fields[0]) || !in_array($fields[1], array('BM', 'TGIF'), true)) { continue; }
+        if (count($fields) !== 2 || !ctype_digit($fields[0]) || !in_array($fields[1], array('BM', 'TGIF', 'STFU'), true)) { continue; }
         $transitionAt = (int)$fields[0];
         if ($transitionAt <= $eventAt && ($activeAt === null || $transitionAt >= $activeAt)) {
             $active = $fields[1];

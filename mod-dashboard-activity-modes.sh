@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Jeff Milne, KE2HNI
 
-# Label received Gateway Activity DMR rows from timestamped BM/TGIF selections.
+# Label received Gateway Activity DMR rows from timestamped BM/TGIF/STFU modes.
 
 set -Eeuo pipefail
 umask 077
@@ -99,7 +99,7 @@ is_installed() {
 
 show_result() {
     if is_installed; then
-        printf 'ALREADY MODIFIED: Gateway Activity DMR rows use the timestamped BM/TGIF selection log.\n'
+        printf 'ALREADY MODIFIED: Gateway Activity DMR rows use timestamped BM/TGIF/STFU mode history.\n'
     else
         printf 'MODIFICATION READY:\nBefore functions.php: %s\nAfter functions.php:  %s\nBefore lh.php:        %s\nAfter lh.php:         %s\n' \
             "$(file_hash "$FUNCTIONS_TARGET")" "$(file_hash "$WORK_DIR/functions.php")" \
@@ -110,7 +110,7 @@ show_result() {
             printf 'Local Activity: previous experimental label wrapper will be removed\n'
         fi
         if [[ -x /usr/local/sbin/dvswitch-mode-buttons ]]; then
-            printf 'Mode Buttons: detected; its optional history hook will be available after upgrade to a compatible release.\n'
+            printf 'Mode Buttons: detected; STFU mode selection will be tracked from its current-mode state file.\n'
         else
             printf 'Mode Buttons: not installed; Mods will detect BM/TGIF changes from MMDVM_Bridge.ini.\n'
         fi
@@ -144,9 +144,11 @@ install_managed_file() {
             "$HELPER_TARGET")
                 grep -qE 'DVSwitch-Mods: (dashboard activity network labels helper v[123]|DMR network activity labels v1)' "$target" || die "Refusing to replace an unrecognized managed file: $target" ;;
             "$HISTORY_SERVICE_TARGET")
-                grep -qE 'Record DVSwitch mode transitions for dashboard activity labels|Record the selected BM/TGIF network for Gateway Activity' "$target" || die "Refusing to replace an unrecognized managed file: $target" ;;
+                grep -qE 'Record DVSwitch mode transitions for dashboard activity labels|Record the selected BM/TGIF network for Gateway Activity|Record selected DMR network and STFU mode for Gateway Activity' "$target" || die "Refusing to replace an unrecognized managed file: $target" ;;
             "$HISTORY_PATH_TARGET")
-                grep -qE 'Watch DVSwitch mode state for dashboard activity history|Watch MMDVM_Bridge DMR network selection for Gateway Activity labels' "$target" || die "Refusing to replace an unrecognized managed file: $target" ;;
+                grep -qE 'Watch DVSwitch mode state for dashboard activity history|Watch MMDVM_Bridge DMR network selection for Gateway Activity labels|Watch DMR network and STFU mode selection for Gateway Activity labels' "$target" || die "Refusing to replace an unrecognized managed file: $target" ;;
+            "$NETWORK_WRITER_TARGET")
+                grep -qE 'Record timestamped BM/TGIF(/STFU)? selections for Gateway Activity labels\.' "$target" || die "Refusing to replace an unrecognized DMR network history writer: $target" ;;
             *) grep -qF "$marker" "$target" || die "Refusing to replace an unrecognized managed file: $target" ;;
         esac
         dvsm_backup_file "$target"
@@ -162,22 +164,22 @@ run_install() {
     prepare_candidates
     show_result
     if is_installed; then
-        printf 'PASS: Gateway Activity DMR network labels are already installed. No files changed.\n'
+        printf 'PASS: Gateway Activity BM/TGIF/STFU mode labels are already installed. No files changed.\n'
         return
     fi
     if [[ -e "$HELPER_TARGET" ]] && ! grep -qE 'DVSwitch-Mods: (dashboard activity network labels helper v[123]|DMR network activity labels v1)' "$HELPER_TARGET"; then
         die "Refusing to replace an unrecognized activity helper: $HELPER_TARGET"
     fi
-    if [[ -e "$NETWORK_WRITER_TARGET" ]] && ! grep -qF 'Record timestamped BM/TGIF selections for Gateway Activity labels.' "$NETWORK_WRITER_TARGET"; then
+    if [[ -e "$NETWORK_WRITER_TARGET" ]] && ! grep -qE 'Record timestamped BM/TGIF(/STFU)? selections for Gateway Activity labels\.' "$NETWORK_WRITER_TARGET"; then
         die "Refusing to replace an unrecognized DMR network history writer: $NETWORK_WRITER_TARGET"
     fi
     if [[ -e "$LEGACY_CAPTURE_TARGET" ]] && ! grep -qF 'Record DVSwitch mode transitions for timestamp-accurate activity labels.' "$LEGACY_CAPTURE_TARGET"; then
         die "Refusing to remove an unrecognized legacy history recorder: $LEGACY_CAPTURE_TARGET"
     fi
-    if [[ -e "$HISTORY_SERVICE_TARGET" ]] && ! grep -qE 'Record DVSwitch mode transitions for dashboard activity labels|Record the selected BM/TGIF network for Gateway Activity' "$HISTORY_SERVICE_TARGET"; then
+    if [[ -e "$HISTORY_SERVICE_TARGET" ]] && ! grep -qE 'Record DVSwitch mode transitions for dashboard activity labels|Record the selected BM/TGIF network for Gateway Activity|Record selected DMR network and STFU mode for Gateway Activity' "$HISTORY_SERVICE_TARGET"; then
         die "Refusing to replace an unrecognized activity history service: $HISTORY_SERVICE_TARGET"
     fi
-    if [[ -e "$HISTORY_PATH_TARGET" ]] && ! grep -qE 'Watch DVSwitch mode state for dashboard activity history|Watch MMDVM_Bridge DMR network selection for Gateway Activity labels' "$HISTORY_PATH_TARGET"; then
+    if [[ -e "$HISTORY_PATH_TARGET" ]] && ! grep -qE 'Watch DVSwitch mode state for dashboard activity history|Watch MMDVM_Bridge DMR network selection for Gateway Activity labels|Watch DMR network and STFU mode selection for Gateway Activity labels' "$HISTORY_PATH_TARGET"; then
         die "Refusing to replace an unrecognized activity history path: $HISTORY_PATH_TARGET"
     fi
 
@@ -194,7 +196,7 @@ run_install() {
     install_candidate "$WORK_DIR/lh.php" "$LH_TARGET"
     install_candidate "$WORK_DIR/localtx.php" "$LOCALTX_TARGET"
     install_managed_file "$HELPER_SOURCE" "$HELPER_TARGET" 'DVSwitch-Mods: DMR network activity labels v1' root root 0644
-    install_managed_file "$NETWORK_WRITER_SOURCE" "$NETWORK_WRITER_TARGET" 'Record timestamped BM/TGIF selections for Gateway Activity labels.' root root 0755
+    install_managed_file "$NETWORK_WRITER_SOURCE" "$NETWORK_WRITER_TARGET" 'Record timestamped BM/TGIF/STFU selections for Gateway Activity labels.' root root 0755
     if [[ -e "$LEGACY_CAPTURE_TARGET" ]]; then
         dvsm_backup_file "$LEGACY_CAPTURE_TARGET"
         rm -f -- "$LEGACY_CAPTURE_TARGET"
@@ -216,7 +218,7 @@ run_install() {
     systemctl enable --now dvswitch-mods-activity-mode-history.path
     systemctl is-active --quiet dvswitch-mods-activity-mode-history.path || die 'DMR network history watcher is not active.'
     INSTALL_ACTIVE=0
-    printf 'PASS: Gateway Activity DMR network labels installed atomically.\nBackup: %s\nHistory: /var/lib/dvswitch-mods/dmr-network-history.tsv\n' "$DVSM_TRANSACTION_DIR"
+    printf 'PASS: Gateway Activity BM/TGIF/STFU mode labels installed atomically.\nBackup: %s\nHistory: /var/lib/dvswitch-mods/dmr-network-history.tsv\n' "$DVSM_TRANSACTION_DIR"
 }
 
 run_restore() {

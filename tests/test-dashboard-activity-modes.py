@@ -2,7 +2,7 @@
 # Version: 1.0.0
 # SPDX-License-Identifier: MIT
 
-"""Tests for independent timestamped BM/TGIF Gateway Activity labels."""
+"""Tests for timestamped BM/TGIF/STFU Gateway Activity labels."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 PATCHER_PATH = ROOT / "lib/patch_dashboard_activity_modes.py"
@@ -89,6 +90,7 @@ with tempfile.TemporaryDirectory() as directory:
         "DVS_DMR_NETWORK_HISTORY_FILE": str(history),
         "DVS_DMR_NETWORK_HISTORY_LOCK": str(base / "lock"),
         "DVS_MMDVM_BRIDGE_INI": str(base / "MMDVM_Bridge.ini"),
+        "DVS_CURRENT_MODE_FILE": str(base / "current-mode"),
     })
     def record(network: str, stamp: int) -> None:
         subprocess.run(["python3", str(WRITER), "--record", network, str(stamp)], env=environment, check=True, capture_output=True)
@@ -104,6 +106,12 @@ with tempfile.TemporaryDirectory() as directory:
     require(history.read_text().splitlines()[-1].endswith("\tTGIF"), "standalone INI watcher did not detect TGIF")
     subprocess.run(["python3", str(WRITER), "--seed-current"], env=environment, check=True, capture_output=True, text=True)
     require(history.read_text().splitlines()[-1].endswith("\tTGIF"), "install-time seed did not recognize current network")
+    current_mode = base / "current-mode"
+    current_mode.write_text("STFU\n")
+    stfu_stamp = time.time_ns() // 1_000_000 + 1000
+    os.utime(current_mode, ns=(stfu_stamp * 1_000_000, stfu_stamp * 1_000_000))
+    subprocess.run(["python3", str(WRITER), "--current"], env=environment, check=True, capture_output=True, text=True)
+    require(history.read_text().splitlines()[-1] == f"{stfu_stamp}\tSTFU", "STFU state-file watcher did not record the selected mode at its change time")
 
 with tempfile.TemporaryDirectory() as directory:
     base = Path(directory)
@@ -119,11 +127,12 @@ with tempfile.TemporaryDirectory() as directory:
 
 with tempfile.TemporaryDirectory() as directory:
     history = Path(directory) / "history.tsv"
-    history.write_text("1790805600123\tBM\n1790805660456\tTGIF\n1790805720789\tBM\n")
+    history.write_text("1790805600123\tBM\n1790805660456\tTGIF\n1790805690000\tSTFU\n1790805720789\tBM\n")
     labels = [
         ("DMR", "2026-09-30 22:00:00.100", "Net", "DMR"),
         ("DMR Slot 2", "2026-09-30 22:00:00.200", "Net", "BM"),
         ("DMR Slot 1", "2026-09-30 22:01:00.500", "Net", "TGIF"),
+        ("DMR Slot 2", "2026-09-30 22:01:30.500", "Net", "STFU"),
         ("DMR", "2026-09-30 22:02:00.800", "Net", "BM"),
         ("DMR Slot 2", "2026-09-30 22:01:00.500", "LNet", "DMR Slot 2"),
         ("YSF", "2026-09-30 22:01:00.500", "Net", "YSF"),
@@ -147,6 +156,7 @@ manager = MANAGER.read_text()
 require("--check" in installer and "--install" in installer and "--restore" in installer, "installer interface is incomplete")
 require("DVSwitch-Mode-Buttons current-mode state is missing" not in installer, "Mods installer depends on Mode Buttons")
 require("--seed-current" in installer and "--current" in installer, "installer lacks history initialization and standalone detection")
+require("PathChanged=/var/lib/dvswitch-mode-buttons/current-mode" in (ROOT / "systemd/dvswitch-mods-activity-mode-history.path").read_text(), "mode-state watcher does not detect STFU selection changes")
 require("dashboard-activity-modes) CHILD_SCRIPT=\"$SCRIPT_DIR/mod-dashboard-activity-modes.sh\"" in manager, "manager no longer uses the established installer filename")
 require("dashboard-activity-modes" in manager.split("readonly -a COMPONENTS=(", 1)[1].split(")", 1)[0], "manager does not register the component")
 print("PASS: timestamped DMR network history, Gateway-only labels, standalone install, and manager registration")
