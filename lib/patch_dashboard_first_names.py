@@ -132,14 +132,21 @@ def patch_legend_text(text: str) -> str:
 
     # Keep the heading separate so it does not shift the first legend row.
     block = re.sub(r'(<b\b[^>]*>\s*Legend:\s*</b>)(?:[ \t\r\n]*<br>[ \t\r\n]*)*', r'\1<br>\n', block, count=1, flags=re.I)
-    block = re.sub(r'(?m)^[ \t]*(?=<span style="display:inline-block;width:\d+ch;text-align:right;">)', '  ', block)
+    block = re.sub(r'(?m)^[ \t]*(?=<span style="display:inline-block;width:\d+ch;text-align:right(?:;margin-left:8ch)?;">)', '  ', block)
+    # HTML collapses leading spaces in this legend. Put the requested eight-
+    # character indent on each fixed-width term span so the entire row moves.
+    block = re.sub(
+        r'<span style="display:inline-block;width:(\d+)ch;text-align:right;">',
+        r'<span style="display:inline-block;width:\1ch;text-align:right;margin-left:8ch;">',
+        block,
+    )
 
     # Wrap each bold legend term in a fixed-width span. Keeping the bold term
     # itself unchanged preserves compatibility with the Target legend patcher.
     term_pattern = re.compile(r'(<b\b(?P<attrs>[^>]*)>)(?P<label>[^<]*)</b>(?P<space>\s*)=')
     terms = list(term_pattern.finditer(block))
     if not terms:
-        already_aligned = re.search(r'<span style="display:inline-block;width:\d+ch;text-align:right;"><b\b[^>]*>[^<]*</b></span>\s*=', block)
+        already_aligned = re.search(r'<span style="display:inline-block;width:\d+ch;text-align:right(?:;margin-left:8ch)?;"><b\b[^>]*>[^<]*</b></span>\s*=', block)
         if not already_aligned:
             raise PatchError("Local Activity legend has no term/equal-sign rows to align")
         if "DVSwitch-Mods callsign file tooltip" not in block:
@@ -159,9 +166,9 @@ def patch_legend_text(text: str) -> str:
             else:
                 attrs = attrs[:style_match.start()] + attrs[style_match.end():]
         bold_term = f'<b{attrs}>{match.group("label")}</b>'
-        return f'<span style="display:inline-block;width:{width}ch;text-align:right;">{bold_term}</span>{match.group("space")}='
+        return f'<span style="display:inline-block;width:{width}ch;text-align:right;margin-left:8ch;">{bold_term}</span>{match.group("space")}='
     block = term_pattern.sub(align_term, block)
-    block = re.sub(r'(?m)^ {1,2}(?=<span style="display:inline-block;width:\d+ch;text-align:right;">)', '  ', block)
+    block = re.sub(r'(?m)^ {1,2}(?=<span style="display:inline-block;width:\d+ch;text-align:right(?:;margin-left:8ch)?;">)', '  ', block)
     if "DVSwitch-Mods callsign file tooltip" not in block:
         block = block.replace('</div>', TOOLTIP_STYLE + '\n</div>', 1)
     return text[:found[0].start()] + block + text[found[0].end():]
@@ -171,7 +178,7 @@ def unpatch_legend_text(text: str) -> str:
     import re
     if LEGEND_MARKER not in text:
         return text
-    pattern = re.compile(r'<br>\n\s*(?:<span style="display:inline-block;width:\d+ch;text-align:right;">)?<b\b[^>]*>\*</b>(?:</span>)?\s*=.*?(?:<br>\n\s*)?' + re.escape(LEGEND_MARKER) + r'\n', re.S)
+    pattern = re.compile(r'<br>\n\s*(?:<span style="display:inline-block;width:\d+ch;text-align:right(?:;margin-left:8ch)?;">)?<b\b[^>]*>\*</b>(?:</span>)?\s*=.*?(?:<br>\n\s*)?' + re.escape(LEGEND_MARKER) + r'\n', re.S)
     updated, count = pattern.subn('', text, count=1)
     if count != 1 or LEGEND_MARKER in updated:
         raise PatchError("manual callsign legend was changed; refusing unsafe removal")

@@ -92,3 +92,11 @@ sudo ./manage-dvswitch-mods.sh --install dashboard-ysf-target-id
 Repeat on pi5test and
 node3040 after pi4test passes. Do not install on production node68425 until the
 test nodes pass and Jeff explicitly authorizes it.
+Callsign legend spacing update (pi4test):
+
+cd ~/DVSwitch-Mods && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-fcc-first-names.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-dashboard-targets.py && sudo ./mod-dashboard-fcc-first-names.sh --check
+
+If the check passes, install the updated legend and confirm both detail rows
+are shifted right while the Legend heading remains in place:
+
+sudo ./mod-dashboard-fcc-first-names.sh --install

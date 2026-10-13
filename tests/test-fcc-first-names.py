@@ -105,6 +105,7 @@ with tempfile.TemporaryDirectory() as directory:
         "manual callsign file path does not have a visible hover/focus popup")
     require("Click --- to add an entry." in legend, "legend does not explain that --- is clickable")
     require(legend.count("width:3ch;text-align:right") == 2, "equals signs do not align across the --- and * legend rows")
+    require(legend.count("margin-left:8ch") == 2, "both legend data rows are not indented by eight character widths")
     require(patcher.patch_legend_text(legend) == legend, "aligned legend patch is not idempotent")
 
 legacy_legend = ('<div><b>Legend:</b> <b>---</b> = no data<br>\n  <b>*</b> = Name entered and saved by you in the local callsign file. '
@@ -115,6 +116,8 @@ require(patcher.LEGEND_MARKER in upgraded_legend and "manual callsign names lege
         "existing manual callsign legend marker was not upgraded")
 require(upgraded_legend.count("width:3ch;text-align:right") == 2,
         "existing legend --- and * terms were not aligned during upgrade")
+require(upgraded_legend.count("margin-left:8ch") == 2,
+        "existing legend rows were not shifted right during upgrade")
 require(patcher.patch_legend_text(upgraded_legend) == upgraded_legend,
         "upgraded existing legend is not idempotent")
 styled_v2_legend = ('<div><b>Legend:</b> <b style="display:inline-block;width:3ch;text-align:right;">---</b> = no data<br>\n  '
@@ -153,6 +156,8 @@ require("Name entered by you in the local callsign file" not in fixed_combined_l
         "combined installed legend kept the old manual-name wording")
 require(fixed_combined_legend.count("width:3ch;text-align:right") == 2,
         "combined installed legend does not align the --- and * rows")
+require(fixed_combined_legend.count("margin-left:8ch") == 2,
+        "combined installed legend data rows were not shifted right")
 require(patcher.patch_legend_text(fixed_combined_legend) == fixed_combined_legend,
         "combined installed legend migration is not idempotent")
 unpatched_combined_legend = patcher.unpatch_legend_text(fixed_combined_legend)
