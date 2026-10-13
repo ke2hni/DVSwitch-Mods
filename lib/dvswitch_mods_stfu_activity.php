@@ -2,7 +2,7 @@
 // Version: 1.0.0
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Jeff Milne, KE2HNI
-// DVSwitch-Mods: STFU activity feed v7
+// DVSwitch-Mods: STFU activity feed v8
 
 /** Parse recent STFU ODMR traffic into DVSwitch's activity-row structure. */
 function dvsModsStfuActivityRows($paths = null)
@@ -60,16 +60,35 @@ function dvsModsStfuActivityRows($paths = null)
     return array_map(function ($event) { return $event['row']; }, $events);
 }
 
-/** Merge STFU events with MMDVM events without changing historical timestamps. */
+/** Merge STFU events while keeping one latest row per DVSwitch caller key. */
 function dvsModsStfuMergeActivity($rows, $paths = null)
 {
-    $rows = is_array($rows) ? $rows : array();
-    $rows = array_merge($rows, dvsModsStfuActivityRows($paths));
-    usort($rows, function ($left, $right) {
+    $combined = array_merge(is_array($rows) ? $rows : array(), dvsModsStfuActivityRows($paths));
+    usort($combined, function ($left, $right) {
         $time = strcmp((string)($right[0] ?? ''), (string)($left[0] ?? ''));
         return $time !== 0 ? $time : 0;
     });
-    return $rows;
+
+    // Match getLastHeard(): caller identity is callsign/ID + mode + ID field + source.
+    // STFU IDs are stored numerically; resolve seven-digit IDs before comparing so
+    // they match MMDVM rows, whose display callsign has already been resolved.
+    $seen = array();
+    $latest = array();
+    foreach ($combined as $row) {
+        if (!is_array($row) || !isset($row[1], $row[2])) { continue; }
+        $identity = trim((string)$row[2]);
+        if (function_exists('dvsModsDmrIdCallsign')) {
+            $identity = dvsModsDmrIdCallsign($identity);
+        }
+        $mode = (string)($row[1] ?? '');
+        $id = (string)($row[3] ?? '');
+        $source = (string)($row[5] ?? '');
+        $key = $identity.'#'.$mode.$id.$source;
+        if (isset($seen[$key])) { continue; }
+        $seen[$key] = true;
+        $latest[] = $row;
+    }
+    return $latest;
 }
 
 /** Look up an STFU destination using the node's BrandMeister talkgroup list. */

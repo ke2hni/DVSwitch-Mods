@@ -93,7 +93,7 @@ I: 2026-10-07 03:23:20.438 DMR, ODMR End Rx:DMR frame count was 100 frames
 if shutil.which("php"):
     with tempfile.TemporaryDirectory() as directory:
         log_path = Path(directory) / "STFU.log"
-        log_path.write_text(log, encoding="utf-8")
+        log_path.write_text(log + "I: 2026-10-07 03:23:30.438 DMR, ODMR Begin Rx: src = 1234567, dst = 93 (GROUP)\nI: 2026-10-07 03:23:35.438 DMR, ODMR End Rx:DMR frame count was 50 frames\n", encoding="utf-8")
         empty_log_path = Path(directory) / "STFU-empty.log"
         empty_log_path.write_text("", encoding="utf-8")
         talkgroup_path = Path(directory) / "TGList_BM.txt"
@@ -112,9 +112,21 @@ echo "\\nCARD:".$card;
         result = subprocess.run(["php"], input=program, text=True, capture_output=True, check=True)
         rows_json, card_output = result.stdout.split("\nCARD:", 1)
         rows = json.loads(rows_json)
-        require(len(rows) == 2, "STFU parser did not produce both RX and TX events")
-        require(rows[0][1] == "STFU" and rows[0][2] == "1234567" and rows[0][5] == "LNet" and rows[0][6] == "5.9", "local STFU TX record was parsed incorrectly")
-        require(rows[1][1] == "STFU" and rows[1][2] == "3213930" and rows[1][4] == "TG 3100" and rows[1][5] == "Net" and rows[1][6] == "15.6", "network STFU RX record was parsed incorrectly")
+        require(len(rows) == 3, "STFU parser did not retain the latest RX row and distinct TX row")
+        require(rows[0][1] == "STFU" and rows[0][2] == "1234567" and rows[0][4] == "TG 93" and rows[0][5] == "Net" and rows[0][6] == "2.9", "latest repeated STFU RX was not selected")
+        require(rows[1][1] == "STFU" and rows[1][2] == "1234567" and rows[1][5] == "LNet" and rows[1][6] == "5.9", "local STFU TX record was parsed incorrectly")
+        require(rows[2][1] == "STFU" and rows[2][2] == "3213930" and rows[2][4] == "TG 3100" and rows[2][5] == "Net" and rows[2][6] == "15.6", "network STFU RX record was parsed incorrectly")
+        merge_program = f'''<?php
+require {str(HELPER)!r};
+function dvsModsDmrIdCallsign($value) {{ return $value === '1234567' ? 'K1ABC' : $value; }}
+$mmdvm = array(array('2026-10-07 03:23:25.000', 'DMR Slot 2', 'K1ABC', '', 'TG 3100', 'Net', '5.0', '0', '0', '', ''));
+echo json_encode(dvsModsStfuMergeActivity($mmdvm, array({str(log_path)!r})));
+'''
+        merged = json.loads(subprocess.run(["php"], input=merge_program, text=True, capture_output=True, check=True).stdout)
+        require(sum(1 for row in merged if row[2] == "K1ABC" and row[5] == "Net") == 1,
+                "STFU RX and MMDVM RX for the same resolved caller were not deduplicated")
+        require(merged[0][2] == "1234567" and merged[0][4] == "TG 93",
+                "newest STFU receive did not replace the older cross-mode receive")
         require(all(row[7:9] == ["---", "---"] for row in rows), "STFU Loss and BER do not use the dashboard's standard unavailable marker")
         require("STFU Net" in card_output, "STFU card header is not consistent with the other mode cards")
         require('Room<br/><span style="color:#b5651d;' in card_output,
@@ -163,8 +175,8 @@ require("null, '---', '---'" in HELPER.read_text(), "STFU rows do not use the st
 require("STFU Net</th>" in HELPER.read_text(), "STFU Net card label was regressed")
 require("$abinfo['last_tune']" not in HELPER.read_text(), "STFU card incorrectly uses the shared live target field")
 require("/var/lib/dvswitch-mode-buttons/stfu-target" in HELPER.read_text(), "STFU card does not read the optional saved-target snapshot")
-require("STFU activity feed v7" in HELPER.read_text(), "repo-root STFU helper is not the intended v7 helper")
-require("STFU activity feed v[1234567]" in installer_text, "installer does not accept the v7 helper during upgrade")
+require("STFU activity feed v8" in HELPER.read_text(), "repo-root STFU helper is not the intended v8 helper")
+require("STFU activity feed v[12345678]" in installer_text, "installer does not accept the current helper during upgrade")
 require(r"\](?:\s*[;#].*)?$/" in HELPER.read_text(), "STFU INI parser does not accept comments after section names")
 require("if ($mode !== 'STFU') { return; }" not in HELPER.read_text(), "STFU card is hidden outside STFU mode")
 dmr_source = DMR_PATCHER.read_text()
