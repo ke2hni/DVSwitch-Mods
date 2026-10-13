@@ -381,7 +381,10 @@ from `data/callsign-lookup.tsv` without replacing the existing file or its
 contents. Existing callsign entries always keep their current value when a
 starter row has the same callsign. Re-running the installer adds no duplicates;
 `--check` reports how many starter entries are still missing without changing
-the file. Hover over or keyboard-focus **file location** in the dashboard
+the file and whether existing rows are in alphabetical order. Installation
+sorts callsign rows alphabetically while keeping each name with its callsign;
+new manual entries are saved in the same order. Header comments and unrecognized
+lines are retained at the top of the file. Hover over or keyboard-focus **file location** in the dashboard
 legend to display the full path. Both user files are retained during upgrades
 and uninstall so their entries can be reviewed or reused.
 

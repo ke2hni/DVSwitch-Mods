@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Append missing starter callsign names without replacing the user file."""
+"""Merge starter callsign names and keep valid entries sorted by callsign."""
 from __future__ import annotations
 import fcntl
 import os
@@ -76,9 +76,34 @@ def missing_entries(data: bytes, starter: list[tuple[str, str]]) -> list[tuple[s
     present = existing_callsigns(data)
     return [entry for entry in starter if entry[0] not in present]
 
+def sorted_content(data: bytes) -> bytes:
+    preserved: list[bytes] = []
+    entries: list[tuple[str, bytes]] = []
+    for line in data.splitlines(keepends=True):
+        parsed = parse_entry(line.decode("utf-8", errors="replace"))
+        if parsed is None:
+            preserved.append(line)
+        else:
+            entries.append((parsed[0], line.rstrip(b"\r\n")))
+    if not entries:
+        return data
+    prefix = b"".join(preserved)
+    if prefix and not prefix.endswith((b"\n", b"\r")):
+        prefix += b"\n"
+    ordered = b"\n".join(row for _, row in sorted(entries, key=lambda entry: entry[0])) + b"\n"
+    return prefix + ordered
+
+def write_all(descriptor: int, content: bytes) -> None:
+    view = memoryview(content)
+    while view:
+        count = os.write(descriptor, view)
+        if count <= 0:
+            raise OSError("short write while saving sorted callsign entries")
+        view = view[count:]
+
 def merge(target: Path, starter: list[tuple[str, str]]) -> int:
     check_target(target)
-    flags = os.O_RDWR | os.O_CREAT | os.O_APPEND
+    flags = os.O_RDWR | os.O_CREAT
     flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     descriptor = os.open(target, flags, 0o660)
     try:
@@ -95,22 +120,19 @@ def merge(target: Path, starter: list[tuple[str, str]]) -> int:
             chunks.append(chunk)
         original = b"".join(chunks)
         additions = missing_entries(original, starter)
-        if not additions:
+        appended = b"".join(f"{call} = {name}\n".encode("utf-8") for call, name in additions)
+        updated = sorted_content(original + (b"" if not original or original.endswith((b"\n", b"\r")) or not appended else b"\n") + appended)
+        if updated == original:
             return 0
-        separator = b"" if not original or original.endswith((b"\n", b"\r")) else b"\n"
-        appended = "".join(f"{call} = {name}\n" for call, name in additions).encode("utf-8")
-        payload = separator + appended
-        original_size = len(original)
         try:
-            view = memoryview(payload)
-            while view:
-                count = os.write(descriptor, view)
-                if count <= 0:
-                    raise OSError("short write while appending starter entries")
-                view = view[count:]
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            os.ftruncate(descriptor, 0)
+            write_all(descriptor, updated)
             os.fsync(descriptor)
         except OSError:
-            os.ftruncate(descriptor, original_size)
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            os.ftruncate(descriptor, 0)
+            write_all(descriptor, original)
             os.fsync(descriptor)
             raise
         return len(additions)
@@ -121,8 +143,8 @@ def merge(target: Path, starter: list[tuple[str, str]]) -> int:
             os.close(descriptor)
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 4 or argv[1] not in {"--check", "--merge"}:
-        print(f"Usage: {argv[0]} {{--check|--merge}} TARGET STARTER", file=sys.stderr)
+    if len(argv) != 4 or argv[1] not in {"--check", "--merge", "--is-sorted"}:
+        print(f"Usage: {argv[0]} {{--check|--merge|--is-sorted}} TARGET STARTER", file=sys.stderr)
         return 2
     operation, target, starter_path = argv[1], Path(argv[2]), Path(argv[3])
     try:
@@ -131,6 +153,9 @@ def main(argv: list[str]) -> int:
         if operation == "--check":
             current = target.read_bytes() if target.exists() else b""
             print(len(missing_entries(current, starter)))
+        elif operation == "--is-sorted":
+            current = target.read_bytes() if target.exists() else b""
+            print("1" if sorted_content(current) == current else "0")
         else:
             print(merge(target, starter))
     except (OSError, ValueError) as exc:

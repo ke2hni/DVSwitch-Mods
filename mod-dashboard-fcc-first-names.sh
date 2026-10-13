@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly SCRIPT_VERSION="1.6.2"
+readonly SCRIPT_VERSION="1.6.3"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PATCHER="$SCRIPT_DIR/lib/patch_dashboard_first_names.py"
 readonly BUILDER="$SCRIPT_DIR/lib/build_fcc_first_names.py"
@@ -406,20 +406,22 @@ run_check() {
     local starter_descriptions_missing
     starter_descriptions_missing=$(python3 "$CALLSIGN_DESCRIPTIONS_MERGER" --check "$CALLSIGN_DESCRIPTIONS_TARGET" "$CALLSIGN_DESCRIPTIONS_SOURCE")
     if [[ -f "$CALLSIGN_DESCRIPTIONS_TARGET" ]]; then printf 'Custom callsign descriptions: editable file present at %s. Starter entries to add: %s.\n' "$CALLSIGN_DESCRIPTIONS_TARGET" "$starter_descriptions_missing"; else printf 'MODIFICATION READY: --install will create %s and add %s starter descriptions.\n' "$CALLSIGN_DESCRIPTIONS_TARGET" "$starter_descriptions_missing"; fi
-    local starter_names_missing
+    local starter_names_missing names_sorted
     starter_names_missing=$(python3 "$CALLSIGN_NAMES_MERGER" --check "$CALLSIGN_NAMES_TARGET" "$CALLSIGN_NAMES_STARTER_SOURCE")
-    if [[ -f "$CALLSIGN_NAMES_TARGET" ]]; then printf 'Manual callsign names: editable file present at %s. Starter entries to add: %s.\n' "$CALLSIGN_NAMES_TARGET" "$starter_names_missing"; else printf 'MODIFICATION READY: --install will create %s and add %s starter names.\n' "$CALLSIGN_NAMES_TARGET" "$starter_names_missing"; fi
+    names_sorted=$(python3 "$CALLSIGN_NAMES_MERGER" --is-sorted "$CALLSIGN_NAMES_TARGET" "$CALLSIGN_NAMES_STARTER_SOURCE")
+    if [[ -f "$CALLSIGN_NAMES_TARGET" ]]; then printf 'Manual callsign names: editable file present at %s. Starter entries to add: %s. Alphabetical by callsign: %s.\n' "$CALLSIGN_NAMES_TARGET" "$starter_names_missing" "$([[ "$names_sorted" == 1 ]] && printf yes || printf no)"; else printf 'MODIFICATION READY: --install will create %s and add %s starter names in alphabetical order.\n' "$CALLSIGN_NAMES_TARGET" "$starter_names_missing"; fi
     printf 'PASS: supported activity-table structure. No files changed.\n'
 }
 
 run_install() {
     preflight; prepare_dashboard
-    local names_starter_missing descriptions_starter_missing
+    local names_starter_missing names_sorted descriptions_starter_missing
     names_starter_missing=$(python3 "$CALLSIGN_NAMES_MERGER" --check "$CALLSIGN_NAMES_TARGET" "$CALLSIGN_NAMES_STARTER_SOURCE")
+    names_sorted=$(python3 "$CALLSIGN_NAMES_MERGER" --is-sorted "$CALLSIGN_NAMES_TARGET" "$CALLSIGN_NAMES_STARTER_SOURCE")
     descriptions_starter_missing=$(python3 "$CALLSIGN_DESCRIPTIONS_MERGER" --check "$CALLSIGN_DESCRIPTIONS_TARGET" "$CALLSIGN_DESCRIPTIONS_SOURCE")
     local cty_ready=0
     if validate_cty "$CTY_DATABASE_TARGET"; then cty_ready=1; fi
-    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$CALLSIGN_NAME_SAVE_TARGET" ]] && cmp -s "$CALLSIGN_NAME_SAVE_SOURCE" "$CALLSIGN_NAME_SAVE_TARGET" && [[ -f "$CALLSIGN_NAMES_TARGET" ]] && [[ "$(stat -c '%U:%G:%a' "$CALLSIGN_NAMES_TARGET")" == "root:www-data:660" ]] && [[ "$names_starter_missing" == 0 ]] && [[ -f "$CALLSIGN_DESCRIPTIONS_TARGET" ]] && [[ "$(stat -c '%U:%G:%a' "$CALLSIGN_DESCRIPTIONS_TARGET")" == "root:www-data:660" ]] && [[ "$descriptions_starter_missing" == 0 ]] && [[ -f "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_release_state)" == current ]] && [[ $cty_ready -eq 1 ]]; then
+    if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$CALLSIGN_NAME_SAVE_TARGET" ]] && cmp -s "$CALLSIGN_NAME_SAVE_SOURCE" "$CALLSIGN_NAME_SAVE_TARGET" && [[ -f "$CALLSIGN_NAMES_TARGET" ]] && [[ "$(stat -c '%U:%G:%a' "$CALLSIGN_NAMES_TARGET")" == "root:www-data:660" ]] && [[ "$names_starter_missing" == 0 ]] && [[ "$names_sorted" == 1 ]] && [[ -f "$CALLSIGN_DESCRIPTIONS_TARGET" ]] && [[ "$(stat -c '%U:%G:%a' "$CALLSIGN_DESCRIPTIONS_TARGET")" == "root:www-data:660" ]] && [[ "$descriptions_starter_missing" == 0 ]] && [[ -f "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_release_state)" == current ]] && [[ $cty_ready -eq 1 ]]; then
         printf 'PASS: worldwide DMR/FCC dashboard Name modification is already installed. No files changed.\n'; return
     fi
     if [[ $cty_ready -eq 0 ]]; then prepare_cty_candidate; fi
@@ -467,10 +469,10 @@ run_install() {
     else
         local current_names_owner_mode
         current_names_owner_mode=$(stat -c '%U:%G:%a' "$CALLSIGN_NAMES_TARGET")
-        if [[ "$names_starter_missing" != 0 || "$current_names_owner_mode" != "root:www-data:660" ]]; then
+        if [[ "$names_starter_missing" != 0 || "$names_sorted" != 1 || "$current_names_owner_mode" != "root:www-data:660" ]]; then
             backup_target "$CALLSIGN_NAMES_TARGET"
         fi
-        if [[ "$names_starter_missing" != 0 ]]; then
+        if [[ "$names_starter_missing" != 0 || "$names_sorted" != 1 ]]; then
             python3 "$CALLSIGN_NAMES_MERGER" --merge "$CALLSIGN_NAMES_TARGET" "$CALLSIGN_NAMES_STARTER_SOURCE" >/dev/null
         fi
         if [[ "$current_names_owner_mode" != "root:www-data:660" ]]; then

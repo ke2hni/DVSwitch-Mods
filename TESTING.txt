@@ -94,13 +94,13 @@ node3040 after pi4test passes. Do not install on production node68425 until the
 test nodes pass and Jeff explicitly authorizes it.
 Callsign legend spacing and exact custom-identifier update (pi4test):
 
-cd ~/DVSwitch-Mods && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-callsign-lookup-merge.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-callsign-descriptions-merge.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-fcc-first-names.py && php tests/test-fcc-custom-descriptions.php && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-dashboard-targets.py && sudo ./mod-dashboard-fcc-first-names.sh --check
+cd ~/DVSwitch-Mods && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-callsign-lookup-merge.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-callsign-descriptions-merge.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-fcc-first-names.py && php tests/test-fcc-manual-callsign-names.php && php tests/test-fcc-custom-descriptions.php && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-dashboard-targets.py && sudo ./mod-dashboard-fcc-first-names.sh --check
 
 If the checks pass, install the updated dashboard patcher and helper. The check
 reports starter callsign names and custom descriptions missing from the local
 files without changing them. Installation appends only missing rows, keeps
-existing values on conflicts, and records a backup before changing either
-file. Confirm the legend
+existing values on conflicts, sorts callsign rows by callsign, and records a
+backup before changing either file. Confirm the legend
 remains correctly spaced, then click the missing `AL-LINK` name,
 choose custom description, and verify the prompt identifies `AL-LINK`. Save a
 description and confirm the exact `AL-LINK = description` key appears in the

@@ -215,15 +215,22 @@ function dvsModsSaveManualCallsignName($rawCallsign, $rawName, $path = '/etc/dvs
     if ($handle === false) { return 'The local callsign names file is unavailable.'; }
     if (!flock($handle, LOCK_EX)) { fclose($handle); return 'Could not lock the local callsign names file.'; }
     rewind($handle);
-    $lines = array();
+    $preserved = array();
+    $entries = array();
     while (($line = fgets($handle)) !== false) {
         $trimmed = trim($line);
         $separator = strpos($trimmed, '=');
         if ($separator === false) { $separator = strpos($trimmed, "\t"); }
-        if ($trimmed !== '' && $trimmed[0] !== '#' && $separator !== false && dvsModsNormalizeLookupCallsign(substr($trimmed, 0, $separator)) === $callsign) { continue; }
-        $lines[] = rtrim($line, "\r\n");
+        $existing = $separator !== false ? dvsModsNormalizeLookupCallsign(substr($trimmed, 0, $separator)) : '';
+        if ($trimmed !== '' && $trimmed[0] !== '#' && preg_match('/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{3,10}$/D', $existing)) {
+            if ($existing !== $callsign) { $entries[] = array($existing, rtrim($line, "\r\n")); }
+            continue;
+        }
+        $preserved[] = rtrim($line, "\r\n");
     }
-    $lines[] = $callsign.' = '.$name;
+    $entries[] = array($callsign, $callsign.' = '.$name);
+    usort($entries, function ($left, $right) { return strcmp($left[0], $right[0]); });
+    $lines = array_merge($preserved, array_map(function ($entry) { return $entry[1]; }, $entries));
     $contents = implode("\n", $lines)."\n";
     rewind($handle);
     $written = ftruncate($handle, 0) && fwrite($handle, $contents) === strlen($contents) && fflush($handle);

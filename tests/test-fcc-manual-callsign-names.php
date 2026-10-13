@@ -19,8 +19,16 @@ requireManualName('Alex', dvsModsFccFirstName('VK2XYZ'), 'DMR database name shou
 requireManualName('Taylor Operator', dvsModsManualCallsignName('VK2XYZ/P'), 'manual file suffix normalization failed');
 requireManualName(false, dvsModsManualCallsignName('N0MISSING'), 'missing manual name unexpectedly matched');
 requireManualName('Avery Example', dvsModsSaveManualCallsignName('N0MISSING', 'Avery Example', $path), 'manual name save failed');
+requireManualName(true, dvsModsSaveManualCallsignName('K1ZZZ', 'Zed Operator', $path), 'second manual name save failed');
 $saved = file_get_contents($path);
 if (strpos($saved, "N0MISSING = Avery Example\n") === false) { fwrite(STDERR, "FAIL: saved entry format was incorrect\n"); exit(1); }
+$savedCalls = array();
+foreach (file($path, FILE_IGNORE_NEW_LINES) as $line) {
+    if (preg_match('/^([A-Z0-9]{3,10}) = /', $line, $match)) { $savedCalls[] = $match[1]; }
+}
+$sortedCalls = $savedCalls;
+sort($sortedCalls, SORT_STRING);
+if ($savedCalls !== $sortedCalls) { fwrite(STDERR, "FAIL: saved callsign entries are not alphabetically sorted\n"); exit(1); }
 requireManualName('Enter a name of 1 to 100 characters without tabs or line breaks.', dvsModsSaveManualCallsignName('N0MISSING', "Bad\nName", $path), 'control characters were accepted');
 requireManualName('A name is already available in the local FCC/DMR databases.', dvsModsSaveManualCallsignName('K1ABC', 'Wrong Override', $path), 'database-backed name was allowed to be overridden');
 requireManualName(true, dvsModsSaveCustomCallsignDescription('XLX618', 'US HemetHangout', $descriptionPath), 'custom description save failed');
