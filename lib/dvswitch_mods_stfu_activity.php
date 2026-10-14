@@ -37,8 +37,8 @@ function dvsModsStfuActivityRows($paths = null)
             $message = $match[2];
             if (preg_match('/^DMR, ODMR Begin (Tx|Rx):\s*src\s*=\s*([0-9]+),\s*dst\s*=\s*([0-9]+)\s*\((GROUP|PRIVATE)\)/i', $message, $call)) {
                 $direction = strtoupper($call[1]);
-                // STFU.log has no Loss/BER fields; use the dashboard's unavailable marker.
-                $row = array($match[1], 'STFU', $call[2], '', 'TG '.$call[3], $direction === 'TX' ? 'Net' : 'LNet', null, '---', '---', '', '');
+                // STFU.log has no Loss/BER fields; display cosmetic zero placeholders only.
+                $row = array($match[1], 'STFU', $call[2], '', 'TG '.$call[3], $direction === 'TX' ? 'Net' : 'LNet', null, '0%', '0.0%', '', '');
                 $events[] = array('row' => $row, 'direction' => $direction, 'sequence' => $sequence++);
                 $open[$direction] = count($events) - 1;
                 continue;

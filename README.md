@@ -42,9 +42,8 @@ DVSwitch-Mods provides two types of changes:
   card. Its target comes from the saved STFU mode target, then `[STFU] StartTG`
   in `/opt/MMDVM_Bridge/DVSwitch.ini`, with the STFU log as a standalone fallback.
   It does not use the shared Analog_Bridge `last_tune` value, which can change
-  with BM/TGIF tuning. STFU rows use `---` in Loss and BER,
-  matching the dashboard's standard marker for modes whose event source does
-  not provide those measurements.
+  with BM/TGIF tuning. STFU rows display `0%` Loss and `0.0%` BER as cosmetic placeholders,
+  not measured values, because STFU does not provide those measurements.
 
 Standard component installers check compatibility before changing anything,
 create protected backups, install atomically, validate the result, and roll

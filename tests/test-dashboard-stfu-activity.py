@@ -127,7 +127,7 @@ echo json_encode(dvsModsStfuMergeActivity($mmdvm, array({str(log_path)!r})));
                 "STFU RX and MMDVM RX for the same resolved caller were not deduplicated")
         require(merged[0][2] == "1234567" and merged[0][4] == "TG 93",
                 "newest STFU receive did not replace the older cross-mode receive")
-        require(all(row[7:9] == ["---", "---"] for row in rows), "STFU Loss and BER do not use the dashboard's standard unavailable marker")
+        require(all(row[7:9] == ["0%", "0.0%"] for row in rows), "STFU Loss and BER do not use the requested cosmetic placeholders")
         require("STFU Net" in card_output, "STFU card header is not consistent with the other mode cards")
         require('Room<br/><span style="color:#b5651d;' in card_output,
                 "STFU card friendly target does not use the dashboard target color")
@@ -171,7 +171,7 @@ require("--check" in installer_text and "--install" in installer_text and "--uni
 require("dashboard-stfu-activity" in manager_text.split("readonly -a COMPONENTS=(", 1)[1].split(")", 1)[0], "manager does not register STFU activity")
 require("dvswitch-mode-buttons" not in installer_text, "STFU activity component depends on the Mode Buttons repository")
 require("/var/log/dvswitch/STFU.log" in HELPER.read_text(), "STFU parser does not use the documented node log path")
-require("null, '---', '---'" in HELPER.read_text(), "STFU rows do not use the standard unavailable Loss/BER markers")
+require("null, '0%', '0.0%'" in HELPER.read_text(), "STFU rows do not use the requested cosmetic Loss/BER placeholders")
 require("STFU Net</th>" in HELPER.read_text(), "STFU Net card label was regressed")
 require("$abinfo['last_tune']" not in HELPER.read_text(), "STFU card incorrectly uses the shared live target field")
 require("/var/lib/dvswitch-mode-buttons/stfu-target" in HELPER.read_text(), "STFU card does not read the optional saved-target snapshot")
