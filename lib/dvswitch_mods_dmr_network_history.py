@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-# Version: 1.0.0
+# Version: 1.1.0
 # SPDX-License-Identifier: MIT
 
-"""Record timestamped BM/TGIF/STFU selections for Gateway Activity labels."""
+"""Record timestamped BM/TGIF bridge-network changes for Gateway Activity labels."""
 
 from __future__ import annotations
 
@@ -22,10 +22,10 @@ LOCK_FILE = Path(os.environ.get(
 BRIDGE_INI = Path(os.environ.get(
     "DVS_MMDVM_BRIDGE_INI", "/opt/MMDVM_Bridge/MMDVM_Bridge.ini"
 ))
-CURRENT_MODE_FILE = Path(os.environ.get(
-    "DVS_CURRENT_MODE_FILE", "/var/lib/dvswitch-mode-buttons/current-mode"
-))
-NETWORKS = {"BM", "TGIF", "STFU"}
+# Keep STFU readable so existing history files remain intact. New events can
+# only record the two networks supported by MMDVM_Bridge's DMR Network section.
+HISTORY_NETWORKS = {"BM", "TGIF", "STFU"}
+DMR_NETWORKS = {"BM", "TGIF"}
 
 
 def read_history(path: Path) -> list[tuple[int, str]]:
@@ -36,7 +36,7 @@ def read_history(path: Path) -> list[tuple[int, str]]:
     rows: list[tuple[int, str]] = []
     for line in lines:
         fields = line.split("\t", 1)
-        if len(fields) == 2 and fields[0].isdigit() and fields[1] in NETWORKS:
+        if len(fields) == 2 and fields[0].isdigit() and fields[1] in HISTORY_NETWORKS:
             rows.append((int(fields[0]), fields[1]))
     return rows
 
@@ -60,17 +60,6 @@ def network_from_ini(path: Path) -> str | None:
                 return "BM"
             return None
     return None
-
-
-def selected_stfu_mode(path: Path) -> tuple[str, int] | None:
-    """Return STFU and the selected-mode file timestamp when STFU is active."""
-    try:
-        with path.open("rb") as state_file:
-            mode = state_file.read().decode("ascii").strip().upper()
-            stamp = os.fstat(state_file.fileno()).st_mtime_ns // 1_000_000
-    except (OSError, UnicodeError, ValueError):
-        return None
-    return (mode, stamp) if mode == "STFU" else None
 
 
 def write_history(path: Path, rows: list[tuple[int, str]]) -> None:
@@ -98,8 +87,8 @@ def write_history(path: Path, rows: list[tuple[int, str]]) -> None:
 
 def record(network: str, timestamp_ms: int) -> bool:
     network = network.upper()
-    if network not in NETWORKS:
-        raise ValueError("mode must be BM, TGIF, or STFU")
+    if network not in DMR_NETWORKS:
+        raise ValueError("network must be BM or TGIF")
     if timestamp_ms < 0:
         raise ValueError("timestamp must be a nonnegative epoch-millisecond value")
 
@@ -130,9 +119,9 @@ def record(network: str, timestamp_ms: int) -> bool:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
-    action.add_argument("--record", nargs=2, metavar=("BM|TGIF|STFU", "EPOCH_MS"))
-    action.add_argument("--current", action="store_true", help="record selected STFU mode or current BM/TGIF bridge network")
-    action.add_argument("--seed-current", action="store_true", help="seed the selected STFU mode or current BM/TGIF network")
+    action.add_argument("--record", nargs=2, metavar=("BM|TGIF", "EPOCH_MS"))
+    action.add_argument("--current", action="store_true", help="record the current BM/TGIF bridge network")
+    action.add_argument("--seed-current", action="store_true", help="seed the current BM/TGIF bridge network")
     args = parser.parse_args()
 
     if args.record:
@@ -141,12 +130,10 @@ def main() -> None:
             parser.error("EPOCH_MS must be an integer")
         stamp = int(raw_stamp)
     else:
-        selected = selected_stfu_mode(CURRENT_MODE_FILE)
-        if selected is not None:
-            network, stamp = selected
-        else:
-            network = network_from_ini(BRIDGE_INI)
-            stamp = time.time_ns() // 1_000_000
+        # The selected dashboard mode can be STFU while the DMR bridge stays
+        # connected to BM or TGIF. Always label MMDVM rows from the bridge INI.
+        network = network_from_ini(BRIDGE_INI)
+        stamp = time.time_ns() // 1_000_000
         if network is None:
             print("NOTICE: MMDVM_Bridge DMR address is not recognized as BM or TGIF; no history entry added.")
             return

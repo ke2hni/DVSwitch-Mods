@@ -53,15 +53,15 @@ Manager upgrade regression (safe to run as the regular user; uses a temporary is
 
 cd ~/DVSwitch-Mods && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-manager-recorded-upgrade.py && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-manager-structure.py
 
-Gateway Activity BM/TGIF/STFU mode label update (run on pi4test first):
+Gateway Activity BM/TGIF bridge-network label correction (run on pi4test first):
 
 cd ~/DVSwitch-Mods && PYTHONDONTWRITEBYTECODE=1 python3 tests/test-dashboard-activity-modes.py && sudo ./mod-dashboard-activity-modes.sh --check
 
-If the check passes, install the updated component and verify the STFU transition is in the history:
+If the check passes, install the updated component. Existing STFU history entries may remain, but they must not affect DMR labels:
 
 sudo ./mod-dashboard-activity-modes.sh --install && sudo tail -n 8 /var/lib/dvswitch-mods/dmr-network-history.tsv
 
-Then select STFU, tune a target, and confirm the new DMR Net activity row is labeled STFU. Switch to BM or TGIF and verify subsequent rows use that mode while older rows retain their event-time labels. Do not install on production node68425 until test nodes pass and Jeff explicitly authorizes it.
+Then, while the bridge is set to TGIF, select STFU and confirm a new MMDVM DMR Net row remains labeled TGIF. Confirm STFU-log activity rows are labeled STFU and continue to show unavailable Loss/BER values. Switch the bridge to BM or TGIF and verify subsequent DMR rows use that bridge network while older rows retain their event-time labels. Do not install on production node68425 until test nodes pass and Jeff explicitly authorizes it.
 
 STFU log activity integration and Target-wrapper compatibility (run on pi4test first):
 

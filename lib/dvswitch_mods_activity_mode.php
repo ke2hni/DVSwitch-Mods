@@ -1,6 +1,6 @@
 <?php
-// Version: 1.0.0
-// DVSwitch-Mods: DMR network activity labels v1
+// Version: 1.1.0
+// DVSwitch-Mods: DMR network activity labels v2
 // SPDX-License-Identifier: MIT
 
 /** Convert a MMDVM_Bridge UTC timestamp (optionally with milliseconds) to epoch ms. */
@@ -17,7 +17,7 @@ function dvsModsActivityTimestampMs($timestamp)
     return ((int)$date->format('U') * 1000) + intdiv((int)$date->format('u'), 1000);
 }
 
-/** Find the latest BM/TGIF/STFU selection at or before the activity event. */
+/** Find the latest BM/TGIF bridge network at or before the activity event. */
 function dvsModsDmrNetworkAt($timestamp, $historyFile = null)
 {
     if ($historyFile === null) {
@@ -31,7 +31,10 @@ function dvsModsDmrNetworkAt($timestamp, $historyFile = null)
     if (!is_array($lines)) { return null; }
     foreach ($lines as $line) {
         $fields = explode("\t", $line, 2);
-        if (count($fields) !== 2 || !ctype_digit($fields[0]) || !in_array($fields[1], array('BM', 'TGIF', 'STFU'), true)) { continue; }
+        // Older history files may contain STFU selections. STFU is not an
+        // MMDVM_Bridge DMR network, so ignore those rows and keep the last
+        // actual BM/TGIF bridge network in effect.
+        if (count($fields) !== 2 || !ctype_digit($fields[0]) || !in_array($fields[1], array('BM', 'TGIF'), true)) { continue; }
         $transitionAt = (int)$fields[0];
         if ($transitionAt <= $eventAt && ($activeAt === null || $transitionAt >= $activeAt)) {
             $active = $fields[1];

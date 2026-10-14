@@ -2,7 +2,7 @@
 # Version: 1.0.0
 # SPDX-License-Identifier: MIT
 
-"""Tests for timestamped BM/TGIF/STFU Gateway Activity labels."""
+"""Tests for timestamped BM/TGIF bridge-network Gateway Activity labels."""
 
 from __future__ import annotations
 
@@ -90,7 +90,6 @@ with tempfile.TemporaryDirectory() as directory:
         "DVS_DMR_NETWORK_HISTORY_FILE": str(history),
         "DVS_DMR_NETWORK_HISTORY_LOCK": str(base / "lock"),
         "DVS_MMDVM_BRIDGE_INI": str(base / "MMDVM_Bridge.ini"),
-        "DVS_CURRENT_MODE_FILE": str(base / "current-mode"),
     })
     def record(network: str, stamp: int) -> None:
         subprocess.run(["python3", str(WRITER), "--record", network, str(stamp)], env=environment, check=True, capture_output=True)
@@ -111,7 +110,25 @@ with tempfile.TemporaryDirectory() as directory:
     stfu_stamp = time.time_ns() // 1_000_000 + 1000
     os.utime(current_mode, ns=(stfu_stamp * 1_000_000, stfu_stamp * 1_000_000))
     subprocess.run(["python3", str(WRITER), "--current"], env=environment, check=True, capture_output=True, text=True)
-    require(history.read_text().splitlines()[-1] == f"{stfu_stamp}\tSTFU", "STFU state-file watcher did not record the selected mode at its change time")
+    require(history.read_text().splitlines()[-1].endswith("\tTGIF"), "STFU mode selection changed the DMR history away from the active TGIF bridge network")
+    rejected_stfu = subprocess.run(["python3", str(WRITER), "--record", "STFU", str(stfu_stamp)], env=environment, capture_output=True, text=True)
+    require(rejected_stfu.returncode != 0 and "network must be BM or TGIF" in rejected_stfu.stderr, "writer accepted STFU as an MMDVM_Bridge DMR network")
+
+with tempfile.TemporaryDirectory() as directory:
+    base = Path(directory)
+    history = base / "history.tsv"
+    history.write_text("1790805600000\tBM\n1790805600300\tSTFU\n")
+    ini = base / "MMDVM_Bridge.ini"
+    ini.write_text("[DMR Network]\nAddress=tgif.network\nPort=62030\n")
+    environment = os.environ.copy()
+    environment.update({
+        "DVS_DMR_NETWORK_HISTORY_FILE": str(history),
+        "DVS_DMR_NETWORK_HISTORY_LOCK": str(base / "lock"),
+        "DVS_MMDVM_BRIDGE_INI": str(ini),
+    })
+    subprocess.run(["python3", str(WRITER), "--current"], env=environment, check=True, capture_output=True, text=True)
+    rows = history.read_text().splitlines()
+    require(rows == ["1790805600000\tBM", "1790805600300\tSTFU", f"{rows[-1].split(chr(9))[0]}\tTGIF"], "current bridge detection failed to preserve legacy STFU history while recording TGIF")
 
 with tempfile.TemporaryDirectory() as directory:
     base = Path(directory)
@@ -132,7 +149,7 @@ with tempfile.TemporaryDirectory() as directory:
         ("DMR", "2026-09-30 22:00:00.100", "Net", "DMR"),
         ("DMR Slot 2", "2026-09-30 22:00:00.200", "Net", "BM"),
         ("DMR Slot 1", "2026-09-30 22:01:00.500", "Net", "TGIF"),
-        ("DMR Slot 2", "2026-09-30 22:01:30.500", "Net", "STFU"),
+        ("DMR Slot 2", "2026-09-30 22:01:30.500", "Net", "TGIF"),
         ("DMR", "2026-09-30 22:02:00.800", "Net", "BM"),
         ("DMR Slot 2", "2026-09-30 22:01:00.500", "LNet", "DMR Slot 2"),
         ("YSF", "2026-09-30 22:01:00.500", "Net", "YSF"),
@@ -156,7 +173,7 @@ manager = MANAGER.read_text()
 require("--check" in installer and "--install" in installer and "--restore" in installer, "installer interface is incomplete")
 require("DVSwitch-Mode-Buttons current-mode state is missing" not in installer, "Mods installer depends on Mode Buttons")
 require("--seed-current" in installer and "--current" in installer, "installer lacks history initialization and standalone detection")
-require("PathChanged=/var/lib/dvswitch-mode-buttons/current-mode" in (ROOT / "systemd/dvswitch-mods-activity-mode-history.path").read_text(), "mode-state watcher does not detect STFU selection changes")
+require("PathChanged=/var/lib/dvswitch-mode-buttons/current-mode" in (ROOT / "systemd/dvswitch-mods-activity-mode-history.path").read_text(), "mode-state watcher no longer refreshes the bridge network after a mode-state change")
 require("dashboard-activity-modes) CHILD_SCRIPT=\"$SCRIPT_DIR/mod-dashboard-activity-modes.sh\"" in manager, "manager no longer uses the established installer filename")
 require("dashboard-activity-modes" in manager.split("readonly -a COMPONENTS=(", 1)[1].split(")", 1)[0], "manager does not register the component")
 print("PASS: timestamped DMR network history, Gateway-only labels, standalone install, and manager registration")
