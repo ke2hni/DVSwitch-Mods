@@ -85,6 +85,26 @@ for name, original in (("lh.php", lh), ("localtx.php", localtx)):
     altered = changed + "<!-- user customization -->\n"
     require(patcher.patch_text(altered, name) == altered, name + " user customization was not preserved")
 
+# The standard manager installs FCC first. A fresh FCC install creates the
+# manual-name legend before Target installs its Local Activity cell patch.
+fresh_localtx = (
+    "<?php\n"
+    "include_once dirname(dirname(__FILE__)).'/include/functions.php';    \n"
+    + patcher.block("localtx.php")[0]
+    + "</div>\n<br>\n"
+)
+fcc_first_localtx = fcc_patcher.patch_legend_text(fresh_localtx)
+target_after_fcc = patcher.patch_text(fcc_first_localtx, "localtx.php")
+require(patcher.MARKER in target_after_fcc, "Target patch did not install after FCC on fresh Local Activity")
+require(target_after_fcc.count(fcc_patcher.LEGEND_MARKER) == 1,
+        "Target patch duplicated or removed the FCC manual-name legend")
+require(len(list(patcher.CUSTOM_LEGEND_BLOCK.finditer(target_after_fcc))) == 1,
+        "FCC-first install did not preserve exactly one usable Local Activity legend")
+require(patcher.patch_text(target_after_fcc, "localtx.php") == target_after_fcc,
+        "Target patch after FCC is not idempotent")
+require(fcc_patcher.patch_legend_text(target_after_fcc) == target_after_fcc,
+        "FCC legend patch after Target is not idempotent")
+
 with tempfile.TemporaryDirectory() as directory:
     data = Path(directory)
     (data / "P25Hosts.json").write_text('{"reflectors":[{"designator":10200,"name":"P25 North America","sponsor":"DVSwitch"},{"designator":43389,"name":null,"sponsor":"Lookout Mountain Amateur Radio Community"}]}')

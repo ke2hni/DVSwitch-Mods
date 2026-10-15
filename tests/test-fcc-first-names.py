@@ -122,6 +122,24 @@ with tempfile.TemporaryDirectory() as directory:
     require(legend.count("margin-left:8ch") == 2, "both legend data rows are not indented by eight character widths")
     require(patcher.patch_legend_text(legend) == legend, "aligned legend patch is not idempotent")
 
+# Stock DVSwitch Local Activity has no Legend block, but has a unique closing anchor.
+stock_localtx = ('''<div>
+<span style="font-weight: bold;font-size:14px;">Local Activity</span>
+<fieldset><table>
+  </table>
+</fieldset>
+</div>
+<br>
+''')
+stock_legend = patcher.patch_legend_text(stock_localtx)
+require(stock_legend.count("<b>Legend:</b>") == 1, "fresh stock Local Activity did not receive one legend")
+require(patcher.LEGEND_MARKER in stock_legend and "Click --- to add an entry." in stock_legend,
+        "fresh stock Local Activity legend is missing manual-entry guidance")
+require(stock_legend.index("</fieldset>") < stock_legend.index(patcher.LEGEND_MARKER),
+        "fresh stock Local Activity legend was not placed after the activity table")
+require(patcher.patch_legend_text(stock_legend) == stock_legend,
+        "fresh stock Local Activity legend insertion is not idempotent")
+
 legacy_legend = ('<div><b>Legend:</b> <b>---</b> = no data<br>\n  <b>*</b> = Name entered and saved by you in the local callsign file. '
                  '<span title="Manually entered callsign names are stored in /etc/dvswitch-mods/callsign-lookup.tsv.">Database</span>\n  '
                  '<!-- DVSwitch-Mods: manual callsign names legend v1 -->\n</div>')

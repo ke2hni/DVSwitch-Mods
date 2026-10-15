@@ -175,7 +175,17 @@ def patch_text(text: str, name: str) -> str:
     text = text.replace(anchor, anchor + INCLUDE + "\n", 1)
     text = text.replace(old, new, 1)
     if name == "localtx.php":
-        text = once(text, "</div>\n<br>", "</div>\n<br>\n" + LEGEND + "<br>", "Local Activity legend anchor")
+        manual_markers = re.findall(
+            r"<!-- DVSwitch-Mods: manual callsign names legend v[1-4] -->", text
+        )
+        if len(manual_markers) > 1:
+            raise PatchError("duplicate FCC manual-name legends in Local Activity")
+        if manual_markers:
+            custom_legends = list(CUSTOM_LEGEND_BLOCK.finditer(text))
+            if len(custom_legends) != 1 or manual_markers[0] not in custom_legends[0].group():
+                raise PatchError("FCC manual-name legend is incomplete or ambiguous")
+        else:
+            text = once(text, "</div>\n<br>", "</div>\n<br>\n" + LEGEND + "<br>", "Local Activity legend anchor")
     return text
 
 

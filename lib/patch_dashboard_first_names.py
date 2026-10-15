@@ -20,6 +20,13 @@ PREVIOUS_LEGEND_MARKERS = (
     "<!-- DVSwitch-Mods: manual callsign names legend v3 -->",
 )
 LEGEND_MARKER = "<!-- DVSwitch-Mods: manual callsign names legend v4 -->"
+STOCK_LOCALTX_LEGEND = (
+    '<div style="margin:3px 0 0 14px;font-size:10px;line-height:1.3;text-align:left;white-space:normal;overflow-wrap:anywhere;">\n'
+    '  <b>Legend:</b><br>\n'
+    '  <b>---</b> = No name found in the local DMR ID or FCC data; country shown when available. Click --- to add an entry.\n'
+    '</div>\n'
+)
+STOCK_LOCALTX_END = "</div>\n<br>"
 TOOLTIP_STYLE = '''<style>/* DVSwitch-Mods callsign file tooltip */
 .dvsModsCallsignFileTip{position:relative;display:inline-block;border-bottom:1px dotted currentColor;cursor:help;text-decoration:none;}
 .dvsModsCallsignFileTip:focus{outline:1px dotted currentColor;outline-offset:2px;}
@@ -87,6 +94,22 @@ def patch_legend_text(text: str) -> str:
         raise PatchError("duplicated or mixed manual callsign legend markers")
     pattern = re.compile(r'(<div\b[^>]*>\s*<b>Legend:</b>.*?</div>)', re.I | re.S)
     found = list(pattern.finditer(text))
+    if not found:
+        # A stock DVSwitch localtx.php has no legend. The Target component is
+        # intentionally installed later, so seed the shared legend at the
+        # verified end-of-Local-Activity anchor instead of rejecting fresh installs.
+        anchor_count = text.count(STOCK_LOCALTX_END)
+        if anchor_count != 1:
+            raise PatchError(
+                "Local Activity legend is missing and the stock closing anchor "
+                f"is unsupported or ambiguous: {anchor_count} matches"
+            )
+        seeded = text.replace(
+            STOCK_LOCALTX_END,
+            STOCK_LOCALTX_END + "\n" + STOCK_LOCALTX_LEGEND,
+            1,
+        )
+        return patch_legend_text(seeded)
     if len(found) != 1:
         raise PatchError(f"unsupported or ambiguous Local Activity legend: {len(found)} matches")
     block = found[0].group(1)
@@ -134,7 +157,11 @@ def patch_legend_text(text: str) -> str:
 
     # Keep the heading separate so it does not shift the first legend row.
     block = re.sub(r'(<b\b[^>]*>\s*Legend:\s*</b>)(?:[ \t\r\n]*<br>[ \t\r\n]*)*', r'\1<br>\n', block, count=1, flags=re.I)
-    block = re.sub(r'(?m)^[ \t]*(?=<span style="display:inline-block;width:\d+ch;text-align:right(?:;margin-left:8ch)?;">)', '  ', block)
+    block = re.sub(
+        r'(?m)^[ \t]*(?=<span style="display:inline-block;width:\d+ch;text-align:right(?:;margin-left:8ch)?;">)',
+        '  ',
+        block,
+    )
     # HTML collapses leading spaces in this legend. Put the requested eight-
     # character indent on each fixed-width term span so the entire row moves.
     block = re.sub(
@@ -170,7 +197,11 @@ def patch_legend_text(text: str) -> str:
         bold_term = f'<b{attrs}>{match.group("label")}</b>'
         return f'<span style="display:inline-block;width:{width}ch;text-align:right;margin-left:8ch;">{bold_term}</span>{match.group("space")}='
     block = term_pattern.sub(align_term, block)
-    block = re.sub(r'(?m)^ {1,2}(?=<span style="display:inline-block;width:\d+ch;text-align:right(?:;margin-left:8ch)?;">)', '  ', block)
+    block = re.sub(
+        r'(?m)^[ \t]*(?=<span style="display:inline-block;width:\d+ch;text-align:right(?:;margin-left:8ch)?;">)',
+        '  ',
+        block,
+    )
     if "DVSwitch-Mods callsign file tooltip" not in block:
         block = block.replace('</div>', TOOLTIP_STYLE + '\n</div>', 1)
     return text[:found[0].start()] + block + text[found[0].end():]

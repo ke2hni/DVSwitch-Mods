@@ -349,6 +349,9 @@ values such as `WD1V ��` without converting international suffixes into FCC 
 **Required first:** Independent of the P25/NXDN/DMR chain, but install it before
 the dashboard Target display modification. Internet access is required for the
 initial FCC database build and CTY.DAT download.
+On a stock DVSwitch install, Local Activity has no legend yet. The FCC installer
+creates the legend at the stock Local Activity ending. The later Target
+modification preserves it without adding a duplicate.
 
 ```bash
 sudo ./mod-dashboard-fcc-first-names.sh --check
