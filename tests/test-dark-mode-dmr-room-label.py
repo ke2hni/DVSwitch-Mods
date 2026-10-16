@@ -14,6 +14,15 @@ CSS = MATCH.group(1)
 
 
 class DarkModeDmrRoomLabelTest(unittest.TestCase):
+    def test_light_mode_recolors_all_inline_copper_labels(self):
+        self.assertIn('body.theme-light [style*="color:#b5651d"]', CSS)
+        self.assertIn('body.theme-auto:not(.dvs-prefers-dark) [style*="color:#b5651d"]', CSS)
+        self.assertIn('color: #934b12 !important;', CSS)
+
+    def test_dark_mode_keeps_existing_color_overrides(self):
+        self.assertNotIn('body.theme-dark [style*="color:#b5651d"]', CSS)
+        self.assertNotIn('body.theme-auto.dvs-prefers-dark [style*="color:#b5651d"]', CSS)
+
     def test_dark_and_auto_dark_modes_override_inline_black(self):
         self.assertIn("body.theme-dark .dvs-dmr-room-label", CSS)
         self.assertIn("body.theme-auto.dvs-prefers-dark .dvs-dmr-room-label", CSS)

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-VERSION="1.2"
+VERSION="1.3"
 ROOT="/usr/share/dvswitch"
 ORIGINAL_BACKUP_DIR="$ROOT/.dvs-dashboard-original-backup"
 CSS_FILE="$ROOT/css/dvs-theme.css"
@@ -78,7 +78,7 @@ write_theme_files(){
   cat > "$CSS_FILE" <<'CSS'
 /*
  * DVSwitch Dashboard Theme Overlay
- * v0.26
+ * v0.27
  *
  * Modes:
  *   Auto  = follows browser/system prefers-color-scheme
@@ -89,6 +89,15 @@ write_theme_files(){
  *   Do not globally recolor every td cell.
  *   DVSwitch uses inline green/red/orange cells for live status.
  */
+
+/* Improve contrast for dashboard labels that use the stock copper color.
+ * Keep the override limited to Light mode and Auto when the system prefers
+ * light, so Dark mode retains its existing colors.
+ */
+body.theme-light [style*="color:#b5651d"],
+body.theme-auto:not(.dvs-prefers-dark) [style*="color:#b5651d"] {
+  color: #934b12 !important;
+}
 
 .dvs-theme-control {
   position: absolute;
