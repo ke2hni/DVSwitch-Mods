@@ -17,6 +17,8 @@ class DarkModeDmrRoomLabelTest(unittest.TestCase):
     def test_light_mode_recolors_all_inline_copper_labels(self):
         self.assertIn('body.theme-light [style*="color:#b5651d"]', CSS)
         self.assertIn('body.theme-auto:not(.dvs-prefers-dark) [style*="color:#b5651d"]', CSS)
+        self.assertIn('body.theme-light [style*="color:#ef7215"]', CSS)
+        self.assertIn('body.theme-auto:not(.dvs-prefers-dark) [style*="color:#ef7215"]', CSS)
         self.assertIn('color: #6b2f00 !important;', CSS)
 
     def test_dark_mode_keeps_existing_color_overrides(self):

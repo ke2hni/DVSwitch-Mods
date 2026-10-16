@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-VERSION="1.5"
+VERSION="1.6"
 ROOT="/usr/share/dvswitch"
 ORIGINAL_BACKUP_DIR="$ROOT/.dvs-dashboard-original-backup"
 CSS_FILE="$ROOT/css/dvs-theme.css"
@@ -78,7 +78,7 @@ write_theme_files(){
   cat > "$CSS_FILE" <<'CSS'
 /*
  * DVSwitch Dashboard Theme Overlay
- * v0.29
+ * v0.30
  *
  * Modes:
  *   Auto  = follows browser/system prefers-color-scheme
@@ -95,7 +95,9 @@ write_theme_files(){
  * light, so Dark mode retains its existing colors.
  */
 body.theme-light [style*="color:#b5651d"],
-body.theme-auto:not(.dvs-prefers-dark) [style*="color:#b5651d"] {
+body.theme-auto:not(.dvs-prefers-dark) [style*="color:#b5651d"],
+body.theme-light [style*="color:#ef7215"],
+body.theme-auto:not(.dvs-prefers-dark) [style*="color:#ef7215"] {
   color: #6b2f00 !important;
 }
 
