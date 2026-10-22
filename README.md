@@ -324,6 +324,10 @@ supplies usable data. The mod also
 installs a self-contained weekly FCC database updater and randomized systemd
 timer.
 
+For Gateway Activity rows whose mode is `NXDN`, numeric radio IDs are resolved
+to callsigns from `/var/lib/mmdvm/NXDN.csv` before the callsign and Name columns
+are rendered. Other modes retain the existing seven-digit DMR ID lookup behavior.
+
 If no usable FCC/DMR name is available, the dashboard checks the custom
 description file and then the operator-name file. Custom descriptions are
 stored at `/etc/dvswitch-mods/callsign-descriptions.tsv`; operator names are
