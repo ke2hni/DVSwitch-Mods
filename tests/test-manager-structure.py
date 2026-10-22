@@ -65,6 +65,9 @@ def main() -> None:
             '4) initialize_state; uninstall_requested all ;;' in master and
             'Choose an option [0/1/2/3/4]:' in master,
             "interactive menu does not expose the recorded reverse-order uninstall")
+    require('"1) Install/Upgrade all standard DVSwitch repairs and modifications"' in master and
+            '"1) Install all standard DVSwitch repairs and modifications"' not in master,
+            "interactive menu does not identify that standard installation also upgrades components")
     require("last_state_line" in master and "remove_last_state_line" in master,
             "recorded LIFO uninstall implementation is missing")
     require('component_is_recorded "$COMPONENT"' in master and

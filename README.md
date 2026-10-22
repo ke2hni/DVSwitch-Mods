@@ -84,8 +84,9 @@ sudo ./manage-dvswitch-mods.sh
 
 The menu provides three installation choices and an uninstall choice:
 
-1. **Standard DVSwitch repairs and modifications** — runs the complete
-   dependency-ordered installation and records its reversible backups.
+1. **Install/Upgrade all standard DVSwitch repairs and modifications** — runs
+   the complete dependency-ordered installation, upgrades supported installed
+   components, and records reversible backups for changes it makes.
 2. **Dark Mode** — launches the standalone dashboard theme installer. It adds
    the Auto/Light/Dark selector and creates its own protected and per-run
    backups.
