@@ -84,9 +84,8 @@ sudo ./manage-dvswitch-mods.sh
 
 The menu provides three installation choices and an uninstall choice:
 
-1. **Install/Upgrade all standard DVSwitch repairs and modifications** — runs
-   the complete dependency-ordered installation, upgrades supported installed
-   components, and records reversible backups for changes it makes.
+1. **Standard DVSwitch repairs and modifications** — runs the complete
+   dependency-ordered installation and records its reversible backups.
 2. **Dark Mode** — launches the standalone dashboard theme installer. It adds
    the Auto/Light/Dark selector and creates its own protected and per-run
    backups.
@@ -324,10 +323,6 @@ use the FCC entity name as their fallback. `---` is shown only when neither sour
 supplies usable data. The mod also
 installs a self-contained weekly FCC database updater and randomized systemd
 timer.
-
-For Gateway Activity rows whose mode is `NXDN`, numeric radio IDs are resolved
-to callsigns from `/var/lib/mmdvm/NXDN.csv` before the callsign and Name columns
-are rendered. Other modes retain the existing seven-digit DMR ID lookup behavior.
 
 If no usable FCC/DMR name is available, the dashboard checks the custom
 description file and then the operator-name file. Custom descriptions are

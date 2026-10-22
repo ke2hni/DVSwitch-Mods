@@ -122,6 +122,8 @@ patcher_structure_supported() {
     grep -Fq 'FCC first-name activity columns' "$target" &&
     grep -Fq 'dvsModsFccFirstName($listElem[2])' "$target" &&
     grep -Fq 'dvsModsDmrIdCallsign($listElem[2])' "$target" &&
+    grep -Fq 'dvsModsNxdnIdCallsign($listElem[2])' "$target" &&
+    grep -Fq 'strtoupper(trim((string)$listElem[1])) === "NXDN"' "$target" &&
     grep -Fq '<th>Name</th>' "$target"
 }
 
@@ -378,9 +380,9 @@ stage_install_component() {
 run_check() {
     preflight; prepare_dashboard
     if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php"; then
-        printf 'ALREADY MODIFIED: Gateway Activity worldwide DMR/FCC names, manual name entry, country fallback, and legend are installed.\n'
+        printf 'ALREADY MODIFIED: Gateway Activity DMR/NXDN callsign resolution, worldwide names, manual name entry, country fallback, and legend are installed.\n'
     else
-        printf 'MODIFICATION READY:\nGateway Activity before: %s\nGateway Activity after:  %s\nLocal Activity before:   %s\nLocal Activity after:    %s\n' "$(file_hash "$LH_TARGET")" "$(file_hash "$WORK_DIR/lh.php")" "$(file_hash "$LOCALTX_TARGET")" "$(file_hash "$WORK_DIR/localtx.php")"
+        printf 'MODIFICATION READY: dashboard repair or upgrade will install/upgrade DMR/NXDN callsign resolution and the supported Gateway Activity name display.\nGateway Activity before: %s\nGateway Activity after:  %s\nLocal Activity before:   %s\nLocal Activity after:    %s\n' "$(file_hash "$LH_TARGET")" "$(file_hash "$WORK_DIR/lh.php")" "$(file_hash "$LOCALTX_TARGET")" "$(file_hash "$WORK_DIR/localtx.php")"
     fi
     if [[ -f "$DATABASE_TARGET" && ! -L "$DATABASE_TARGET" ]]; then
         local database_count database_checksum
@@ -410,7 +412,7 @@ run_check() {
     starter_names_missing=$(python3 "$CALLSIGN_NAMES_MERGER" --check "$CALLSIGN_NAMES_TARGET" "$CALLSIGN_NAMES_STARTER_SOURCE")
     names_sorted=$(python3 "$CALLSIGN_NAMES_MERGER" --is-sorted "$CALLSIGN_NAMES_TARGET" "$CALLSIGN_NAMES_STARTER_SOURCE")
     if [[ -f "$CALLSIGN_NAMES_TARGET" ]]; then printf 'Manual callsign names: editable file present at %s. Starter entries to add: %s. Alphabetical by callsign: %s.\n' "$CALLSIGN_NAMES_TARGET" "$starter_names_missing" "$([[ "$names_sorted" == 1 ]] && printf yes || printf no)"; else printf 'MODIFICATION READY: --install will create %s and add %s starter names in alphabetical order.\n' "$CALLSIGN_NAMES_TARGET" "$starter_names_missing"; fi
-    printf 'PASS: supported activity-table structure. No files changed.\n'
+    if patcher_structure_supported "$WORK_DIR/lh.php"; then printf 'PASS: supported activity-table structure, including NXDN ID-to-callsign lookup. No files changed.\n'; else die "Prepared dashboard does not contain the NXDN callsign lookup."; fi
 }
 
 run_install() {
@@ -422,7 +424,7 @@ run_install() {
     local cty_ready=0
     if validate_cty "$CTY_DATABASE_TARGET"; then cty_ready=1; fi
     if cmp -s "$LH_TARGET" "$WORK_DIR/lh.php" && cmp -s "$LOCALTX_TARGET" "$WORK_DIR/localtx.php" && [[ -f "$HELPER_TARGET" ]] && cmp -s "$HELPER_SOURCE" "$HELPER_TARGET" && [[ -f "$CALLSIGN_NAME_SAVE_TARGET" ]] && cmp -s "$CALLSIGN_NAME_SAVE_SOURCE" "$CALLSIGN_NAME_SAVE_TARGET" && [[ -f "$CALLSIGN_NAMES_TARGET" ]] && [[ "$(stat -c '%U:%G:%a' "$CALLSIGN_NAMES_TARGET")" == "root:www-data:660" ]] && [[ "$names_starter_missing" == 0 ]] && [[ "$names_sorted" == 1 ]] && [[ -f "$CALLSIGN_DESCRIPTIONS_TARGET" ]] && [[ "$(stat -c '%U:%G:%a' "$CALLSIGN_DESCRIPTIONS_TARGET")" == "root:www-data:660" ]] && [[ "$descriptions_starter_missing" == 0 ]] && [[ -f "$DATABASE_TARGET" ]] && python3 "$BUILDER" --validate "$DATABASE_TARGET" >/dev/null && [[ "$(updater_release_state)" == current ]] && [[ $cty_ready -eq 1 ]]; then
-        printf 'PASS: worldwide DMR/FCC dashboard Name modification is already installed. No files changed.\n'; return
+        printf 'PASS: DMR/NXDN callsign resolution and worldwide DMR/FCC dashboard Name modification are already installed. No files changed.\n'; return
     fi
     if [[ $cty_ready -eq 0 ]]; then prepare_cty_candidate; fi
     local database_ready=0

@@ -98,7 +98,7 @@ show_menu() {
     printf '%s\n' \
         "DVSwitch-Mods installer menu $SCRIPT_VERSION" \
         "" \
-        "1) Install/Upgrade all standard DVSwitch repairs and modifications" \
+        "1) Install all standard DVSwitch repairs and modifications" \
         "2) Install/launch the Dark Mode dashboard installer" \
         "3) Install/launch the Widescreen Display Layout installer" \
         "4) Uninstall all manager-recorded standard components" \

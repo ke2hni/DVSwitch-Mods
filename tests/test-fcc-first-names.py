@@ -52,8 +52,8 @@ require("operator name (callsign-lookup.tsv)" in changed and "custom description
 require(patcher.MARKER.endswith("v6"), "FCC patch version was not advanced for NXDN ID lookup")
 require("dvsModsNxdnIdCallsign($listElem[2])" in changed, "NXDN resolver missing")
 require('strtoupper(trim((string)$listElem[1])) === "NXDN"' in changed, "NXDN resolution is not limited to NXDN rows")
+require(changed.index('strtoupper(trim((string)$listElem[1])) === "NXDN"') < changed.index('dvsModsNxdnIdCallsign($listElem[2])') < changed.index('dvsModsDmrIdCallsign($listElem[2])'), "NXDN resolver is not correctly dispatched before DMR fallback")
 require("dvsModsDmrIdCallsign($listElem[2])" in changed, "DMR resolver missing")
-require(changed.index('dvsModsNxdnIdCallsign($listElem[2])') < changed.index('if ((is_numeric($listElem[2])') < changed.index('dvsModsFccFirstName($listElem[2])'), "NXDN ID is not resolved before callsign rendering and name lookup")
 require(changed.count("width:12ch;min-width:12ch;max-width:12ch") == 1, "Name-cell width and wrap limit missing")
 require(changed.count("overflow-wrap:anywhere") == 1, "Name-cell overflow wrapping missing")
 require("width:640px" not in changed, "fixture unexpectedly contained layout width")
@@ -213,6 +213,12 @@ require(patcher.patch_legend_text(upgraded_test7_legend) == upgraded_test7_legen
         "Test7 combined legend upgrade is not idempotent")
 
 installer = (ROOT / "mod-dashboard-fcc-first-names.sh").read_text()
+require("grep -Fq 'dvsModsNxdnIdCallsign($listElem[2])' \"$target\"" in installer,
+        "FCC installer does not verify NXDN resolver is present in deployed lh.php")
+require('grep -Fq \'strtoupper(trim((string)$listElem[1])) === "NXDN"\' "$target"' in installer,
+        "FCC installer does not verify NXDN-only dashboard dispatch")
+require("DMR/NXDN callsign resolution" in installer,
+        "FCC install/check output does not identify NXDN integration")
 require('cmp -s "$TRANSACTION_LIBRARY" "$TRANSACTION_TARGET" || die' not in installer,
         "FCC dashboard installer still blocks a structurally compatible transaction helper revision")
 require('transaction_library_supported "$TRANSACTION_TARGET"' in installer,
