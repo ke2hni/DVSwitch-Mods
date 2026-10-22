@@ -227,6 +227,42 @@ def once(text: str, old: str, new: str, description: str) -> str:
     return text.replace(old, new, 1)
 
 
+def ensure_nxdn_dispatch(text: str) -> str:
+    """Add the NXDN ID resolver to an existing FCC Name-modified dashboard."""
+    dispatch = '''if (strtoupper(trim((string)$listElem[1])) === "NXDN") {
+                    $listElem[2] = dvsModsNxdnIdCallsign($listElem[2]);
+                } else {
+                    $listElem[2] = dvsModsDmrIdCallsign($listElem[2]);
+                }
+'''
+    if text.count("dvsModsNxdnIdCallsign($listElem[2])") == 1:
+        if text.count(dispatch) != 1 and not (
+            text.count('if (strtoupper(trim((string)$listElem[1])) === "NXDN") {') == 1
+            and text.count("$listElem[2] = dvsModsNxdnIdCallsign($listElem[2]);") == 1
+        ):
+            raise PatchError("existing NXDN callsign dispatch is partial or unsupported")
+        return text
+    if text.count("dvsModsNxdnIdCallsign($listElem[2])") > 1:
+        raise PatchError("duplicate NXDN callsign dispatch")
+    dmr_call = "$listElem[2] = dvsModsDmrIdCallsign($listElem[2]);"
+    if text.count(dmr_call) == 1:
+        line_start = text.rfind("\n", 0, text.index(dmr_call)) + 1
+        indent = text[line_start:text.index(dmr_call)]
+        nxdn_only = indent + '''if (strtoupper(trim((string)$listElem[1])) === "NXDN") {
+                    $listElem[2] = dvsModsNxdnIdCallsign($listElem[2]);
+                }
+'''
+        return text[:line_start] + nxdn_only + text[line_start:]
+    if text.count(dmr_call) > 1:
+        raise PatchError("duplicate DMR callsign dispatch")
+    anchor = 'if ((is_numeric($listElem[2]) || strpos($listElem[2], "openSPOT") !== FALSE)'
+    if text.count(anchor) != 1:
+        raise PatchError("unsupported or ambiguous Gateway Activity callsign anchor")
+    insertion = text.rfind("\n", 0, text.index(anchor)) + 1
+    indent = text[insertion:text.index(anchor)]
+    return text[:insertion] + indent + dispatch + text[insertion:]
+
+
 def upgrade_legacy_name_region(text: str) -> str:
     """Replace an older owned Name block while preserving its existing cell output."""
     anchor = OLD_LEGACY_NAME
@@ -273,13 +309,14 @@ def patch_text(text: str) -> str:
             else:
                 raise PatchError("unsupported or ambiguous existing Gateway Activity name block")
         if text.count(NAME_CELL_STYLE_NEW) == 1:
-            return text
+            return ensure_nxdn_dispatch(text)
         if text.count(NAME_CELL_STYLE_PREVIOUS) == 1:
-            return text.replace(NAME_CELL_STYLE_PREVIOUS, NAME_CELL_STYLE_NEW, 1)
+            return ensure_nxdn_dispatch(text.replace(NAME_CELL_STYLE_PREVIOUS, NAME_CELL_STYLE_NEW, 1))
         if text.count(NAME_CELL_STYLE_LEGACY_WIDTH) == 1:
-            return text.replace(NAME_CELL_STYLE_LEGACY_WIDTH, NAME_CELL_STYLE_NEW, 1)
+            return ensure_nxdn_dispatch(text.replace(NAME_CELL_STYLE_LEGACY_WIDTH, NAME_CELL_STYLE_NEW, 1))
         if text.count(NAME_CELL_STYLE_OLD) == 1:
-            return text.replace(NAME_CELL_STYLE_OLD, NAME_CELL_STYLE_NEW, 1)
+            text = text.replace(NAME_CELL_STYLE_OLD, NAME_CELL_STYLE_NEW, 1)
+            return ensure_nxdn_dispatch(text)
         raise PatchError("unsupported or ambiguous FCC Name-cell style")
     if any(text.count(marker) > 1 for marker in (MARKER, PREVIOUS_NAME_MARKER, PREVIOUS_MARKER, OLDER_MARKER, LEGACY_MARKER)):
         raise PatchError("duplicate FCC modification marker")
@@ -317,17 +354,7 @@ def patch_text(text: str) -> str:
                 echo '<td align="left" style="font-weight:bold;color:#464646;white-space:normal;overflow-wrap:anywhere;word-break:normal;width:12ch;min-width:12ch;max-width:12ch;">&nbsp;<b>'.$dvsModsNameHtml.'</b></td>';
 '''
     text = text[:start] + replacement + text[end:]
-    token = 'if ((is_numeric($listElem[2]) || strpos($listElem[2], "openSPOT") !== FALSE)'
-    if text.count(token) != 1:
-        raise PatchError(f"unsupported or ambiguous Gateway Activity callsign anchor: {text.count(token)} matches")
-    insertion = text.rfind("\n", 0, text.index(token)) + 1
-    indent = text[insertion:text.index(token)]
-    return text[:insertion] + indent + '''if (strtoupper(trim((string)$listElem[1])) === "NXDN") {
-                    $listElem[2] = dvsModsNxdnIdCallsign($listElem[2]);
-                } else {
-                    $listElem[2] = dvsModsDmrIdCallsign($listElem[2]);
-                }
-''' + text[insertion:]
+    return ensure_nxdn_dispatch(text)
 
 
 def patch_file(path: Path) -> None:

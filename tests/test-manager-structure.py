@@ -22,6 +22,8 @@ def require(condition: bool, message: str) -> None:
 def main() -> None:
     master = MASTER.read_text()
     mmdvm = MMDVM.read_text()
+    require('"1) Install/Upgrade all standard DVSwitch repairs and modifications"' in master,
+            "menu option 1 must state that it installs or upgrades standard modifications")
 
     children = (
         "manage-mmdvm-spacing.sh",

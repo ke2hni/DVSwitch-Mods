@@ -58,6 +58,21 @@ require(changed.count("width:12ch;min-width:12ch;max-width:12ch") == 1, "Name-ce
 require(changed.count("overflow-wrap:anywhere") == 1, "Name-cell overflow wrapping missing")
 require("width:640px" not in changed, "fixture unexpectedly contained layout width")
 require(patcher.patch_text(changed) == changed, "patch is not idempotent")
+existing_dashboard_without_nxdn = changed.replace(
+    '''if (strtoupper(trim((string)$listElem[1])) === "NXDN") {
+                    $listElem[2] = dvsModsNxdnIdCallsign($listElem[2]);
+                } else {
+                    $listElem[2] = dvsModsDmrIdCallsign($listElem[2]);
+                }
+''', '                    $listElem[2] = dvsModsDmrIdCallsign($listElem[2]);\n', 1)
+require("dvsModsNxdnIdCallsign($listElem[2])" not in existing_dashboard_without_nxdn,
+        "failed to prepare the installed FCC dashboard missing only NXDN dispatch")
+repaired_existing_dashboard = patcher.patch_text(existing_dashboard_without_nxdn)
+require("dvsModsNxdnIdCallsign($listElem[2])" in repaired_existing_dashboard and
+        "dvsModsDmrIdCallsign($listElem[2])" in repaired_existing_dashboard,
+        "existing FCC dashboard missing NXDN dispatch was not upgraded")
+require(patcher.patch_text(repaired_existing_dashboard) == repaired_existing_dashboard,
+        "NXDN dispatch repair of an existing dashboard is not idempotent")
 legacy_country_upgrade = changed.replace(patcher.NAME_BLOCK, patcher.OLD_NAME_BLOCK, 1).replace(patcher.MARKER, patcher.PREVIOUS_MARKER, 1)
 require(legacy_country_upgrade != changed, "failed to prepare legacy country-fallback fixture")
 require(patcher.patch_text(legacy_country_upgrade) == changed, "existing country-fallback installation was not upgraded")
