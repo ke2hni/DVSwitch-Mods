@@ -13,7 +13,8 @@ LEGACY_MARKER = "// DVSwitch-Mods: FCC first-name activity columns v1"
 OLDER_MARKER = "// DVSwitch-Mods: FCC first-name activity columns v2"
 PREVIOUS_MARKER = "// DVSwitch-Mods: FCC first-name activity columns v3"
 PREVIOUS_NAME_MARKER = "// DVSwitch-Mods: FCC first-name activity columns v4"
-MARKER = "// DVSwitch-Mods: FCC first-name activity columns v5"
+PREVIOUS_NXDN_MARKER = "// DVSwitch-Mods: FCC first-name activity columns v5"
+MARKER = "// DVSwitch-Mods: FCC first-name activity columns v6"
 PREVIOUS_LEGEND_MARKERS = (
     "<!-- DVSwitch-Mods: manual callsign names legend v1 -->",
     "<!-- DVSwitch-Mods: manual callsign names legend v2 -->",
@@ -250,12 +251,12 @@ def upgrade_legacy_name_region(text: str) -> str:
 
 
 def patch_text(text: str) -> str:
-    supported_markers = (MARKER, PREVIOUS_NAME_MARKER, PREVIOUS_MARKER, OLDER_MARKER)
+    supported_markers = (MARKER, PREVIOUS_NXDN_MARKER, PREVIOUS_NAME_MARKER, PREVIOUS_MARKER, OLDER_MARKER)
     if sum(text.count(marker) for marker in supported_markers) == 1:
         required = (INCLUDE, "dvsModsFccFirstName($listElem[2])",
                     "dvsModsDmrIdCallsign($listElem[2])", "<th>Name</th>")
         if text.count(MARKER) == 0:
-            old_marker = next(marker for marker in (PREVIOUS_NAME_MARKER, PREVIOUS_MARKER, OLDER_MARKER)
+            old_marker = next(marker for marker in (PREVIOUS_NXDN_MARKER, PREVIOUS_NAME_MARKER, PREVIOUS_MARKER, OLDER_MARKER)
                               if text.count(marker) == 1)
             text = once(text, old_marker, MARKER, "FCC patch version marker")
         if any(text.count(token) != 1 for token in required):
@@ -321,7 +322,12 @@ def patch_text(text: str) -> str:
         raise PatchError(f"unsupported or ambiguous Gateway Activity callsign anchor: {text.count(token)} matches")
     insertion = text.rfind("\n", 0, text.index(token)) + 1
     indent = text[insertion:text.index(token)]
-    return text[:insertion] + indent + "$listElem[2] = dvsModsDmrIdCallsign($listElem[2]);\n" + text[insertion:]
+    return text[:insertion] + indent + '''if (strtoupper(trim((string)$listElem[1])) === "NXDN") {
+                    $listElem[2] = dvsModsNxdnIdCallsign($listElem[2]);
+                } else {
+                    $listElem[2] = dvsModsDmrIdCallsign($listElem[2]);
+                }
+''' + text[insertion:]
 
 
 def patch_file(path: Path) -> None:

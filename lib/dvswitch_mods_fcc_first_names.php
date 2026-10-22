@@ -104,6 +104,27 @@ function dvsModsDmrIdCallsign($rawCallsign) {
     return $cache[$value] = $callsign;
 }
 
+function dvsModsNxdnIdCallsign($rawCallsign, $databasePath = '/var/lib/mmdvm/NXDN.csv') {
+    static $cache = array();
+    $value = trim((string)$rawCallsign);
+    if (!preg_match('/^[0-9]{1,5}$/D', $value)) { return $value; }
+    if (array_key_exists($value, $cache)) { return $cache[$value]; }
+    if (!is_readable($databasePath)) { return $cache[$value] = $value; }
+    $handle = @fopen($databasePath, 'r');
+    if ($handle === false) { return $cache[$value] = $value; }
+    $callsign = false;
+    while (($row = fgetcsv($handle)) !== false) {
+        if (!isset($row[0], $row[1])) { continue; }
+        $id = trim((string)$row[0]);
+        $candidate = strtoupper(trim((string)$row[1]));
+        if ($id !== $value || !preg_match('/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{3,10}$/D', $candidate)) { continue; }
+        if ($callsign !== false && $callsign !== $candidate) { fclose($handle); return $cache[$value] = $value; }
+        $callsign = $candidate;
+    }
+    fclose($handle);
+    return $cache[$value] = ($callsign !== false ? $callsign : $value);
+}
+
 function dvsModsFccFirstName($rawCallsign) {
     static $cache = array();
     $callsign = dvsModsNormalizeLookupCallsign($rawCallsign);

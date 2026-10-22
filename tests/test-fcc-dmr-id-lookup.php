@@ -14,6 +14,12 @@ function requireSame($expected, $actual, $message) {
 }
 
 $dmrIDline = "1023007 VA3BOC Hans Juergen\n3220537 N4YZP Walter\n3220538 KI5FFE Robert\n3300360 WP4J Manuel\n4000001 BAD-CALL Name\n5000001 K1ABC One\n5000001 K2ABC Two\n5151594 DX1E Elite Hamster Club Inc\n5301034 ZL2BEZ Paul\n5301049 ZL2BEZ Paul\n6000001 K1DUP First Value\n6000002 K1DUP Second Value\n7000001 K1BAD Unknown\n7000002 K2BAD ---\n7000003 K3BAD 12345\n8000001 SP1ABC Łukasz\n8000002 WD1V John\n8100001 KD3CVZ Richard\n8100002 W6GPS Don\n8100003 N4KF Test Name\n";
+$nxdnPath = tempnam(sys_get_temp_dir(), 'nxdn-ids-');
+file_put_contents($nxdnPath, "RADIO_ID,CALLSIGN,FIRST_NAME,LAST_NAME,CITY,STATE,COUNTRY,REMARKS\n14051,K1NXD,Alex,Radio,Town,NJ,USA,Test\n10257,W2NXD,Sam,Radio,Town,NJ,USA,Test\n34741,K3NXD,Lee,Radio,Town,NJ,USA,Test\n");
+requireSame('K1NXD', dvsModsNxdnIdCallsign('14051', $nxdnPath), 'five-digit NXDN ID was not resolved');
+requireSame('10257', dvsModsNxdnIdCallsign('10257', $nxdnPath), 'non-callsign CSV record was accepted');
+requireSame('1234567', dvsModsNxdnIdCallsign('1234567', $nxdnPath), 'NXDN resolver changed a seven-digit DMR ID');
+unlink($nxdnPath);
 requireSame('N4YZP', dvsModsDmrIdCallsign('3220537'), 'observed DMR ID was not resolved');
 requireSame('KI5FFE', dvsModsDmrIdCallsign(' 3220538 '), 'trimmed DMR ID was not resolved');
 requireSame('KE2HNI/INFO', dvsModsDmrIdCallsign('KE2HNI/INFO'), 'ordinary suffixed callsign changed');
